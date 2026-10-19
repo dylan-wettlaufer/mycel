@@ -1,0 +1,2 @@
+// Source structure extraction.
+export {};
