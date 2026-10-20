@@ -2,23 +2,29 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serveStatic } from "@hono/node-server/serve-static";
-import type { HealthResponse } from "@mycel/shared";
+import type { HealthResponse, ProjectInfo } from "@mycel/shared";
 import { Hono } from "hono";
 
-const defaultWebDistPath = fileURLToPath(
+export const defaultWebDistPath = fileURLToPath(
   new URL("../../../apps/web/dist/", import.meta.url),
 );
 
-interface AppOptions {
+export interface AppOptions {
   webDistPath?: string;
+  project?: ProjectInfo;
 }
 
-export function createApp({ webDistPath = defaultWebDistPath }: AppOptions = {}) {
+export function createApp({ webDistPath = defaultWebDistPath, project }: AppOptions = {}) {
   const app = new Hono();
 
   app.get("/api/health", (context) => {
     const response: HealthResponse = { status: "ok" };
     return context.json(response);
+  });
+
+  app.get("/api/project", (context) => {
+    if (!project) return context.json({ error: "No repository selected" }, 503);
+    return context.json(project);
   });
 
   // API misses must never fall through to the frontend's HTML entry point.

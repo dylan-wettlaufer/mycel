@@ -79,3 +79,16 @@ test("health still works when the frontend has not been built", async (t) => {
   const page = await app.request("/", { headers: { Accept: "text/html" } });
   assert.equal(page.status, 404);
 });
+
+test("project endpoint returns the selected repository rather than the server's directory", async () => {
+  const project = { name: "selected-repository", root: "/projects/selected-repository" };
+  const response = await createApp({ project }).request("/api/project");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), project);
+});
+
+test("project endpoint reports when no repository has been selected", async () => {
+  const response = await createApp().request("/api/project");
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "No repository selected" });
+});

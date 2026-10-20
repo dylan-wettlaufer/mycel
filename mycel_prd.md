@@ -5,12 +5,12 @@
 **Product:** Local-first, open-source developer tool\
 **Initial platform:** macOS, Linux, and Windows where Node.js and native
 dependencies are supported\
-**Primary command:** `mycel web`
+**Primary command:** `mycel`
 
 ## 1. Product overview
 
 **Mycel** is a local-first tool for understanding how a codebase changes
-while humans and AI coding agents work on it. Running `mycel web` inside
+while humans and AI coding agents work on it. Running `mycel` inside
 a repository launches a browser dashboard backed by an independently
 maintained, continuously updated structural graph of the source code.
 
@@ -50,7 +50,7 @@ than a static diagram or an agent-maintained architecture document.
   -----------------------------------------------------------------------
   ID                      Requirement             Acceptance behavior
   ----------------------- ----------------------- -----------------------
-  R1                      Local launch            `mycel web` run at a
+  R1                      Local launch            `mycel` run at a
                                                   repository root starts
                                                   a loopback-only server
                                                   and opens the
@@ -115,7 +115,7 @@ workspaces, and languages beyond TypeScript/TSX.
 
 ### Primary workflow
 
-1.  In a TypeScript repository, run `mycel web`.
+1.  In a TypeScript repository, run `mycel`.
 2.  Mycel performs an initial index and opens the local dashboard.
 3.  Search for a file/function and inspect its immediate relationships.
 4.  Modify source code manually or using any coding agent.
@@ -242,7 +242,7 @@ repository.
 
 The core MVP is complete when:
 
--   `mycel web` launches a working local dashboard.
+-   `mycel` launches a working local dashboard.
 -   A TypeScript/TSX repository indexes into queryable nodes and
     resolved relationships.
 -   Users can search, navigate bounded neighborhoods, and open source
@@ -280,7 +280,7 @@ agreed implementation plan.
 -   [ ] Initialize Vite + React, Tailwind, shadcn/ui, and the Mycel
     theme.
 -   [ ] Create a Hono server with GET /api/health.
--   [ ] Implement mycel web: resolve the current repository, start the
+-   [x] Implement `mycel`: resolve the current repository, start the
     server, and open the browser.
 -   [ ] Serve compiled frontend assets from Hono for production CLI
     usage.
@@ -395,7 +395,7 @@ agreed implementation plan.
 -   [ ] Handle shutdown, stale processes, unavailable ports, and
     database recovery.
 -   [ ] Build the React frontend and bundle it with the CLI package.
--   [ ] Test installation and mycel web outside the monorepo.
+-   [ ] Test installation and mycel outside the monorepo.
 -   [ ] Write README, architecture documentation, and a short demo
     walkthrough.
 -   [ ] Publish an initial open-source release after confirming

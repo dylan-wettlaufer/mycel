@@ -12,7 +12,7 @@
     "build": "pnpm -r build",
     "dev:server": "pnpm --filter @mycel/server dev",
     "dev:web": "pnpm --filter @mycel/web dev",
-    "start": "pnpm --filter @mycel/server start",
+    "start": "node packages/cli/dist/bin.js",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm run build && pnpm -r typecheck"
   },

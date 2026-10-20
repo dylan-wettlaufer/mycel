@@ -4,6 +4,9 @@
   "private": true,
   "description": "Command-line entry point and application lifecycle.",
   "type": "module",
+  "bin": {
+    "mycel": "./dist/bin.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -15,11 +18,17 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "start": "node dist/bin.js",
+    "test": "pnpm --filter @mycel/web build && pnpm --filter @mycel/cli... build && node --test test/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mycel/server": "workspace:*",
     "@mycel/core": "workspace:*",
-    "@mycel/shared": "workspace:*"
+    "@mycel/server": "workspace:*",
+    "@mycel/shared": "workspace:*",
+    "open": "^11.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
   }
 }

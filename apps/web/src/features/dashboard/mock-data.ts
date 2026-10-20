@@ -1,15 +1,9 @@
-import type { ActivityEvent, DashboardStat, ProjectSummary } from "./types";
+import type { ActivityEvent, DashboardStat } from "./types";
 
 // Placeholder data until the server exposes real query APIs (see PRD phase 2+).
 const now = Date.now();
 const minutesAgo = (minutes: number): string =>
   new Date(now - minutes * 60_000).toISOString();
-
-export const project: ProjectSummary = {
-  name: "example-project",
-  root: "~/projects/example-project",
-  lastIndexedAt: minutesAgo(1),
-};
 
 export const stats: DashboardStat[] = [
   { id: "files", label: "Files", value: "148", detail: "TypeScript and TSX" },

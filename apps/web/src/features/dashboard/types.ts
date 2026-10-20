@@ -18,9 +18,3 @@ export interface ActivityEvent {
   /** ISO 8601 timestamp. */
   occurredAt: string;
 }
-
-export interface ProjectSummary {
-  name: string;
-  root: string;
-  lastIndexedAt: string;
-}

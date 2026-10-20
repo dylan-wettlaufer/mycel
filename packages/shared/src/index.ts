@@ -1,1 +1,1 @@
-export type { HealthResponse } from "./types.js";
+export type { HealthResponse, ProjectInfo } from "./types.js";

@@ -1,6 +1,12 @@
+import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { startServer } from "./server.js";
 
-const server = startServer();
+// The standalone development server targets the Mycel workspace.
+// The CLI supplies the repository selected by the user's working directory.
+const root = fileURLToPath(new URL("../../../", import.meta.url));
+const server = startServer(3000, { project: { name: basename(root), root } });
 
 server.on("listening", () => {
   console.info("Mycel server listening at http://127.0.0.1:3000");

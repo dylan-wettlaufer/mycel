@@ -3,6 +3,39 @@
 See your codebase evolve. Mycel is a local-first developer tool for
 understanding structural changes in a codebase.
 
+## Open a repository
+
+Run `mycel` from a repository or any of its subdirectories:
+
+```sh
+cd /path/to/your/repository
+mycel
+```
+
+Mycel resolves the Git working-tree root, starts one local server, and opens the
+dashboard in your default browser. Outside Git, it opens the current folder.
+The dashboard shows the selected repository's name and absolute path. The
+terminal stays running; press Ctrl+C to stop the server.
+
+Each launch uses an available port on `127.0.0.1` and prints the dashboard URL.
+Use `mycel --no-open` when you want to open the URL yourself, or `mycel --help`
+for usage. No subcommand is required.
+
+### Install from source
+
+Requires Node.js 22 or newer and pnpm 10.34.7. From the Mycel workspace:
+
+```sh
+pnpm install
+pnpm build
+npx pnpm@10.34.7 link --global ./packages/cli
+```
+
+If pnpm reports that its global bin directory is missing from PATH, run
+`pnpm setup`, restart your shell, and retry the link command. Linking keeps the
+command connected to this checkout; rebuild after changing source code. The
+CLI and compiled dashboard must remain in the checkout together.
+
 ## Workspace
 
 | Directory | Package | Responsibility |
@@ -19,8 +52,9 @@ understanding structural changes in a codebase.
 shadcn/ui; it currently renders a dashboard shell with placeholder data. The
 Hono backend in `packages/server` serves the built dashboard and exposes a
 health endpoint. The dashboard connection badge polls that endpoint; the
-remaining dashboard data is still a placeholder. The CLI, core,
-parser, and database implementations are planned in [the PRD](mycel_prd.md).
+repository identity comes from `/api/project`. Indexing, graph statistics, and
+activity are still placeholders; core, parser, and database implementations
+are planned in [the PRD](mycel_prd.md).
 
 ## Development
 
@@ -52,19 +86,21 @@ pnpm dev:web
 ```
 
 Open http://127.0.0.1:5173. Vite proxies `/api` requests to Hono at
-http://127.0.0.1:3000, so the frontend always uses relative API URLs.
+http://127.0.0.1:3000, so the frontend always uses relative API URLs. The
+standalone development server selects the Mycel workspace itself.
 
-For production, build once and start only Hono:
+To launch Mycel directly from the workspace without globally linking it:
 
 ```sh
 pnpm build
 pnpm start
 ```
 
-Open http://127.0.0.1:3000. One Node.js server serves both `/api` and the compiled
-Vite application in `apps/web/dist`; a Vite process is not needed. Static paths
-are resolved relative to the server module, independent of the working
-directory. Browser navigation to client routes serves `index.html`; unknown
+This is the same default launch as `mycel`: the browser opens automatically at
+the URL printed in the terminal. One Node.js process serves both `/api` and the
+compiled Vite application in `apps/web/dist`; a Vite process is not needed.
+Static paths are resolved relative to the server module, independent of the
+working directory. Browser navigation to client routes serves `index.html`; unknown
 API routes and missing assets return 404.
 
 The connection badge starts at **Checking…**, then displays **Connected** only
@@ -74,18 +110,20 @@ shows **Disconnected** on errors or after a three-second request timeout.
 Check that the process is responding:
 
 ```sh
-curl http://127.0.0.1:3000/api/health
+curl 'http://127.0.0.1:<port>/api/health'
 # {"status":"ok"}
 ```
 
-The health endpoint currently checks process liveness. Indexing and database
-readiness are not implemented yet. The server binds only to the loopback
-interface. Stop it with Ctrl+C.
+Replace `<port>` with the port printed by `mycel` (or use port 3000 for
+`pnpm dev:server`). The health endpoint currently checks process liveness.
+Indexing and database readiness are not implemented yet. The server binds
+only to the loopback interface. Stop it with Ctrl+C.
 
-To run the compiled server, build first with `pnpm build`, then run
-`pnpm --filter @mycel/server start`. The package also exports `createApp()` for
-in-process requests and `startServer(port = 3000)` for the future CLI. Importing
-the package does not start a listener.
+For a fixed-port server without browser launch, build first with `pnpm build`,
+then run `pnpm --filter @mycel/server start` at http://127.0.0.1:3000. The server
+package exports `createApp(options)` for in-process requests and
+`startServer(port = 3000, options)` for the CLI. Importing either the server or
+CLI package does not start a listener or open a browser.
 
 Add shadcn/ui components from `apps/web`, for example
 `pnpm dlx shadcn@latest add dialog`. Generated components land in

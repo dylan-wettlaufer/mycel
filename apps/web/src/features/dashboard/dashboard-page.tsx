@@ -9,7 +9,7 @@ import {
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-import { activity, project, stats } from "./mock-data";
+import { activity, stats } from "./mock-data";
 import type { ChangeKind } from "./types";
 
 const changeStyles: Record<ChangeKind, string> = {
@@ -18,13 +18,21 @@ const changeStyles: Record<ChangeKind, string> = {
   deleted: "text-destructive border-destructive/40",
 };
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  project: ProjectInfo | null;
+  projectError: boolean;
+}
+
+export function DashboardPage({ project, projectError }: DashboardPageProps) {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p className="text-sm text-muted-foreground">
-          {project.root} · indexed {formatRelativeTime(project.lastIndexedAt)}
+          {project?.root ?? (projectError ? "Repository details unavailable" : "Connecting to repository…")}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Indexing is not implemented yet. Statistics and activity below are sample data.
         </p>
       </div>
 
@@ -77,3 +85,4 @@ export function DashboardPage() {
     </div>
   );
 }
+import type { ProjectInfo } from "@mycel/shared";
