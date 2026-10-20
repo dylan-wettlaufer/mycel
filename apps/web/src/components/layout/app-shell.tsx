@@ -45,7 +45,7 @@ export function AppShell({ projectName, connection, children }: AppShellProps) {
                 "disabled:cursor-not-allowed disabled:opacity-50",
                 label === "Dashboard"
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-muted-foreground enabled:hover:bg-sidebar-accent/60",
+                  : "text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
               )}
             >
               <Icon className="size-4" aria-hidden />
