@@ -1,2 +1,1 @@
-// Shared contracts and utilities.
-export {};
+export type { HealthResponse } from "./types.js";

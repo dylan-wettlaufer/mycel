@@ -17,8 +17,8 @@ understanding structural changes in a codebase.
 
 `apps/web` is a Vite + React + TypeScript app styled with Tailwind CSS v4 and
 shadcn/ui; it currently renders a dashboard shell with placeholder data. The
-other packages are still TypeScript module scaffolds. The CLI, server, parser,
-and database implementations are planned in [the PRD](mycel_prd.md).
+Hono backend in `packages/server` exposes a health endpoint. The CLI, core,
+parser, and database implementations are planned in [the PRD](mycel_prd.md).
 
 ## Development
 
@@ -29,6 +29,7 @@ If pnpm is unavailable, run `npx pnpm@10.34.7` in place of `pnpm` below.
 pnpm install
 pnpm build
 pnpm typecheck
+pnpm test
 ```
 
 Build runs in dependency order and emits JavaScript, declarations, and source
@@ -46,6 +47,28 @@ To run the dashboard with hot reload at http://127.0.0.1:5173:
 ```sh
 pnpm dev:web
 ```
+
+To run the Hono backend with automatic restarts at http://127.0.0.1:3000:
+
+```sh
+pnpm dev:server
+```
+
+Check that the process is responding:
+
+```sh
+curl http://127.0.0.1:3000/api/health
+# {"status":"ok"}
+```
+
+The health endpoint currently checks process liveness. Indexing and database
+readiness are not implemented yet. The server binds only to the loopback
+interface. Stop it with Ctrl+C.
+
+To run the compiled server, build first with `pnpm build`, then run
+`pnpm --filter @mycel/server start`. The package also exports `createApp()` for
+in-process requests and `startServer(port = 3000)` for the future CLI. Importing
+the package does not start a listener.
 
 Add shadcn/ui components from `apps/web`, for example
 `pnpm dlx shadcn@latest add dialog`. Generated components land in

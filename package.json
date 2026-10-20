@@ -10,7 +10,9 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "dev:server": "pnpm --filter @mycel/server dev",
     "dev:web": "pnpm --filter @mycel/web dev",
+    "test": "pnpm -r --if-present test",
     "typecheck": "pnpm run build && pnpm -r typecheck"
   },
   "devDependencies": {
