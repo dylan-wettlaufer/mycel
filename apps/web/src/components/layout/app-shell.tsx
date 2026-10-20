@@ -3,6 +3,7 @@ import { Activity, FolderTree, LayoutDashboard, Network, Waypoints } from "lucid
 import type { LucideIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import type { ConnectionStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -21,7 +22,7 @@ const navItems: NavItem[] = [
 
 interface AppShellProps {
   projectName: string;
-  connection: "connected" | "disconnected";
+  connection: ConnectionStatus;
   children: ReactNode;
 }
 
@@ -58,15 +59,23 @@ export function AppShell({ projectName, connection, children }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b px-4 md:px-6">
           <h1 className="truncate text-sm font-medium">{projectName}</h1>
-          <Badge variant="outline" className="gap-1.5">
+          <Badge variant="outline" className="gap-1.5" role="status">
             <span
               aria-hidden
               className={cn(
                 "size-1.5 rounded-full",
-                connection === "connected" ? "bg-success" : "bg-destructive",
+                connection === "connected"
+                  ? "bg-success"
+                  : connection === "checking"
+                    ? "bg-muted-foreground"
+                    : "bg-destructive",
               )}
             />
-            {connection === "connected" ? "Connected" : "Disconnected"}
+            {connection === "connected"
+              ? "Connected"
+              : connection === "checking"
+                ? "Checking…"
+                : "Disconnected"}
           </Badge>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>

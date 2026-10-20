@@ -8,7 +8,6 @@ const minutesAgo = (minutes: number): string =>
 export const project: ProjectSummary = {
   name: "example-project",
   root: "~/projects/example-project",
-  status: "connected",
   lastIndexedAt: minutesAgo(1),
 };
 

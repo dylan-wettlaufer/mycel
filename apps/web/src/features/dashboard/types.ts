@@ -22,6 +22,5 @@ export interface ActivityEvent {
 export interface ProjectSummary {
   name: string;
   root: string;
-  status: "connected" | "disconnected";
   lastIndexedAt: string;
 }

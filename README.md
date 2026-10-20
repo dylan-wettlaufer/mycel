@@ -17,7 +17,9 @@ understanding structural changes in a codebase.
 
 `apps/web` is a Vite + React + TypeScript app styled with Tailwind CSS v4 and
 shadcn/ui; it currently renders a dashboard shell with placeholder data. The
-Hono backend in `packages/server` exposes a health endpoint. The CLI, core,
+Hono backend in `packages/server` serves the built dashboard and exposes a
+health endpoint. The dashboard connection badge polls that endpoint; the
+remaining dashboard data is still a placeholder. The CLI, core,
 parser, and database implementations are planned in [the PRD](mycel_prd.md).
 
 ## Development
@@ -42,17 +44,32 @@ Internal dependencies use `workspace:*` and imports use package names such as
 core depends on parser and db. Shared is available to every consumer, and web
 depends only on shared to keep backend modules out of the browser.
 
-To run the dashboard with hot reload at http://127.0.0.1:5173:
-
-```sh
-pnpm dev:web
-```
-
-To run the Hono backend with automatic restarts at http://127.0.0.1:3000:
+For development with hot reload, run these commands in separate terminals:
 
 ```sh
 pnpm dev:server
+pnpm dev:web
 ```
+
+Open http://127.0.0.1:5173. Vite proxies `/api` requests to Hono at
+http://127.0.0.1:3000, so the frontend always uses relative API URLs.
+
+For production, build once and start only Hono:
+
+```sh
+pnpm build
+pnpm start
+```
+
+Open http://127.0.0.1:3000. One Node.js server serves both `/api` and the compiled
+Vite application in `apps/web/dist`; a Vite process is not needed. Static paths
+are resolved relative to the server module, independent of the working
+directory. Browser navigation to client routes serves `index.html`; unknown
+API routes and missing assets return 404.
+
+The connection badge starts at **Checking…**, then displays **Connected** only
+after a successful health response. It checks again every five seconds and
+shows **Disconnected** on errors or after a three-second request timeout.
 
 Check that the process is responding:
 
