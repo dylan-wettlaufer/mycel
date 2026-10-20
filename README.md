@@ -15,9 +15,10 @@ understanding structural changes in a codebase.
 | `packages/shared` | `@mycel/shared` | Shared contracts and utilities |
 | `apps/web` | `@mycel/web` | Browser dashboard |
 
-These packages currently contain TypeScript module scaffolds. The CLI,
-server, parser, database, and dashboard implementations are planned in
-[the PRD](mycel_prd.md).
+`apps/web` is a Vite + React + TypeScript app styled with Tailwind CSS v4 and
+shadcn/ui; it currently renders a dashboard shell with placeholder data. The
+other packages are still TypeScript module scaffolds. The CLI, server, parser,
+and database implementations are planned in [the PRD](mycel_prd.md).
 
 ## Development
 
@@ -39,6 +40,16 @@ Internal dependencies use `workspace:*` and imports use package names such as
 `@mycel/shared`. The CLI depends on server and core; server depends on core;
 core depends on parser and db. Shared is available to every consumer, and web
 depends only on shared to keep backend modules out of the browser.
+
+To run the dashboard with hot reload at http://127.0.0.1:5173:
+
+```sh
+pnpm dev:web
+```
+
+Add shadcn/ui components from `apps/web`, for example
+`pnpm dlx shadcn@latest add dialog`. Generated components land in
+`apps/web/src/components/ui`.
 
 To build one package and its dependencies:
 
