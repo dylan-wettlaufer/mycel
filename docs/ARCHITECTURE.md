@@ -62,7 +62,7 @@ implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
 | `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: `/api/health`, `/api/project`, static serving |
 | `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Planned (empty scaffold) |
 | `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
-| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Planned (empty scaffold) |
+| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: connection setup, initial schema, transactional migrations; graph queries planned |
 | `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: project/graph/query contracts, health, source ranges, diagnostics |
 | `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
 | `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
@@ -134,8 +134,9 @@ write, and browser delivery.
 ## Data model (planned)
 
 Types live in `@mycel/shared` so the backend and browser agree on shapes.
-Structural graph, project, query, and health contracts are now defined; storage,
-ID/hash generation, and query execution remain planned. See the
+Structural graph, project, query, and health contracts are now defined. SQLite
+connection setup and the initial graph schema/migrations are implemented;
+graph writes/queries and ID/hash generation remain planned. See the
 [shared contract semantics](../packages/shared/README.md).
 
 | Entity | Key fields |
@@ -222,14 +223,19 @@ the prebuilt `apps/web/dist`, and Vite is not used at runtime.
   local dashboard, which guards against DNS rebinding and cross-site reads.
   **Planned.**
 - Store application data outside the tracked repository by default.
-  **Planned.**
+  **Current in db.** Default paths use a per-user data directory, and explicit
+  database destinations inside the repository are rejected, including symlinks.
 
-## Storage location (planned)
+## Storage location
 
-The database lives outside the repository so it is never committed. The
-proposed location is a per-user Mycel data directory with one database per
-project, keyed by a hash of the repository root. The exact path for each
-operating system is an open decision; see [`tasks/db.md`](tasks/db.md).
+`resolveDatabasePath` selects one database per canonical repository root, named
+by its SHA-256 hash, outside the repository. macOS uses
+`~/Library/Application Support/Mycel`, Linux uses `$XDG_DATA_HOME/mycel`
+(falling back to `~/.local/share/mycel`), and Windows uses `%LOCALAPPDATA%\\Mycel`
+(falling back to `~\\AppData\\Local\\Mycel`). Databases live in a `projects/`
+subdirectory. Explicit absolute paths are supported and checked against the
+repository root. CLI integration remains planned. See
+[database usage](../packages/db/README.md).
 
 ## Testing strategy
 
@@ -240,7 +246,8 @@ operating system is an open decision; see [`tasks/db.md`](tasks/db.md).
 | Server | `node --test` (`packages/server/test`) | Health, project, static serving, API 404s |
 | Web | Vitest + Testing Library (jsdom) | Health polling, app rendering with project data |
 | Parser | `node --test` (`packages/parser/test`) | TS/TSX fixtures, containment, imports/exports, callers, recovery, ranges, identities, large files |
-| Db, core | Planned: fixture repositories and in-memory SQLite | None yet |
+| Database | `node --test` (`packages/db/test`) | Migrations, constraints, rollback, revisions, project isolation, disk persistence, external paths |
+| Core | Planned: fixture repositories | None yet |
 | End to end | Planned | None yet |
 
 The MVP acceptance test from the PRD: start Mycel on a small TypeScript
@@ -290,8 +297,9 @@ These need a decision before or during the relevant phase:
    `tree-sitter-typescript@0.23.2`, matching the grammar's peer dependency.
    This gives the Node backend a synchronous API without WASM initialization
    or asset loading. See [parser usage](../packages/parser/README.md).
-3. **Data directory.** Exact per-OS location and whether a `--data-dir` option
-   is needed.
+3. **Data directory.** Resolved for db: platform per-user Mycel directories with
+   one file per canonical repository root. Whether the CLI exposes `--data-dir`
+   remains open.
 4. **History retention.** How many snapshots and events to keep, and whether it
    can be configured.
 5. **Rename detection.** Chokidar reports a rename as unlink plus add; whether

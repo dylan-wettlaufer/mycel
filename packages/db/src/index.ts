@@ -1,2 +1,5 @@
-// SQLite persistence and queries.
-export {};
+export { openDatabase } from "./database.js";
+export type { OpenDatabaseOptions, SqliteDatabase } from "./database.js";
+export { migrateDatabase } from "./migrate.js";
+export type { Migration } from "./migrations/index.js";
+export { resolveDatabasePath } from "./paths.js";

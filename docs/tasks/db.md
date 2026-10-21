@@ -8,22 +8,28 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 
 ## Current state
 
-- Empty scaffold (`src/index.ts`).
+- `openDatabase` configures connections and applies transactional migrations.
+- Initial strict schema for projects, nodes, edges, diagnostics, revisions,
+  and migration history, with integrity constraints and lookup indexes.
+- Canonical per-repository paths in the platform's per-user Mycel data directory;
+  explicit overrides are checked to stay outside the repository.
+- Tests use in-memory databases and temporary external storage. See
+  [package usage and schema](../../packages/db/README.md).
 
 ## Tasks
 
 ### Phase 2: setup and schema
 
-- [ ] Add `better-sqlite3` and its types, and allow its build script in
+- [x] Add `better-sqlite3` and its types, and allow its build script in
       `pnpm.onlyBuiltDependencies`.
-- [ ] Decide the data directory (open decision 3). Implement
+- [x] Decide the data directory (open decision 3). Implement
       `resolveDatabasePath(projectRoot)` that returns a per-project file
       outside the repository.
-- [ ] Open connections with WAL mode, foreign keys on, and a busy timeout.
-- [ ] Write a migration runner with a `schema_migrations` table and ordered
+- [x] Open connections with WAL mode, foreign keys on, and a busy timeout.
+- [x] Write a migration runner with a `schema_migrations` table and ordered
       files in `src/migrations/`.
-- [ ] Create tables: `projects`, `nodes`, `edges`, `diagnostics`, `revisions`.
-- [ ] Add indexes for lookup by id, path, qualified name, and edge source and
+- [x] Create tables: `projects`, `nodes`, `edges`, `diagnostics`, `revisions`.
+- [x] Add indexes for lookup by id, path, qualified name, and edge source and
       target.
 - [ ] Add full-text search (FTS5) over node names and paths, or a simpler
       `LIKE` search if FTS5 is not needed yet.
@@ -56,11 +62,15 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 
 - [ ] Recover from a corrupt or locked database with a clear error message and
       an option to rebuild from source.
-- [ ] Handle a schema version newer than the running code.
+- [x] Handle a schema version newer than the running code.
 
 ## Tests
 
-- [ ] Migrations apply cleanly to an empty database and are idempotent.
+- [x] Migrations apply cleanly to an empty database and are idempotent.
+- [x] Failed migration batches and low-level graph transactions leave no partial
+      writes; modified/newer migration histories are rejected.
+- [x] Constraints, project isolation, cascading cleanup, WAL persistence, and
+      external storage paths (including symlinks).
 - [ ] Queries against an in-memory database seeded with a fixture graph.
 - [ ] A failing write inside `commitChangeSet` leaves no partial state.
 - [ ] Event ids are strictly increasing across restarts.
@@ -71,3 +81,6 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
   through these queries.
 - All writes for one change set happen in a single transaction.
 - The database file is never created inside the target repository.
+
+The schema/connection foundation is complete. Public graph queries, file-graph
+replacement, and history/event writes remain unchecked above.
