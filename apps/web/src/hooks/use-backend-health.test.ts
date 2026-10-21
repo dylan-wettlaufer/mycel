@@ -62,9 +62,14 @@ test.each([
 });
 
 test("times out a stalled request and continues polling", async () => {
-  fetchMock.mockImplementationOnce((_input, options) => new Promise((_resolve, reject) => {
-    options?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
-  }));
+  fetchMock.mockImplementationOnce(
+    (_input, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("Aborted", "AbortError")),
+        );
+      }),
+  );
   fetchMock.mockResolvedValueOnce(Response.json({ status: "ok" }));
   const { result } = renderHook(() => useBackendHealth());
 
@@ -77,14 +82,21 @@ test("times out a stalled request and continues polling", async () => {
 
 test("aborts pending requests and stops polling when unmounted", async () => {
   let finishRequest: (response: Response) => void = () => {};
-  fetchMock.mockImplementationOnce(() => new Promise((resolve) => { finishRequest = resolve; }));
+  fetchMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishRequest = resolve;
+      }),
+  );
   const { unmount } = renderHook(() => useBackendHealth());
   const signal = fetchMock.mock.calls[0]?.[1]?.signal;
 
   unmount();
   expect(signal?.aborted).toBe(true);
 
-  await act(async () => { finishRequest(Response.json({ status: "ok" })); });
+  await act(async () => {
+    finishRequest(Response.json({ status: "ok" }));
+  });
   await act(() => vi.advanceTimersByTimeAsync(10_000));
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });

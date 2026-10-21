@@ -14,10 +14,16 @@ export function useProject(connection: ConnectionStatus) {
     const timeout = setTimeout(() => controller.abort(), 3000);
     let disposed = false;
 
-    setError(false);
     fetchProject(controller.signal)
-      .then((response) => { if (!disposed) setProject(response); })
-      .catch(() => { if (!disposed) setError(true); })
+      .then((response) => {
+        if (!disposed) {
+          setProject(response);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        if (!disposed) setError(true);
+      })
       .finally(() => clearTimeout(timeout));
 
     return () => {

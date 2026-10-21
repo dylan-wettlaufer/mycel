@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { Activity, FolderTree, LayoutDashboard, Network, Waypoints } from "lucide-react";
+import {
+  Activity,
+  FolderTree,
+  LayoutDashboard,
+  Network,
+  Waypoints,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";

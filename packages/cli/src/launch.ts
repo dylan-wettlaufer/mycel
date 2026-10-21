@@ -22,7 +22,10 @@ export async function launchDashboard({
   try {
     await access(join(webDistPath, "index.html"));
   } catch (error) {
-    throw new Error("Dashboard build not found. Run pnpm build in the Mycel workspace first.", { cause: error });
+    throw new Error(
+      "Dashboard build not found. Run pnpm build in the Mycel workspace first.",
+      { cause: error },
+    );
   }
 
   // Let the OS choose a free port so other projects and dev servers can coexist.
@@ -39,7 +42,9 @@ export async function launchDashboard({
     await openBrowser(url);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`Could not open the browser (${message}). Open ${url} manually.`);
+    console.warn(
+      `Could not open the browser (${message}). Open ${url} manually.`,
+    );
   }
 
   return { server, project, url };

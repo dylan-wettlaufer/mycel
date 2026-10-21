@@ -7,7 +7,8 @@ import test from "node:test";
 
 import { createApp, startServer } from "../dist/index.js";
 
-const indexHtml = '<!doctype html><html><body><div id="root">Mycel</div></body></html>';
+const indexHtml =
+  '<!doctype html><html><body><div id="root">Mycel</div></body></html>';
 
 async function createWebApp(t) {
   const webDistPath = await mkdtemp(join(tmpdir(), "mycel-web-"));
@@ -20,9 +21,12 @@ async function createWebApp(t) {
 
 test("health responds with JSON over a loopback HTTP connection", async (t) => {
   const server = startServer(0);
-  t.after(() => new Promise((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
-  }));
+  t.after(
+    () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
+  );
   await once(server, "listening");
 
   const address = server.address();
@@ -59,10 +63,22 @@ test("browser navigation to client routes serves the frontend entry point", asyn
 
 test("API misses and missing assets never fall back to frontend HTML", async (t) => {
   const app = await createWebApp(t);
-  for (const path of ["/api", "/api/missing", "/assets/missing.js", "/assets/missing", "/missing.css"]) {
-    const response = await app.request(path, { headers: { Accept: "text/html" } });
+  for (const path of [
+    "/api",
+    "/api/missing",
+    "/assets/missing.js",
+    "/assets/missing",
+    "/missing.css",
+  ]) {
+    const response = await app.request(path, {
+      headers: { Accept: "text/html" },
+    });
     assert.equal(response.status, 404, path);
-    assert.doesNotMatch(response.headers.get("content-type"), /text\/html/, path);
+    assert.doesNotMatch(
+      response.headers.get("content-type"),
+      /text\/html/,
+      path,
+    );
   }
 
   const response = await app.request("/graph", { method: "POST" });
@@ -81,7 +97,10 @@ test("health still works when the frontend has not been built", async (t) => {
 });
 
 test("project endpoint returns the selected repository rather than the server's directory", async () => {
-  const project = { name: "selected-repository", root: "/projects/selected-repository" };
+  const project = {
+    name: "selected-repository",
+    root: "/projects/selected-repository",
+  };
   const response = await createApp({ project }).request("/api/project");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), project);

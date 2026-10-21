@@ -14,7 +14,10 @@ export interface AppOptions {
   project?: ProjectInfo;
 }
 
-export function createApp({ webDistPath = defaultWebDistPath, project }: AppOptions = {}) {
+export function createApp({
+  webDistPath = defaultWebDistPath,
+  project,
+}: AppOptions = {}) {
   const app = new Hono();
 
   app.get("/api/health", (context) => {

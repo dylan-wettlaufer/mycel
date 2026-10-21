@@ -273,13 +273,13 @@ agreed implementation plan.
 
 -   [ ] Audit existing Texo code and identify reusable parser, graph,
     and source-viewer components.
--   [ ] Create a pnpm monorepo with packages for cli, server, core,
+-   [x] Create a pnpm monorepo with packages for cli, server, core,
     parser, db, and shared, plus apps/web.
 -   [ ] Configure TypeScript, linting, formatting, and workspace
     imports.
--   [ ] Initialize Vite + React, Tailwind, shadcn/ui, and the Mycel
+-   [x] Initialize Vite + React, Tailwind, shadcn/ui, and the Mycel
     theme.
--   [ ] Create a Hono server with GET /api/health.
+-   [x] Create a Hono server with GET /api/health.
 -   [x] Implement `mycel`: resolve the current repository, start the
     server, and open the browser.
 -   [ ] Serve compiled frontend assets from Hono for production CLI

@@ -29,14 +29,21 @@ export function DashboardPage({ project, projectError }: DashboardPageProps) {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p className="text-sm text-muted-foreground">
-          {project?.root ?? (projectError ? "Repository details unavailable" : "Connecting to repository…")}
+          {project?.root ??
+            (projectError
+              ? "Repository details unavailable"
+              : "Connecting to repository…")}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Indexing is not implemented yet. Statistics and activity below are sample data.
+          Indexing is not implemented yet. Statistics and activity below are
+          sample data.
         </p>
       </div>
 
-      <section aria-label="Project statistics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Project statistics"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         {stats.map((stat) => (
           <Card key={stat.id} className="gap-2 py-4">
             <CardHeader className="px-4">
@@ -53,13 +60,24 @@ export function DashboardPage({ project, projectError }: DashboardPageProps) {
       <Card>
         <CardHeader>
           <CardTitle>Recent activity</CardTitle>
-          <CardDescription>Latest structural changes detected in the repository.</CardDescription>
+          <CardDescription>
+            Latest structural changes detected in the repository.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="divide-y">
             {activity.map((event) => (
-              <li key={event.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <Badge variant="outline" className={cn("w-20 justify-center", changeStyles[event.kind])}>
+              <li
+                key={event.id}
+                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "w-20 justify-center",
+                    changeStyles[event.kind],
+                  )}
+                >
                   {event.kind}
                 </Badge>
                 <div className="min-w-0 flex-1">
@@ -69,7 +87,9 @@ export function DashboardPage({ project, projectError }: DashboardPageProps) {
                     </span>
                     {event.name}
                   </p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">{event.path}</p>
+                  <p className="truncate font-mono text-xs text-muted-foreground">
+                    {event.path}
+                  </p>
                 </div>
                 <time
                   dateTime={event.occurredAt}

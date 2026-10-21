@@ -12,7 +12,10 @@ test("the dashboard shows backend health and the repository selected by the CLI"
   const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (url) => {
     return url === "/api/health"
       ? Response.json({ status: "ok" })
-      : Response.json({ name: "selected-repository", root: "/projects/selected-repository" });
+      : Response.json({
+          name: "selected-repository",
+          root: "/projects/selected-repository",
+        });
   });
   vi.stubGlobal("fetch", fetchMock);
 
@@ -28,9 +31,14 @@ test("the dashboard shows backend health and the repository selected by the CLI"
 });
 
 test("invalid repository metadata is reported without showing a fake project", async () => {
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockImplementation(async (url) => {
-    return url === "/api/health" ? Response.json({ status: "ok" }) : Response.json({ name: "invalid" });
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>().mockImplementation(async (url) => {
+      return url === "/api/health"
+        ? Response.json({ status: "ok" })
+        : Response.json({ name: "invalid" });
+    }),
+  );
   render(<App />);
   await screen.findByText("Repository details unavailable");
   expect(screen.getByRole("heading", { name: "Mycel" })).toBeTruthy();

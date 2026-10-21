@@ -12,11 +12,22 @@
     "build": "pnpm -r build",
     "dev:server": "pnpm --filter @mycel/server dev",
     "dev:web": "pnpm --filter @mycel/web dev",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,yaml,yml,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,yaml,yml,css,html}\"",
     "start": "node packages/cli/dist/bin.js",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm run build && pnpm -r typecheck"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "@eslint/js": "10.0.1",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.0"
   }
 }
