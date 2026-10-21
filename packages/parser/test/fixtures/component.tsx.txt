@@ -1,0 +1,13 @@
+import type { Props } from './types';
+
+export const Panel = ({ title }: Props) => {
+  const onClick = () => track(title);
+  return <section onClick={onClick}>
+    <Header title={format(title)} />
+    {items.map(item => <Row key={item.id}>{render(item)}</Row>)}
+  </section>;
+};
+
+export default function () {
+  return <><Panel title="🙂" /><footer>{timestamp()}</footer></>;
+}

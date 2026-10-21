@@ -1,0 +1,20 @@
+import Default, { original as renamed, type Shape, type Mode as LocalMode } from "./model";
+import * as utilities from './utilities';
+import type DefaultType from './types';
+import type { OnlyType } from './types';
+import './side-effect';
+import legacy = require('./legacy');
+import escaped from './\u006dodel';
+
+export { renamed, renamed as publicName, type Shape };
+export { external as forwarded, type Remote } from './remote';
+export type { OnlyType as PublicType } from './types';
+export * from './all';
+export * as namespace from './namespace';
+export const { first, second: alias, fallback = 1, ...rest } = record;
+export const [head, , ...tail] = values;
+export interface PublicShape { value: string; }
+export type PublicAlias = string;
+export declare function declared(): void;
+export declare const declaredValue: number;
+export default renamed;

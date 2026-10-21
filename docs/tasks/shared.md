@@ -10,6 +10,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
 
 - `HealthResponse` (`{ status: "ok" }`) and `ProjectInfo` (`{ name, root }`)
   in `src/types.ts`.
+- Browser-safe `SourceRange` and `Diagnostic` contracts used by the parser.
 
 ## Tasks
 
@@ -17,12 +18,12 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
 
 - [ ] Define `NodeKind` (`file`, `function`, `class`, `method`) and
       `EdgeKind` (`CONTAINS`, `IMPORTS`, `CALLS`; reserve `REFERENCES`).
-- [ ] Define `SourceRange` (start and end line and column, plus byte offsets if
-      the parser provides them).
+- [x] Define `SourceRange` with one-based line/column positions and exclusive
+      UTF-16 offsets, matching source slicing in JavaScript.
 - [ ] Define `GraphNode`: id, project id, kind, name, qualified name, path,
       range, content hash, revision.
 - [ ] Define `GraphEdge`: id, source id, target id, kind, revision.
-- [ ] Define `Diagnostic`: path, range, severity, source (`parser` or
+- [x] Define `Diagnostic`: path, range, severity, source (`parser` or
       `resolver`), message.
 - [ ] Extend `ProjectInfo` or add `Project` with id and indexing settings.
 - [ ] Define API response types: `SearchResult`, `NodeDetails` (node plus

@@ -8,6 +8,12 @@
     "node": ">=22",
     "pnpm": ">=10 <11"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "tree-sitter",
+      "tree-sitter-typescript"
+    ]
+  },
   "scripts": {
     "build": "pnpm -r build",
     "dev:server": "pnpm --filter @mycel/server dev",

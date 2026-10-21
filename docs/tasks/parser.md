@@ -1,74 +1,76 @@
 # `@mycel/parser` tasks
 
 Turns TypeScript and TSX source text into structural facts: symbols, their
-locations, imports, exports, and call sites. The parser is pure. It does not read
-the file system, touch SQLite, or know about the server. Cross-file resolution
-happens in `@mycel/core`.
+locations, imports, exports, and call sites. The parser does not read source
+files, touch SQLite, or know about the server. Cross-file resolution belongs
+to `@mycel/core`.
 
-See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
+See [package usage and contracts](../../packages/parser/README.md) and
+[architecture](../ARCHITECTURE.md#change-pipeline-planned).
 
 ## Current state
 
-- Empty scaffold (`src/index.ts`).
+- Fresh Tree-sitter implementation; no Texo code or fixtures reused.
+- Native `tree-sitter@0.21.1` and `tree-sitter-typescript@0.23.2`, pinned to
+  satisfy the grammar package's binding peer dependency. Native bindings keep
+  a synchronous Node API without WASM initialization or asset loading.
+- `parseFile(path, source)` selects the `.ts` or `.tsx` grammar and returns
+  serializable structural facts. Parsing recovers from syntax errors.
 
 ## Tasks
 
 ### Phase 1: decisions
 
-- [ ] Locate the existing Texo parser and decide what to reuse (see open
-      decision 1 in the architecture document).
-- [ ] Choose a binding: native `tree-sitter` with `tree-sitter-typescript`, or
-      `web-tree-sitter` with WASM grammars. Record the decision and the reason.
-- [ ] If native, add the packages to `pnpm.onlyBuiltDependencies` in the root
-      `package.json` and confirm install on macOS, Linux, and Windows.
+- [x] Implement from scratch rather than porting Texo, per the revised scope.
+- [x] Choose and document the native binding and separate TS/TSX grammars.
+- [x] Allow required native dependency builds in `pnpm.onlyBuiltDependencies`.
+- [ ] Confirm installation and parser tests on Linux and Windows. Verified
+      locally on macOS with Node 26.9.0.
 
 ### Phase 2: extraction
 
-- [ ] Expose a single entry point, for example
-      `parseFile(path, source): ParseResult`, choosing the TypeScript or TSX
-      grammar by extension.
-- [ ] Extract top-level and nested functions, including arrow functions and
-      function expressions assigned to `const`.
-- [ ] Extract classes and their methods, including getters, setters, and
-      static methods.
-- [ ] Compute qualified names (for example `GraphStore.upsertNode`) and a
-      source range for each symbol.
-- [ ] Extract import declarations: specifier, named, default, and namespace
-      imports, and type-only imports flagged separately.
-- [ ] Extract exports: named, default, and re-exports (`export * from`,
-      `export { a } from`).
-- [ ] Extract call sites with the callee expression text and the enclosing
-      symbol, leaving resolution to core.
-- [ ] Report syntax errors as diagnostics with ranges. Still return whatever
-      structure was recoverable.
-- [ ] Return containment (file contains class contains method) directly in the
-      result.
+- [x] Expose `parseFile(path, source): ParseResult`.
+- [x] Extract top-level/nested functions, assigned arrows/function expressions,
+      generators, and anonymous callbacks.
+- [x] Extract classes, constructors, methods, accessors, and static methods.
+- [x] Include object methods and class property arrows as methods.
+- [x] Compute lexical qualified names, deterministic local identities,
+      containment, and source ranges.
+- [x] Group adjacent overload signatures with their implementation.
+- [x] Extract default, named, namespace, side-effect, and type-only imports.
+- [x] Extract named/default exports, declaration exports, and re-exports.
+- [x] Record call/constructor sites with callee text, ranges, and the nearest
+      callable; leave targets unresolved.
+- [x] Report error nodes and missing tokens with ranges and partial results.
+- [x] Name anonymous default-exported callables/classes `default`.
 
-### Phase 3: incremental support
+### Phase 3: performance
 
-- [ ] Keep parsing a single file fast enough for the one-second update target.
-      Measure parse time on a large fixture file.
-- [ ] Optionally support Tree-sitter incremental reparse with a previous tree
-      if measurements show it is needed.
+- [x] Measure a generated 130,889-byte file with 2,000 functions and calls:
+      approximately 183–185 ms for full parse and extraction on the local
+      development machine. This is a parser measurement, not an end-to-end
+      update-latency guarantee.
+- [x] Use bounded input reads and test large files against truncation/failure.
+- [ ] Add incremental reparse only if indexing measurements show it is needed.
+      The current API performs a fresh parse and retains no trees.
 
 ## Tests
 
-- [ ] Fixture files covering each symbol kind, import and export form, and
-      call shape.
-- [ ] Snapshot or explicit assertions on `ParseResult` for each fixture.
-- [ ] Files with syntax errors produce diagnostics and partial results without
-      throwing.
-- [ ] TSX components and JSX do not break extraction.
+- [x] Fresh fixtures for symbols, module declarations, and TSX components.
+- [x] Explicit assertions for extraction, containment, overloads, and callers.
+- [x] Determinism, identities across line shifts, and duplicate scopes.
+- [x] UTF-16 offsets, Unicode columns, CRLF, and exclusive end positions.
+- [x] Invalid TS/TSX and missing tokens produce ranged diagnostics.
+- [x] Large-file regression coverage.
 
-## Done when
+## Remaining boundaries
 
-- `parseFile` returns stable, deterministic results for the fixture set.
-- Malformed input never throws; it produces diagnostics.
-- The package has no dependency on `db`, `core`, or `server`.
-
-## Open questions
-
-- Should anonymous default-exported functions get a synthetic name such as
-  `default`?
-- Should object-literal methods and class property arrow functions count as
-  methods in the first version?
+- Supported file extensions are `.ts` (including `.d.ts`) and `.tsx`.
+- Interfaces, type aliases, ordinary variables, and objects are not graph
+  symbols. Their named exports are still recorded.
+- Dynamic imports and ordinary `require()` expressions are call sites; they
+  are not resolved module dependencies. Static `import x = require(...)` is
+  recorded as an import.
+- No semantic type checking or cross-file module/call resolution.
+- Invalid caller arguments and unsupported extensions throw explicitly;
+  malformed source for a supported language returns diagnostics.

@@ -61,9 +61,9 @@ implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
 | `@mycel/cli` | `packages/cli` | `mycel` command, repository resolution, process lifecycle | Current: launches server and browser |
 | `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: `/api/health`, `/api/project`, static serving |
 | `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Planned (empty scaffold) |
-| `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Planned (empty scaffold) |
+| `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
 | `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Planned (empty scaffold) |
-| `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: `HealthResponse`, `ProjectInfo` |
+| `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: health/project, source ranges, diagnostics |
 | `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
 | `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
 
@@ -235,7 +235,8 @@ operating system is an open decision; see [`tasks/db.md`](tasks/db.md).
 | CLI | `node --test` (`packages/cli/test`) | Repository resolution, launch, executable lifecycle |
 | Server | `node --test` (`packages/server/test`) | Health, project, static serving, API 404s |
 | Web | Vitest + Testing Library (jsdom) | Health polling, app rendering with project data |
-| Parser, db, core | Planned: fixture repositories and in-memory SQLite | None yet |
+| Parser | `node --test` (`packages/parser/test`) | TS/TSX fixtures, containment, imports/exports, callers, recovery, ranges, identities, large files |
+| Db, core | Planned: fixture repositories and in-memory SQLite | None yet |
 | End to end | Planned | None yet |
 
 The MVP acceptance test from the PRD: start Mycel on a small TypeScript
@@ -279,11 +280,12 @@ then the web activity feed, explorer, graph, and source views.
 
 These need a decision before or during the relevant phase:
 
-1. **Texo reuse.** The PRD says to audit existing Texo parser, graph, and
-   source-viewer code, but that code is not in this repository. Where it lives
-   and what to reuse is unresolved.
-2. **Tree-sitter binding.** Native `tree-sitter` bindings or `web-tree-sitter`
-   (WASM). WASM avoids native builds and simplifies packaging; native is faster.
+1. **Texo reuse.** Parser decision resolved: build from scratch without copying
+   Texo code or fixtures. Graph/source-viewer reuse remains a separate decision.
+2. **Tree-sitter binding.** Resolved: native `tree-sitter@0.21.1` with
+   `tree-sitter-typescript@0.23.2`, matching the grammar's peer dependency.
+   This gives the Node backend a synchronous API without WASM initialization
+   or asset loading. See [parser usage](../packages/parser/README.md).
 3. **Data directory.** Exact per-OS location and whether a `--data-dir` option
    is needed.
 4. **History retention.** How many snapshots and events to keep, and whether it

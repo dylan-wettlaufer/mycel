@@ -1,0 +1,29 @@
+export function load(value: string): string;
+export function load(value: number): number;
+export function load(value: string | number) {
+  function normalize() { return String(value); }
+  const finish = function internal() { return normalize(); };
+  return finish();
+}
+
+export class Store {
+  constructor() { initialize(); }
+  get value() { return read(); }
+  set value(next: string) { write(next); }
+  static open() { return new Store(); }
+  save = async () => persist();
+  update(value: string): void;
+  update(value: string) { notify(value); }
+}
+
+const handlers = {
+  onSave() { load("saved"); },
+  onClose: () => close(),
+};
+const wrapped = (() => load("wrapped")) satisfies Callable;
+const Box = class { render() { paint(); } };
+items.map(() => load("callback"));
+namespace Utilities { export function format() {} }
+abstract class Base { abstract execute(): void; }
+interface Shape { ignored(): void; }
+type Callback = () => void;
