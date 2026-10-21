@@ -63,7 +63,7 @@ implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
 | `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Planned (empty scaffold) |
 | `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
 | `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Planned (empty scaffold) |
-| `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: health/project, source ranges, diagnostics |
+| `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: project/graph/query contracts, health, source ranges, diagnostics |
 | `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
 | `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
 
@@ -134,12 +134,15 @@ write, and browser delivery.
 ## Data model (planned)
 
 Types live in `@mycel/shared` so the backend and browser agree on shapes.
+Structural graph, project, query, and health contracts are now defined; storage,
+ID/hash generation, and query execution remain planned. See the
+[shared contract semantics](../packages/shared/README.md).
 
 | Entity | Key fields |
 | --- | --- |
 | Project | id, name, absolute root, indexing settings |
 | Node | id, project id, kind (`file`, `function`, `class`, `method`), qualified name, path, source range, content hash, revision |
-| Edge | id, source node, target node, kind (`CONTAINS`, `IMPORTS`, `CALLS`; `REFERENCES` only once resolution is reliable), revision |
+| Edge | id, project id, source node, target node, kind (`CONTAINS`, `IMPORTS`, `CALLS`; `REFERENCES` only once resolution is reliable), revision |
 | Diagnostic | file, location, severity, parser or resolution message |
 | Change event | monotonic id, timestamp, entity type and id, action (`created`, `modified`, `deleted`), before and after revision references, optional attribution |
 | Snapshot | path, revision, full source content (needed for diffs) |
@@ -232,6 +235,7 @@ operating system is an open decision; see [`tasks/db.md`](tasks/db.md).
 
 | Area | Tooling | Current coverage |
 | --- | --- | --- |
+| Shared contracts | `tsc` consumer fixtures (`packages/shared/test`) | Public exports, graph/query contracts, legacy payload compatibility, invalid contract rejection |
 | CLI | `node --test` (`packages/cli/test`) | Repository resolution, launch, executable lifecycle |
 | Server | `node --test` (`packages/server/test`) | Health, project, static serving, API 404s |
 | Web | Vitest + Testing Library (jsdom) | Health polling, app rendering with project data |

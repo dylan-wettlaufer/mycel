@@ -1,6 +1,11 @@
-import type { Diagnostic, SourceRange } from "@mycel/shared";
+import type {
+  Diagnostic,
+  SourceLanguage,
+  SourceRange,
+  SymbolKind,
+} from "@mycel/shared";
 
-export type SymbolKind = "function" | "class" | "method";
+export type { SymbolKind } from "@mycel/shared";
 
 export interface ParsedSymbol {
   /** File-local identity based on path, kind, lexical name, and duplicate ordinal. */
@@ -50,7 +55,7 @@ export interface CallSite {
 
 export interface ParseResult {
   path: string;
-  language: "typescript" | "tsx";
+  language: SourceLanguage;
   fileId: string;
   status: "parsed" | "partial";
   symbols: ParsedSymbol[];

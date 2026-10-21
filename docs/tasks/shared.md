@@ -11,26 +11,38 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
 - `HealthResponse` (`{ status: "ok" }`) and `ProjectInfo` (`{ name, root }`)
   in `src/types.ts`.
 - Browser-safe `SourceRange` and `Diagnostic` contracts used by the parser.
+- Project/indexing settings, graph nodes/edges, opaque string IDs, content
+  hashes, revisions, and bounded query request/response contracts.
+- Optional index/database health fields; current HTTP payloads remain valid.
+- Compile-time consumer fixtures against the public entry point. See
+  [contract semantics](../../packages/shared/README.md).
 
 ## Tasks
 
 ### Phase 2: graph contracts
 
-- [ ] Define `NodeKind` (`file`, `function`, `class`, `method`) and
+- [x] Define `NodeKind` (`file`, `function`, `class`, `method`) and
       `EdgeKind` (`CONTAINS`, `IMPORTS`, `CALLS`; reserve `REFERENCES`).
 - [x] Define `SourceRange` with one-based line/column positions and exclusive
       UTF-16 offsets, matching source slicing in JavaScript.
-- [ ] Define `GraphNode`: id, project id, kind, name, qualified name, path,
+- [x] Define `GraphNode`: id, project id, kind, name, qualified name, path,
       range, content hash, revision.
-- [ ] Define `GraphEdge`: id, source id, target id, kind, revision.
+- [x] Define `GraphEdge`: id, project id, source id, target id, kind, revision.
+- [x] Define opaque string ID aliases, `ContentHash`, and project-scoped
+      `Revision`; document hash/range/identity semantics. Generation is core's
+      responsibility.
 - [x] Define `Diagnostic`: path, range, severity, source (`parser` or
       `resolver`), message.
-- [ ] Extend `ProjectInfo` or add `Project` with id and indexing settings.
-- [ ] Define API response types: `SearchResult`, `NodeDetails` (node plus
+- [x] Extend `ProjectInfo` or add `Project` with id and indexing settings.
+- [x] Define API response types: `SearchResult`, `NodeDetails` (node plus
       callers, dependencies, related files), `Neighborhood` (nodes, edges,
       truncation flag), `FileContent`.
-- [ ] Extend `HealthResponse` with index status (`idle`, `indexing`, `ready`,
+- [x] Extend `HealthResponse` with index status (`idle`, `indexing`, `ready`,
       `error`), indexed file count, and database status.
+- [x] Add query option types, bounded node lists, graph stats, and the existing
+      JSON error shape. Successful graph responses identify a project/revision.
+- [x] Reuse shared `NodeKind` in the dashboard and `SymbolKind`/`SourceLanguage`
+      in the parser.
 
 ### Phase 4: change history contracts
 
@@ -41,8 +53,9 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
       content, after content, revisions).
 - [ ] Define SSE message types as a discriminated union, for example
       `change`, `index-status`, `diagnostics`.
-- [ ] Move `ChangeKind`, `SymbolKind`, and `ActivityEvent` out of
-      `apps/web/src/features/dashboard/types.ts` once the shared versions exist.
+- [ ] Move `ChangeKind` and `ActivityEvent` out of
+      `apps/web/src/features/dashboard/types.ts` once shared event versions exist.
+      Its node kinds already come from shared contracts.
 
 ### Post-MVP
 

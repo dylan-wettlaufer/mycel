@@ -1,6 +1,6 @@
-export type ChangeKind = "created" | "modified" | "deleted";
+import type { NodeKind } from "@mycel/shared";
 
-export type SymbolKind = "file" | "function" | "class" | "method";
+export type ChangeKind = "created" | "modified" | "deleted";
 
 export interface DashboardStat {
   id: string;
@@ -12,7 +12,7 @@ export interface DashboardStat {
 export interface ActivityEvent {
   id: string;
   kind: ChangeKind;
-  symbolKind: SymbolKind;
+  symbolKind: NodeKind;
   name: string;
   path: string;
   /** ISO 8601 timestamp. */
