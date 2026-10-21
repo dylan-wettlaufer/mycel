@@ -38,6 +38,9 @@ CLI and compiled dashboard must remain in the checkout together.
 
 ## Workspace
 
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit
+together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
+
 | Directory | Package | Responsibility |
 | --- | --- | --- |
 | `packages/cli` | `@mycel/cli` | Command-line entry point and application lifecycle |
@@ -67,6 +70,21 @@ pnpm build
 pnpm typecheck
 pnpm test
 ```
+
+Code quality commands run across the workspace:
+
+```sh
+pnpm lint          # Check JavaScript, TypeScript, and React hooks
+pnpm lint:fix      # Apply safe automatic lint fixes
+pnpm format        # Format source code and configuration files
+pnpm format:check  # Check formatting without changing files
+```
+
+ESLint checks code correctness; Prettier handles consistent formatting.
+Formatting covers TypeScript, JavaScript, JSON, YAML, CSS, and HTML. Generated
+build output, dependencies, coverage, and the lockfile are excluded. Markdown
+documents are not automatically reformatted. Run linting and the formatting
+check alongside `pnpm typecheck` and `pnpm test` before committing.
 
 Build runs in dependency order and emits JavaScript, declarations, and source
 maps into each package's `dist/` directory. Typecheck builds first so workspace
