@@ -1,7 +1,7 @@
 # @mycel/db
 
-SQLite connection setup, versioned graph-schema migrations, and full-project
-graph replacement. This package
+SQLite connection setup, versioned graph-schema migrations, full-project
+graph replacement, and project-scoped graph queries. This package
 depends on `better-sqlite3` and shared contracts, and does not import the parser,
 indexing engine, HTTP server, or frontend.
 
@@ -89,8 +89,8 @@ diagnostics may have zero-width ranges.
 
 Primary keys support scoped ID lookup. Secondary indexes cover node paths,
 qualified names, case-insensitive names, edge sources/targets, diagnostic paths,
-and revision foreign keys. Search/query implementations and any decision to add
-FTS5 remain future work. Path normalization, semantic edge validation, and
+and revision foreign keys. Search currently uses literal `LIKE` matching rather
+than FTS5. Path normalization, semantic edge validation, and
 source/hash generation remain core responsibilities.
 
 ## Migrations and writes
@@ -125,8 +125,58 @@ are not mutated. A project ID cannot be rebound to another root, records must
 belong to the supplied project, and disk storage must be outside that root.
 SQLite constraint/insert failures roll back the entire operation.
 
-Per-file write/query methods,
-snapshots, events, and history retention are separate milestones.
+Per-file writes, snapshots, events, and history retention are separate milestones.
+
+## Graph queries
+
+All query functions take `(database, projectId, ...)`. IDs are scoped to the
+explicit project, including when the same node ID exists in multiple projects.
+
+```ts
+import {
+  getNode,
+  searchSymbols,
+  getNeighborhood,
+  getCallers,
+  getDependencies,
+} from "@mycel/db";
+
+const node = getNode(database, projectId, nodeId);
+const search = searchSymbols(database, projectId, "save", 20);
+const neighborhood = getNeighborhood(database, projectId, nodeId, 2, 100);
+const callers = getCallers(database, projectId, nodeId, 100);
+const dependencies = getDependencies(database, projectId, nodeId, 100);
+```
+
+- `getNode` returns a `GraphNode`, or `undefined` when absent.
+- `searchSymbols` returns `SearchResult`, searching files and symbols by name,
+  qualified name, and path. Matching uses SQLite's ASCII case-insensitive `LIKE`;
+  `%`, `_`, and backslashes are literal characters. Queries are trimmed; blank
+  queries return no matches. Exact matches rank before prefix matches, then
+  substring matches, with deterministic ties. The default limit is 20 nodes.
+- `getNeighborhood` returns `Neighborhood`, or `undefined` for a missing root.
+  Breadth-first traversal follows every edge kind in both directions, with
+  neighbors ordered by ID. Depth defaults to 1; zero includes just the root.
+  The node limit defaults to 100 and includes the root. All edges between the
+  selected nodes are returned, including cycles and self-edges, with no dangling
+  endpoints. `truncated` means the node limit omitted a node within the requested
+  depth; reaching the depth boundary alone does not set it.
+- `getCallers` returns a `NodeList` of direct incoming `CALLS` sources.
+- `getDependencies` returns a `NodeList` of direct outgoing `CALLS` and `IMPORTS`
+  targets. `CONTAINS` is excluded. Both relationship queries deduplicate nodes,
+  sort by name, qualified name, path, then ID, and default to 100 nodes. Missing
+  roots return empty lists. Each list reports whether its limit omitted matches.
+
+Depth must be a nonnegative safe integer and limits must be positive safe
+integers; invalid values throw `RangeError`. The HTTP layer must still cap
+resource usage when exposing these functions to clients.
+
+Search and neighborhood queries run in read transactions, so their data and
+project revision describe the same committed snapshot. The response revision is
+the latest project revision, even when individual records retain older
+last-written revisions. Searches of unknown projects return revision 0 and no
+nodes. Callers composing multiple queries can use an outer read transaction to
+keep all results in one snapshot.
 
 ## Verify
 
@@ -139,6 +189,7 @@ pnpm test
 
 Tests cover fresh/idempotent migrations, batch/graph rollback, drift/newer-schema
 detection, strict constraints, foreign keys, cascading deletion, revisions,
-WAL persistence, and external-path/symlink handling. Platform path conventions
+WAL persistence, external-path/symlink handling, ranked literal search, bounded
+cyclic traversal, relationship filtering, and query revision context. Platform path conventions
 are checked as pure functions; native installation has been verified locally on
 macOS with Node 26.9.0. Linux/Windows native verification is still pending.

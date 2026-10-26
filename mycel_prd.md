@@ -299,7 +299,7 @@ agreed implementation plan.
     edges, and diagnostics.
 -   [x] Implement full-repository indexing with ignored directories and
     unsupported files excluded.
--   [ ] Implement getNode, searchSymbols, getNeighborhood, getCallers,
+-   [x] Implement getNode, searchSymbols, getNeighborhood, getCallers,
     and getDependencies.
 -   [ ] Expose graph queries through Hono API endpoints.
 -   [ ] Test extraction and resolution on small fixture repositories.

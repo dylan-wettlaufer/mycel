@@ -147,7 +147,8 @@ Types live in `@mycel/shared` so the backend and browser agree on shapes.
 Structural graph, project, query, and health contracts are now defined. SQLite
 connection setup and the initial graph schema/migrations are implemented;
 full-project graph writes and ID/hash generation are implemented in core/db.
-Graph queries and import/call resolution remain planned. See the
+Project-scoped graph queries are implemented in db; HTTP integration and
+import/call resolution remain planned. See the
 [shared contract semantics](../packages/shared/README.md).
 
 | Entity | Key fields |

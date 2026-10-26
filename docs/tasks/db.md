@@ -17,6 +17,8 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
   [package usage and schema](../../packages/db/README.md).
 - `replaceProjectGraph` writes a complete current project graph and its next
   revision in one transaction for full-repository indexing.
+- Project-scoped node lookup, ranked file/symbol search, bounded neighborhoods,
+  callers, and dependencies use the shared graph/query contracts.
 
 ## Tasks
 
@@ -33,7 +35,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - [x] Create tables: `projects`, `nodes`, `edges`, `diagnostics`, `revisions`.
 - [x] Add indexes for lookup by id, path, qualified name, and edge source and
       target.
-- [ ] Add full-text search (FTS5) over node names and paths, or a simpler
+- [x] Add full-text search (FTS5) over node names and paths, or a simpler
       `LIKE` search if FTS5 is not needed yet.
 
 ### Phase 2: queries
@@ -41,11 +43,11 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - [x] `replaceProjectGraph(...)`: upsert project metadata and replace its nodes,
       edges, and diagnostics with one revision, preserving other projects and
       rolling back on failure. Reject cross-project records and internal paths.
-- [ ] `getNode(id)`.
-- [ ] `searchSymbols(query, limit)`, ranking exact and prefix matches first.
-- [ ] `getNeighborhood(id, depth, limit)`: a bounded subgraph with a truncation
+- [x] `getNode(id)`.
+- [x] `searchSymbols(query, limit)`, ranking exact and prefix matches first.
+- [x] `getNeighborhood(id, depth, limit)`: a bounded subgraph with a truncation
       flag.
-- [ ] `getCallers(id)` and `getDependencies(id)`.
+- [x] `getCallers(id)` and `getDependencies(id)`.
 - [ ] `getStats()`: file, symbol, and edge counts for the dashboard.
 - [ ] `replaceFileGraph(path, nodes, edges, diagnostics)` inside one
       transaction.
@@ -76,7 +78,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
       writes; modified/newer migration histories are rejected.
 - [x] Constraints, project isolation, cascading cleanup, WAL persistence, and
       external storage paths (including symlinks).
-- [ ] Queries against an in-memory database seeded with a fixture graph.
+- [x] Queries against an in-memory database seeded with a fixture graph.
 - [ ] A failing write inside `commitChangeSet` leaves no partial state.
 - [ ] Event ids are strictly increasing across restarts.
 
@@ -87,6 +89,6 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - All writes for one change set happen in a single transaction.
 - The database file is never created inside the target repository.
 
-The schema/connection and full-project write foundation is complete. Public
-graph queries, per-file graph replacement, and history/event writes remain
+The schema/connection, full-project writes, and public graph queries are
+complete. Stats, per-file graph replacement, and history/event writes remain
 unchecked above.
