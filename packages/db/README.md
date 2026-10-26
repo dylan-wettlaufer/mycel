@@ -1,6 +1,7 @@
 # @mycel/db
 
-SQLite connection setup and versioned graph-schema migrations. This package
+SQLite connection setup, versioned graph-schema migrations, and full-project
+graph replacement. This package
 depends on `better-sqlite3` and shared contracts, and does not import the parser,
 indexing engine, HTTP server, or frontend.
 
@@ -113,7 +114,18 @@ control statements or change connection pragmas.
 
 The native connection exposes synchronous `transaction()` for future graph
 writers. Allocate the next project revision and write nodes, edges, and
-diagnostics in the same transaction. Application write/query methods,
+diagnostics in the same transaction.
+
+`replaceProjectGraph(database, { project, nodes, edges, diagnostics })` is the
+full-index write operation. Node/edge inputs omit `revision`: it is allocated
+inside the immediate transaction and returned. The operation updates project
+metadata and replaces only that project's current graph and diagnostics;
+previous revision records and other projects remain untouched. Input records
+are not mutated. A project ID cannot be rebound to another root, records must
+belong to the supplied project, and disk storage must be outside that root.
+SQLite constraint/insert failures roll back the entire operation.
+
+Per-file write/query methods,
 snapshots, events, and history retention are separate milestones.
 
 ## Verify

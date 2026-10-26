@@ -60,9 +60,9 @@ implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
 | --- | --- | --- | --- |
 | `@mycel/cli` | `packages/cli` | `mycel` command, repository resolution, process lifecycle | Current: launches server and browser |
 | `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: `/api/health`, `/api/project`, static serving |
-| `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Planned (empty scaffold) |
+| `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Current: one-shot structural indexing with exclusions and atomic persistence; resolution/live updates planned |
 | `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
-| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: connection setup, initial schema, transactional migrations; graph queries planned |
+| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: schema, migrations, full-project transactional replacement; graph queries planned |
 | `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: project/graph/query contracts, health, source ranges, diagnostics |
 | `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
 | `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
@@ -112,6 +112,16 @@ routes can query it and subscribe to its events. The dashboard opens as soon as
 the server is listening; indexing progress is reported through `/api/health`
 and SSE rather than blocking the launch.
 
+### Full structural index (current library API)
+
+`indexRepository` discovers `.ts`/`.tsx` working-tree files, prunes excluded
+directories, honors root/nested `.gitignore` and configured globs, then captures
+and parses source. It constructs file/symbol nodes, containment, hashes, and
+parser diagnostics, and commits a complete project replacement plus its next
+revision through db. Read failures preserve the previous graph; database
+failures roll back the replacement. Import/call resolution and CLI/server
+integration are still planned. See [core usage](../packages/core/README.md).
+
 ### Change pipeline (planned)
 
 ```text
@@ -136,7 +146,8 @@ write, and browser delivery.
 Types live in `@mycel/shared` so the backend and browser agree on shapes.
 Structural graph, project, query, and health contracts are now defined. SQLite
 connection setup and the initial graph schema/migrations are implemented;
-graph writes/queries and ID/hash generation remain planned. See the
+full-project graph writes and ID/hash generation are implemented in core/db.
+Graph queries and import/call resolution remain planned. See the
 [shared contract semantics](../packages/shared/README.md).
 
 | Entity | Key fields |
@@ -152,10 +163,12 @@ graph writes/queries and ID/hash generation remain planned. See the
 
 Identity rules:
 
-- **Stable ids do not depend on line numbers alone.** The proposed id is a hash
-  of project, path, node kind, and qualified name, with a disambiguating ordinal
-  for duplicates in the same scope. A function that moves down a file keeps its
-  id; a renamed function becomes a delete plus a create.
+- **Stable ids do not depend on line numbers.** Core hashes the canonical root
+  for project identity, then the project ID and parser-local identity for nodes.
+  Parser identity includes path, kind, lexical name, static/accessor distinction,
+  and duplicate ordinal. A named function shifted down a file keeps its ID;
+  renaming or changing scope produces a different ID. Anonymous scopes retain
+  their occurrence-based limits. Edge IDs hash project, kind, and endpoints.
 - **Revisions are monotonic per project.** Every committed change set gets a
   new revision. Events reference the before and after revisions so the server
   can rebuild a diff from snapshots.
@@ -246,8 +259,8 @@ repository root. CLI integration remains planned. See
 | Server | `node --test` (`packages/server/test`) | Health, project, static serving, API 404s |
 | Web | Vitest + Testing Library (jsdom) | Health polling, app rendering with project data |
 | Parser | `node --test` (`packages/parser/test`) | TS/TSX fixtures, containment, imports/exports, callers, recovery, ranges, identities, large files |
-| Database | `node --test` (`packages/db/test`) | Migrations, constraints, rollback, revisions, project isolation, disk persistence, external paths |
-| Core | Planned: fixture repositories | None yet |
+| Database | `node --test` (`packages/db/test`) | Migrations, constraints, rollback, revisions, project isolation, disk persistence, external paths, graph replacement guards |
+| Core | `node --test` (`packages/core/test`) | Exclusions, nested ignore rules, structural graphs, identities/hashes, rescans, persistence, atomic failures |
 | End to end | Planned | None yet |
 
 The MVP acceptance test from the PRD: start Mycel on a small TypeScript

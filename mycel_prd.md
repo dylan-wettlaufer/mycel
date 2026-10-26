@@ -289,15 +289,15 @@ agreed implementation plan.
 
 **Estimated: 3--5 days**
 
--   [ ] Reuse and adapt the existing Tree-sitter parser for TypeScript
-    and TSX.
--   [ ] Extract files, functions, classes, methods, imports, calls, and
+-   [x] Implement a fresh Tree-sitter parser for TypeScript and TSX
+    without reusing Texo code.
+-   [x] Extract files, functions, classes, methods, imports, calls, and
     source locations.
--   [ ] Define node and edge types with deterministic identifiers and
+-   [x] Define node and edge types with deterministic identifiers and
     content hashes.
--   [ ] Implement SQLite migrations and tables for projects, nodes,
+-   [x] Implement SQLite migrations and tables for projects, nodes,
     edges, and diagnostics.
--   [ ] Implement full-repository indexing with ignored directories and
+-   [x] Implement full-repository indexing with ignored directories and
     unsupported files excluded.
 -   [ ] Implement getNode, searchSymbols, getNeighborhood, getCallers,
     and getDependencies.

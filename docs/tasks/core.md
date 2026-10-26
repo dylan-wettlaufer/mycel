@@ -10,8 +10,13 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 
 ## Current state
 
-- Empty scaffold (`src/index.ts`). Already depends on `parser`, `db`, and
-  `shared`.
+- `discoverSourceFiles` applies hard directory exclusions, root/nested
+  `.gitignore` rules, configured globs, and the parser's supported extensions.
+- `indexRepository` captures and parses source, builds deterministic file and
+  symbol nodes/containment, then replaces one project's graph transactionally
+  through db. It returns committed revision/counts and elapsed time.
+- Import/call resolution, query methods, engine lifecycle, and live updates
+  remain planned. See [usage and boundaries](../../packages/core/README.md).
 
 ## Tasks
 
@@ -20,13 +25,19 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - [ ] Define `createEngine({ project, databasePath })` returning an object
       with query methods (delegating to db), `start()`, `stop()`, and an event
       subscription such as `onEvent(listener)`.
-- [ ] Walk the repository for `.ts`, `.tsx`, `.mts`, and `.cts` files,
+- [x] Add a standalone full-index entry point and discovery API.
+- [x] Walk the repository for supported `.ts` and `.tsx` files,
       skipping `node_modules`, `dist`, `build`, `.git`, and coverage
       directories, and honoring `.gitignore`.
-- [ ] Parse each file and store nodes, edges, and diagnostics through db.
-- [ ] Generate deterministic node ids from project, path, kind, and qualified
+- [x] Parse each file and store file/symbol nodes, containment edges, and parser
+      diagnostics through db. Resolved import/call edges are separate below.
+- [x] Generate deterministic node ids from project, path, kind, and qualified
       name, with an ordinal for duplicates (see the identity rules in the
       architecture document).
+- [x] Compute exact source content hashes and commit a project snapshot plus
+      its new revision atomically; remove stale/deleted/excluded file records.
+- [ ] Extend discovery when `.mts`/`.cts` support is added to the parser and
+      shared extension contract. Those extensions are currently excluded.
 - [ ] Resolve relative imports to files, including extension and `index`
       resolution.
 - [ ] Decide how far to honor `tsconfig` `paths`, `baseUrl`, and workspace
@@ -63,7 +74,11 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 
 ## Tests
 
-- [ ] Index fixture repositories and assert nodes, edges, and diagnostics.
+- [x] Index fixture repositories and assert structural nodes, containment,
+      hashes, ranges, diagnostics, persistence, and project isolation.
+- [x] Verify nested ignore rules against Git and cover custom exclusions,
+      unsupported files, generated directories, and symlinks.
+- [x] Failed scans/graph writes preserve the previous graph and revision.
 - [ ] Watcher integration tests: create, edit, delete, and rename files in a
       temporary directory and assert the resulting events.
 - [ ] Rapid successive writes produce one consistent final state.

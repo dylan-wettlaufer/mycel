@@ -15,6 +15,8 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
   explicit overrides are checked to stay outside the repository.
 - Tests use in-memory databases and temporary external storage. See
   [package usage and schema](../../packages/db/README.md).
+- `replaceProjectGraph` writes a complete current project graph and its next
+  revision in one transaction for full-repository indexing.
 
 ## Tasks
 
@@ -36,6 +38,9 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 
 ### Phase 2: queries
 
+- [x] `replaceProjectGraph(...)`: upsert project metadata and replace its nodes,
+      edges, and diagnostics with one revision, preserving other projects and
+      rolling back on failure. Reject cross-project records and internal paths.
 - [ ] `getNode(id)`.
 - [ ] `searchSymbols(query, limit)`, ranking exact and prefix matches first.
 - [ ] `getNeighborhood(id, depth, limit)`: a bounded subgraph with a truncation
@@ -82,5 +87,6 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - All writes for one change set happen in a single transaction.
 - The database file is never created inside the target repository.
 
-The schema/connection foundation is complete. Public graph queries, file-graph
-replacement, and history/event writes remain unchecked above.
+The schema/connection and full-project write foundation is complete. Public
+graph queries, per-file graph replacement, and history/event writes remain
+unchecked above.
