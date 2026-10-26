@@ -11,25 +11,26 @@ See [architecture](../ARCHITECTURE.md#runtime-flow).
   `src/bin.ts`.
 - `resolveRepository` uses the Git working-tree root (including linked
   worktrees) and falls back to the current folder outside Git.
-- `launchDashboard` checks for the dashboard build, starts the server on an
-  OS-assigned port, and opens the browser. If the browser cannot open, it
+- `launchDashboard` checks for the dashboard build, completes the initial index
+  through core, starts the server on an OS-assigned port with graph queries,
+  and opens the browser. If the browser cannot open, it
   prints the URL instead.
-- `SIGINT` and `SIGTERM` close the server.
+- `SIGINT` and `SIGTERM` close the server and its database.
 - Tests in `test/cli.test.mjs`.
 
 ## Tasks
 
 ### Phase 2 to 4: wire the engine
 
-- [ ] Create the core engine with the resolved project and database path
-      before starting the server, and pass it to `startServer`.
+- [x] Open and index the resolved project through core before starting the
+      server, and attach its queries through `startIndexedServer`.
 - [ ] Start the server and open the browser right away, and run the initial
       index in the background so launch is not blocked.
 - [ ] Print a short indexing summary (files, symbols, duration, diagnostics)
       when the first index completes.
 - [ ] Stop the watcher and close the database on shutdown, after the server
       closes.
-- [ ] Exit with a non-zero code and a clear message if the engine fails to
+- [x] Exit with a non-zero code and a clear message if the initial index fails to
       start.
 
 ### Options

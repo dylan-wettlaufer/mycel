@@ -7,6 +7,7 @@ export { replaceProjectGraph } from "./graph.js";
 export type { ProjectGraph } from "./graph.js";
 export {
   getNode,
+  getNodeDetails,
   searchSymbols,
   getNeighborhood,
   getCallers,

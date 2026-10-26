@@ -58,11 +58,11 @@ implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
 
 | Package | Path | Responsibility | Status |
 | --- | --- | --- | --- |
-| `@mycel/cli` | `packages/cli` | `mycel` command, repository resolution, process lifecycle | Current: launches server and browser |
-| `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: `/api/health`, `/api/project`, static serving |
-| `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Current: one-shot structural indexing with exclusions and atomic persistence; resolution/live updates planned |
+| `@mycel/cli` | `packages/cli` | `mycel` command, repository resolution, process lifecycle | Current: indexes repository, launches server and browser |
+| `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: health/project, graph queries, indexed startup, static serving |
+| `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Current: one-shot structural indexing and project-scoped query facade; resolution/live updates planned |
 | `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
-| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: schema, migrations, full-project transactional replacement; graph queries planned |
+| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: schema, migrations, full-project replacement, graph queries |
 | `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: project/graph/query contracts, health, source ranges, diagnostics |
 | `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
 | `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
@@ -99,18 +99,17 @@ web ──► shared only
 2. `resolveRepository` runs `git rev-parse --show-toplevel` from the working
    directory. Outside Git it uses the current folder.
 3. `launchDashboard` checks that `apps/web/dist/index.html` exists, then calls
-   `startServer(0, { project, webDistPath })` so the OS picks a free port on
-   `127.0.0.1`.
+   `startIndexedServer(0, { project, webDistPath })`. Core opens the external
+   per-repository database and completes a full structural index, then the
+   server binds to an available port on `127.0.0.1` with graph queries attached.
 4. The CLI prints the URL and opens the browser. `SIGINT` and `SIGTERM` close the
-   server.
+   server and its database. Standalone/dev startup uses the same helper on port 3000.
 
 ### Launch (planned)
 
-Between steps 2 and 3, the CLI opens the project's database, creates the core
-engine, and runs the initial index. The engine is passed to `createApp` so
-routes can query it and subscribe to its events. The dashboard opens as soon as
-the server is listening; indexing progress is reported through `/api/health`
-and SSE rather than blocking the launch.
+Move the initial index to the background so the dashboard can open while
+indexing progress is reported through `/api/health` and SSE. Add watching and
+event subscriptions for live graph updates.
 
 ### Full structural index (current library API)
 
@@ -119,8 +118,9 @@ directories, honors root/nested `.gitignore` and configured globs, then captures
 and parses source. It constructs file/symbol nodes, containment, hashes, and
 parser diagnostics, and commits a complete project replacement plus its next
 revision through db. Read failures preserve the previous graph; database
-failures roll back the replacement. Import/call resolution and CLI/server
-integration are still planned. See [core usage](../packages/core/README.md).
+failures roll back the replacement. CLI/dev startup invokes this index before
+serving queries. Import/call resolution and live updates are still planned.
+See [core usage](../packages/core/README.md).
 
 ### Change pipeline (planned)
 
@@ -147,8 +147,9 @@ Types live in `@mycel/shared` so the backend and browser agree on shapes.
 Structural graph, project, query, and health contracts are now defined. SQLite
 connection setup and the initial graph schema/migrations are implemented;
 full-project graph writes and ID/hash generation are implemented in core/db.
-Project-scoped graph queries are implemented in db; HTTP integration and
-import/call resolution remain planned. See the
+Project-scoped graph queries are implemented in db and exposed through a core
+facade and Hono routes, attached automatically by CLI/dev startup.
+Import/call resolution remains planned. See the
 [shared contract semantics](../packages/shared/README.md).
 
 | Entity | Key fields |
@@ -186,13 +187,18 @@ dashboard HTML.
 | --- | --- | --- | --- |
 | GET | `/api/health` | Process liveness, later index and database status | Current (liveness only) |
 | GET | `/api/project` | Selected repository name and root | Current |
-| GET | `/api/graph/search?q=` | Search files and symbols | Planned |
-| GET | `/api/graph/nodes/:id` | Node metadata | Planned |
-| GET | `/api/graph/nodes/:id/neighborhood` | Bounded connected subgraph | Planned |
+| GET | `/api/graph/search?q=` | Search files and symbols | Current |
+| GET | `/api/graph/nodes/:id` | Node details, relationships, and diagnostics | Current |
+| GET | `/api/graph/nodes/:id/neighborhood` | Bounded connected subgraph | Current |
 | GET | `/api/files/content?path=` | Source content, constrained to the repository root | Planned |
 | GET | `/api/changes` | Paginated change history | Planned |
 | GET | `/api/changes/:id/diff` | Before and after source for a change | Planned |
 | GET | `/api/events` | SSE stream of committed events, resumable with `Last-Event-ID` | Planned |
+
+Graph routes validate numeric bounds and return shared query contracts with
+snapshot revisions; see [limits and usage](../packages/server/README.md).
+CLI/dev startup attaches queries after the initial index. Lower-level consumers
+of `createApp`/`startServer` without a graph facade receive JSON 503 on graph routes.
 
 Non-API `GET` requests that accept HTML serve `index.html` so client-side
 routes work. Requests for missing assets return 404.

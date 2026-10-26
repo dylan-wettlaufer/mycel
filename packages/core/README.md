@@ -1,7 +1,8 @@
 # @mycel/core
 
 Full-repository structural indexing, independent of the HTTP server and browser.
-The current entry points are `discoverSourceFiles` and `indexRepository`.
+The current entry points are `discoverSourceFiles`, `indexRepository`,
+`createGraphQueries`, and `openIndexedProject`.
 
 ```ts
 import { openDatabase } from "@mycel/db";
@@ -95,13 +96,43 @@ graph writes. Failed database writes roll back graph replacement, metadata,
 and revision allocation together. Captured files form a scan of a changing
 working tree, not an atomic filesystem snapshot.
 
+## Indexed project lifecycle
+
+`openIndexedProject({ project, databasePath?, indexing? })` opens the project's
+database, runs a full initial index, and returns `{ project, graph, close }`.
+Storage defaults to the per-repository database outside the source tree.
+The returned `graph` is a project-scoped query facade ready to use. `close()`
+releases storage and is safe to call more than once; indexing failures close
+the connection before rejecting. Restarting reindexes the current source and
+allocates a new revision in the existing database.
+
+The CLI and standalone server use this lifecycle through `startIndexedServer`.
+Startup waits for the initial index; background progress and live updates are
+future work. For temporary indexes, pass `databasePath: ":memory:"`.
+
+## Graph queries
+
+`createGraphQueries(database, projectId)` creates a `GraphQueries` facade for
+one project's current graph. It exposes `searchSymbols({ q, limit? })`,
+`getNodeDetails(id, { limit? }?)`, and
+`getNeighborhood(id, { depth?, limit? }?)`, delegating to db without depending
+on HTTP. Results use the shared `SearchResult`, `NodeDetails`, and `Neighborhood`
+contracts. Unknown nodes return `undefined`. Node details include callers,
+dependencies, related files, and file diagnostics in the same read transaction.
+Limits and other database semantics are described in [db usage](../db/README.md).
+
+The caller owns the database connection and keeps it open while using the
+facade. The facade fixes the project ID and reads the latest committed graph
+on each call. Pass it as `graph` to the server's `AppOptions`; see
+[server usage](../server/README.md).
+
 ## Next stages
 
 This stage stores structural nodes and containment only. Import/export and call
 facts are available to the indexing pipeline from the parser; resolution into
-`IMPORTS` and `CALLS` edges remains the next task. Graph query methods, the
-engine lifecycle/progress API, watcher, content-hash skipping, event history,
-and CLI/server/dashboard integration remain separate work. Full scans do not
+`IMPORTS` and `CALLS` edges remains the next task. The
+background indexing/progress API, watcher, content-hash skipping, event history,
+and dashboard graph integration remain separate work. Full scans do not
 retain a previous valid per-file graph when syntax changes; they store the
 currently recoverable structure and diagnostics.
 

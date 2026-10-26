@@ -2,8 +2,10 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serveStatic } from "@hono/node-server/serve-static";
+import type { GraphQueries } from "@mycel/core";
 import type { HealthResponse, ProjectInfo } from "@mycel/shared";
 import { Hono } from "hono";
+import { createGraphRoutes } from "./routes/graph.js";
 
 export const defaultWebDistPath = fileURLToPath(
   new URL("../../../apps/web/dist/", import.meta.url),
@@ -12,11 +14,13 @@ export const defaultWebDistPath = fileURLToPath(
 export interface AppOptions {
   webDistPath?: string;
   project?: ProjectInfo;
+  graph?: GraphQueries;
 }
 
 export function createApp({
   webDistPath = defaultWebDistPath,
   project,
+  graph,
 }: AppOptions = {}) {
   const app = new Hono();
 
@@ -30,9 +34,11 @@ export function createApp({
     return context.json(project);
   });
 
+  app.route("/api/graph", createGraphRoutes(graph));
+
   // API misses must never fall through to the frontend's HTML entry point.
-  app.all("/api", (context) => context.notFound());
-  app.all("/api/*", (context) => context.notFound());
+  app.all("/api", (context) => context.json({ error: "Not found" }, 404));
+  app.all("/api/*", (context) => context.json({ error: "Not found" }, 404));
 
   app.use("*", serveStatic({ root: webDistPath }));
 

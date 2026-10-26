@@ -14,6 +14,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { resolveDatabasePath } from "@mycel/db";
 
 import { launchDashboard, resolveRepository } from "../dist/index.js";
 
@@ -117,17 +118,30 @@ test("rejects missing directories and files", async (t) => {
 test("starts the dashboard and selected project before opening the browser", async (t) => {
   const { root, nested } = await repository(t);
   const webDistPath = await dashboardFixture(t);
+  await writeFile(join(root, "sample.ts"), "export function sample() {}\n");
   let openedUrl;
   let checkedDashboard = false;
   const running = await launchDashboard({
     cwd: nested,
     webDistPath,
+    databasePath: ":memory:",
     openBrowser: async (url) => {
       openedUrl = url;
       const health = await fetch(`${url}/api/health`);
       assert.deepEqual(await health.json(), { status: "ok" });
       const response = await fetch(`${url}/api/project`);
       assert.deepEqual(await response.json(), { name: basename(root), root });
+      const search = await fetch(`${url}/api/graph/search?q=sample`);
+      assert.equal(search.status, 200);
+      const results = await search.json();
+      const symbol = results.nodes.find((node) => node.name === "sample");
+      assert.ok(symbol);
+      const details = await fetch(`${url}/api/graph/nodes/${symbol.id}`);
+      assert.equal((await details.json()).node.name, "sample");
+      const neighborhood = await fetch(
+        `${url}/api/graph/nodes/${symbol.id}/neighborhood`,
+      );
+      assert.equal((await neighborhood.json()).nodes.length, 2);
       const page = await fetch(url);
       assert.equal(page.status, 200);
       assert.match(await page.text(), /id="root"/);
@@ -146,6 +160,7 @@ test("keeps the server running and prints a URL when the browser cannot open", a
   const running = await launchDashboard({
     cwd: await fixture(t),
     webDistPath: await dashboardFixture(t),
+    databasePath: ":memory:",
     openBrowser: async () => {
       throw new Error("No browser available");
     },
@@ -176,14 +191,24 @@ test(
   { timeout: 15_000 },
   async (t) => {
     const { root, nested } = await repository(t);
+    await writeFile(join(root, "sample.ts"), "export function sample() {}\n");
+    const databasePath = resolveDatabasePath(root);
     const child = spawn(process.execPath, [binary, "--no-open"], {
       cwd: nested,
       stdio: ["ignore", "pipe", "pipe"],
     });
-    t.after(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    });
     const exit = once(child, "exit");
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+        await exit;
+      }
+      await Promise.all(
+        ["", "-wal", "-shm"].map((suffix) =>
+          rm(`${databasePath}${suffix}`, { force: true }),
+        ),
+      );
+    });
     let output = "";
     let errors = "";
     child.stderr.on("data", (chunk) => {
@@ -210,6 +235,11 @@ test(
     assert.ok(output.includes(`Repository: ${root}`));
     const project = await fetch(`${url}/api/project`);
     assert.deepEqual(await project.json(), { name: basename(root), root });
+    const search = await fetch(`${url}/api/graph/search?q=sample`);
+    assert.equal(search.status, 200);
+    assert.ok(
+      (await search.json()).nodes.some((node) => node.name === "sample"),
+    );
     assert.equal((await fetch(url)).status, 200);
 
     child.kill("SIGTERM");

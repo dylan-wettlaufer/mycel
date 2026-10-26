@@ -1,8 +1,10 @@
 import type {
+  Diagnostic,
   GraphEdge,
   GraphNode,
   Neighborhood,
   NodeId,
+  NodeDetails,
   NodeList,
   ProjectId,
   SearchResult,
@@ -219,4 +221,77 @@ export function getDependencies(
       ORDER BY n.name COLLATE NOCASE, n.qualified_name, n.path, n.id LIMIT ?`,
   );
   return nodeList(rows.all(projectId, id, projectId, probeLimit(limit)), limit);
+}
+
+/** Node metadata and direct relationships from one consistent graph snapshot. */
+export function getNodeDetails(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+  id: NodeId,
+  limit = 100,
+): NodeDetails | undefined {
+  validateInteger("limit", limit, 1);
+  return database.transaction(() => {
+    const node = getNode(database, projectId, id);
+    if (!node) return undefined;
+    const revision = getRevision(database, projectId);
+    const callers = getCallers(database, projectId, id, limit);
+    const dependencies = getDependencies(database, projectId, id, limit);
+    // Include the owning file and files of all direct callers/dependencies,
+    // independently of the limits on those two lists.
+    const files = database.prepare<
+      { projectId: string; id: string; path: string; limit: number },
+      NodeRow
+    >(`SELECT ${nodeColumns} FROM nodes n
+      WHERE n.project_id = @projectId AND n.kind = 'file' AND (
+        n.path = @path OR n.path IN (
+          SELECT related.path FROM nodes related JOIN (
+            SELECT source_id AS id FROM edges
+              WHERE project_id = @projectId AND target_id = @id AND kind = 'CALLS'
+            UNION
+            SELECT target_id AS id FROM edges
+              WHERE project_id = @projectId AND source_id = @id AND kind IN ('CALLS', 'IMPORTS')
+          ) endpoints ON endpoints.id = related.id
+          WHERE related.project_id = @projectId
+        )
+      ) ORDER BY CASE WHEN n.path = @path THEN 0 ELSE 1 END, n.path, n.id
+      LIMIT @limit`);
+    const diagnostics = database
+      .prepare<[string, string], Omit<Diagnostic, "range"> & SourceRange>(
+        `SELECT path, severity, source, code, message,
+          start_offset AS start, end_offset AS end,
+          start_line AS startLine, start_column AS startColumn,
+          end_line AS endLine, end_column AS endColumn
+        FROM diagnostics WHERE project_id = ? AND path = ?
+        ORDER BY start_offset, end_offset, id`,
+      )
+      .all(projectId, node.path)
+      .map((row): Diagnostic => {
+        const {
+          start,
+          end,
+          startLine,
+          startColumn,
+          endLine,
+          endColumn,
+          ...fields
+        } = row;
+        return {
+          ...fields,
+          range: { start, end, startLine, startColumn, endLine, endColumn },
+        };
+      });
+    return {
+      projectId,
+      revision,
+      node,
+      callers,
+      dependencies,
+      relatedFiles: nodeList(
+        files.all({ projectId, id, path: node.path, limit: probeLimit(limit) }),
+        limit,
+      ),
+      diagnostics,
+    };
+  })();
 }

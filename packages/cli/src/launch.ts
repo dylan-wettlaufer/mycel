@@ -1,8 +1,7 @@
-import { once } from "node:events";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 
-import { defaultWebDistPath, startServer } from "@mycel/server";
+import { defaultWebDistPath, startIndexedServer } from "@mycel/server";
 import open from "open";
 
 import { resolveRepository } from "./repository.js";
@@ -10,12 +9,14 @@ import { resolveRepository } from "./repository.js";
 interface LaunchOptions {
   cwd?: string;
   webDistPath?: string;
+  databasePath?: string;
   openBrowser?: (url: string) => Promise<unknown>;
 }
 
 export async function launchDashboard({
   cwd = process.cwd(),
   webDistPath = defaultWebDistPath,
+  databasePath,
   openBrowser = open,
 }: LaunchOptions = {}) {
   const project = await resolveRepository(cwd);
@@ -29,8 +30,11 @@ export async function launchDashboard({
   }
 
   // Let the OS choose a free port so other projects and dev servers can coexist.
-  const server = startServer(0, { project, webDistPath });
-  await once(server, "listening");
+  const server = await startIndexedServer(0, {
+    project,
+    webDistPath,
+    ...(databasePath === undefined ? {} : { databasePath }),
+  });
   const address = server.address();
   if (!address || typeof address === "string") {
     server.close();

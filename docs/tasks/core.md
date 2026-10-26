@@ -15,7 +15,11 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - `indexRepository` captures and parses source, builds deterministic file and
   symbol nodes/containment, then replaces one project's graph transactionally
   through db. It returns committed revision/counts and elapsed time.
-- Import/call resolution, query methods, engine lifecycle, and live updates
+- `createGraphQueries` exposes project-scoped database queries through a core
+  facade for server consumers.
+- `openIndexedProject` owns the database and initial scan, exposes queries after
+  the commit, and closes storage on shutdown or startup failure.
+- Import/call resolution, engine lifecycle, and live updates
   remain planned. See [usage and boundaries](../../packages/core/README.md).
 
 ## Tasks

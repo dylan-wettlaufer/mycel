@@ -301,7 +301,7 @@ agreed implementation plan.
     unsupported files excluded.
 -   [x] Implement getNode, searchSymbols, getNeighborhood, getCallers,
     and getDependencies.
--   [ ] Expose graph queries through Hono API endpoints.
+-   [x] Expose graph queries through Hono API endpoints.
 -   [ ] Test extraction and resolution on small fixture repositories.
 
 ## Phase 3 --- Live incremental indexing

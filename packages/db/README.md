@@ -149,6 +149,13 @@ const dependencies = getDependencies(database, projectId, nodeId, 100);
 ```
 
 - `getNode` returns a `GraphNode`, or `undefined` when absent.
+- `getNodeDetails(database, projectId, id, limit = 100)` returns `NodeDetails`,
+  or `undefined` when absent. It combines the node, callers, dependencies,
+  related file nodes, and diagnostics for the node's path in one read transaction.
+  Related files include the owning file first, then files of all direct callers
+  and dependencies ordered by path, independently of the other lists' limits.
+  Each relationship list has its own truncation flag. Diagnostics are ordered by
+  source offsets and internal ID.
 - `searchSymbols` returns `SearchResult`, searching files and symbols by name,
   qualified name, and path. Matching uses SQLite's ASCII case-insensitive `LIKE`;
   `%`, `_`, and backslashes are literal characters. Queries are trimmed; blank
@@ -171,7 +178,7 @@ Depth must be a nonnegative safe integer and limits must be positive safe
 integers; invalid values throw `RangeError`. The HTTP layer must still cap
 resource usage when exposing these functions to clients.
 
-Search and neighborhood queries run in read transactions, so their data and
+Search, node details, and neighborhood queries run in read transactions, so their data and
 project revision describe the same committed snapshot. The response revision is
 the latest project revision, even when individual records retain older
 last-written revisions. Searches of unknown projects return revision 0 and no

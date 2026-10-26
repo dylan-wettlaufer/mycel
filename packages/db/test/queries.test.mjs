@@ -5,6 +5,7 @@ import {
   getDependencies,
   getNeighborhood,
   getNode,
+  getNodeDetails,
   openDatabase,
   replaceProjectGraph,
   searchSymbols,
@@ -269,6 +270,10 @@ test("queries validate integer bounds before reading", (t) => {
     );
     assert.throws(() => getCallers(db, project.id, "save", limit), RangeError);
     assert.throws(
+      () => getNodeDetails(db, project.id, "save", limit),
+      RangeError,
+    );
+    assert.throws(
       () => getDependencies(db, project.id, "save", limit),
       RangeError,
     );
@@ -330,10 +335,13 @@ test("query context uses the latest project revision, even when nodes retain old
   );
   const search = searchSymbols(db, project.id, "root");
   const neighborhood = getNeighborhood(db, project.id, "root");
+  const details = getNodeDetails(db, project.id, "root");
   assert.equal(search.revision, 2);
   assert.equal(search.nodes[0].revision, 1);
   assert.equal(neighborhood.revision, 2);
   assert.equal(neighborhood.nodes[0].revision, 1);
+  assert.equal(details.revision, 2);
+  assert.equal(details.node.revision, 1);
   assert.equal(searchSymbols(db, "project:other", "root").revision, 1);
 
   replaceProjectGraph(db, { project, nodes: [], edges: [], diagnostics: [] });
@@ -345,6 +353,37 @@ test("query context uses the latest project revision, even when nodes retain old
   });
   assert.equal(getNode(db, project.id, "root"), undefined);
   assert.equal(getNeighborhood(db, project.id, "root"), undefined);
+  assert.equal(getNodeDetails(db, project.id, "root"), undefined);
+});
+
+test("node details find related files independently of truncated caller lists", (t) => {
+  const db = fixture(
+    t,
+    [
+      node("root", "root", { path: "src/root.ts" }),
+      node("file:root", "root.ts", { kind: "file", path: "src/root.ts" }),
+      node("file:a", "a.ts", { kind: "file", path: "src/a.ts" }),
+      node("file:b", "b.ts", { kind: "file", path: "src/b.ts" }),
+      node("file:z", "z.ts", { kind: "file", path: "src/z.ts" }),
+      node("alpha", "Alpha", { path: "src/z.ts" }),
+      node("beta", "Beta", { path: "src/b.ts" }),
+      node("zulu", "Zulu", { path: "src/a.ts" }),
+    ],
+    [edge("alpha", "root"), edge("beta", "root"), edge("zulu", "root")],
+  );
+  const details = getNodeDetails(db, project.id, "root", 2);
+  assert.deepEqual(ids(details.callers), ["alpha", "beta"]);
+  assert.equal(details.callers.truncated, true);
+  assert.deepEqual(ids(details.relatedFiles), ["file:root", "file:a"]);
+  assert.equal(details.relatedFiles.truncated, true);
+  assert.deepEqual(details.dependencies, { nodes: [], truncated: false });
+  assert.deepEqual(details.diagnostics, []);
+  assert.ok(
+    details.relatedFiles.nodes.every(
+      (n) => n.kind === "file" && n.projectId === project.id,
+    ),
+  );
+  assert.equal(getNodeDetails(db, "missing-project", "root"), undefined);
 });
 
 test("default limits bound search, relationship lists, and wide neighborhoods", (t) => {

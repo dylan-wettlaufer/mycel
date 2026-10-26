@@ -16,24 +16,29 @@ See [architecture](../ARCHITECTURE.md#http-api).
   HTML navigation falls back to `index.html`.
 - `src/start.ts` is a fixed-port (3000) development entry targeting the Mycel
   workspace.
-- Tests in `test/server.test.mjs`.
+- Graph routes accept a project-scoped core `GraphQueries` facade through
+  `AppOptions.graph`; search, node details, and neighborhoods use shared response
+  contracts. See [server usage](../../packages/server/README.md).
+- Tests in `test/server.test.mjs` and `test/graph.test.mjs`.
 
 ## Tasks
 
 ### Phase 2: graph routes
 
-- [ ] Accept the core engine in `AppOptions` and move routes into
+- [x] Accept the core query facade in `AppOptions` and move routes into
       `src/routes/` as the API grows.
-- [ ] `GET /api/graph/search?q=` with a result limit.
-- [ ] `GET /api/graph/nodes/:id`, returning 404 for unknown ids.
-- [ ] `GET /api/graph/nodes/:id/neighborhood` with bounded `depth` and
+- [x] `GET /api/graph/search?q=` with a result limit.
+- [x] `GET /api/graph/nodes/:id`, returning 404 for unknown ids.
+- [x] `GET /api/graph/nodes/:id/neighborhood` with bounded `depth` and
       `limit` parameters.
 - [ ] `GET /api/files/content?path=`: resolve the path with `realpath`, reject
       anything outside the project root (including through symlinks), and
       return 404 for missing files.
-- [ ] Validate query parameters and return 400 with a JSON error body for bad
+- [x] Validate graph query parameters and return 400 with a JSON error body for bad
       input.
 - [ ] Extend `/api/health` with index and database status from the engine.
+- [x] Wire initial indexing and graph queries into CLI/dev startup; close storage
+      on shutdown and failed startup through `startIndexedServer`.
 - [ ] Add a `GET /api/stats` route for the dashboard cards, or include the
       counts in `/api/project`.
 
@@ -63,7 +68,8 @@ See [architecture](../ARCHITECTURE.md#http-api).
 
 ## Tests
 
-- [ ] Each route with an in-memory engine or fixture database.
+- [x] Graph routes with an in-memory fixture database, validation, errors,
+      project isolation, and loopback HTTP. File/history routes remain below.
 - [ ] Path traversal (`..`, absolute paths, symlinks out of the root) is
       rejected by `/api/files/content`.
 - [ ] SSE delivers events in order and replays after `Last-Event-ID`.

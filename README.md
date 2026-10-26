@@ -12,10 +12,10 @@ cd /path/to/your/repository
 mycel
 ```
 
-Mycel resolves the Git working-tree root, starts one local server, and opens the
+Mycel resolves the Git working-tree root, indexes the repository, starts one local server, and opens the
 dashboard in your default browser. Outside Git, it opens the current folder.
 The dashboard shows the selected repository's name and absolute path. The
-terminal stays running; press Ctrl+C to stop the server.
+terminal stays running; press Ctrl+C to stop the server and close its database.
 
 Each launch uses an available port on `127.0.0.1` and prints the dashboard URL.
 Use `mycel --no-open` when you want to open the URL yourself, or `mycel --help`
@@ -55,9 +55,12 @@ together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
 shadcn/ui; it currently renders a dashboard shell with placeholder data. The
 Hono backend in `packages/server` serves the built dashboard and exposes a
 health endpoint. The dashboard connection badge polls that endpoint; the
-repository identity comes from `/api/project`. Indexing, graph statistics, and
-activity are still placeholders; core, parser, and database implementations
-are planned in [the PRD](mycel_prd.md).
+repository identity comes from `/api/project`. Structural indexing and database
+graph queries are implemented as library APIs. Hono exposes search, node details,
+and neighborhood routes. CLI/dev startup indexes the selected repository and
+attaches its queries automatically; see [server usage](packages/server/README.md).
+Dashboard graph statistics and activity integration remain planned in
+[the PRD](mycel_prd.md).
 
 ## Development
 
@@ -134,14 +137,26 @@ curl 'http://127.0.0.1:<port>/api/health'
 
 Replace `<port>` with the port printed by `mycel` (or use port 3000 for
 `pnpm dev:server`). The health endpoint currently checks process liveness.
-Indexing and database readiness are not implemented yet. The server binds
+Startup completes an initial index before listening. Each restart rescans the
+repository; live file watching and progress reporting remain planned. The server binds
 only to the loopback interface. Stop it with Ctrl+C.
 
 For a fixed-port server without browser launch, build first with `pnpm build`,
 then run `pnpm --filter @mycel/server start` at http://127.0.0.1:3000. The server
 package exports `createApp(options)` for in-process requests and
-`startServer(port = 3000, options)` for the CLI. Importing either the server or
+`startIndexedServer(port, options)` for startup with indexing, and
+`startServer(port = 3000, options)` for callers supplying their own graph queries. Importing either the server or
 CLI package does not start a listener or open a browser.
+
+Query the indexed graph using the dev server (port 3000) or the CLI's printed port:
+
+```sh
+curl 'http://127.0.0.1:3000/api/graph/search?q=indexRepository&limit=10'
+```
+
+Use an ID from `nodes` to request `/api/graph/nodes/<id>` or
+`/api/graph/nodes/<id>/neighborhood?depth=2&limit=50`. See
+[graph route parameters](packages/server/README.md#graph-routes) for limits.
 
 Add shadcn/ui components from `apps/web`, for example
 `pnpm dlx shadcn@latest add dialog`. Generated components land in
