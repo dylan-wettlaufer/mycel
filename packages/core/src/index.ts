@@ -10,3 +10,5 @@ export { watchSourceFiles } from "./watcher.js";
 export type { SourceChange, SourceWatcherOptions } from "./watcher.js";
 export { createSourceChangeQueue } from "./changes.js";
 export type { SourceBatch, SourceChangeQueueOptions } from "./changes.js";
+export { watchRepository } from "./live-index.js";
+export type { WatchRepositoryOptions } from "./live-index.js";

@@ -31,6 +31,26 @@ export async function indexRepository(
   options: IndexRepositoryOptions,
 ): Promise<IndexResult> {
   const started = performance.now();
+  const { project, files, paths } = await captureRepository(options);
+  const graph = buildProjectGraph(project, files);
+  const revision = replaceProjectGraph(options.database, graph);
+  return {
+    project,
+    projectId: project.id,
+    revision,
+    files: paths,
+    fileCount: files.length,
+    symbolCount: graph.nodes.length - files.length,
+    edgeCount: graph.edges.length,
+    diagnosticCount: graph.diagnostics.length,
+    durationMs: performance.now() - started,
+  };
+}
+
+export async function captureRepository(
+  options: IndexRepositoryOptions,
+  parse: typeof parseFile = parseFile,
+) {
   if (typeof options.project.name !== "string" || !options.project.name.trim())
     throw new TypeError("Project name must be nonempty");
   const indexing = resolveIndexingSettings(options.indexing);
@@ -49,19 +69,7 @@ export async function indexRepository(
     } catch (cause) {
       throw new Error(`Could not read repository source: ${path}`, { cause });
     }
-    files.push({ source, parsed: parseFile(path, source) });
+    files.push({ source, parsed: parse(path, source) });
   }
-  const graph = buildProjectGraph(project, files);
-  const revision = replaceProjectGraph(options.database, graph);
-  return {
-    project,
-    projectId: project.id,
-    revision,
-    files: discovered.paths,
-    fileCount: files.length,
-    symbolCount: graph.nodes.length - files.length,
-    edgeCount: graph.edges.length,
-    diagnosticCount: graph.diagnostics.length,
-    durationMs: performance.now() - started,
-  };
+  return { project, files, paths: discovered.paths };
 }

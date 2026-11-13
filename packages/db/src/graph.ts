@@ -32,6 +32,22 @@ export function replaceProjectGraph(
   database: SqliteDatabase,
   graph: ProjectGraph,
 ): Revision {
+  return writeProjectGraph(database, graph, false);
+}
+
+/** Reconcile a graph while preserving records whose content has not changed. */
+export function applyProjectGraph(
+  database: SqliteDatabase,
+  graph: ProjectGraph,
+): Revision {
+  return writeProjectGraph(database, graph, true);
+}
+
+function writeProjectGraph(
+  database: SqliteDatabase,
+  graph: ProjectGraph,
+  incremental: boolean,
+): Revision {
   const { project } = graph;
   if (!database.memory)
     resolveExternalDatabasePath(project.root, database.name);
@@ -78,12 +94,27 @@ export function replaceProjectGraph(
       database
         .prepare("INSERT INTO revisions (project_id, revision) VALUES (?, ?)")
         .run(project.id, revision);
-      database
-        .prepare("DELETE FROM edges WHERE project_id = ?")
-        .run(project.id);
-      database
-        .prepare("DELETE FROM nodes WHERE project_id = ?")
-        .run(project.id);
+      if (incremental) {
+        database
+          .prepare(
+            `DELETE FROM edges WHERE project_id = ?
+          AND id NOT IN (SELECT value FROM json_each(?))`,
+          )
+          .run(project.id, JSON.stringify(graph.edges.map((edge) => edge.id)));
+        database
+          .prepare(
+            `DELETE FROM nodes WHERE project_id = ?
+          AND id NOT IN (SELECT value FROM json_each(?))`,
+          )
+          .run(project.id, JSON.stringify(graph.nodes.map((node) => node.id)));
+      } else {
+        database
+          .prepare("DELETE FROM edges WHERE project_id = ?")
+          .run(project.id);
+        database
+          .prepare("DELETE FROM nodes WHERE project_id = ?")
+          .run(project.id);
+      }
       database
         .prepare("DELETE FROM diagnostics WHERE project_id = ?")
         .run(project.id);
@@ -96,14 +127,38 @@ export function replaceProjectGraph(
       @projectId, @id, @kind, @name, @qualifiedName, @path,
       @start, @end, @startLine, @startColumn, @endLine, @endColumn,
       @contentHash, @revision
-    )`);
+    ) ${
+      incremental
+        ? `ON CONFLICT(project_id, id) DO UPDATE SET
+      kind = excluded.kind, name = excluded.name, qualified_name = excluded.qualified_name,
+      path = excluded.path, start_offset = excluded.start_offset, end_offset = excluded.end_offset,
+      start_line = excluded.start_line, start_column = excluded.start_column,
+      end_line = excluded.end_line, end_column = excluded.end_column,
+      content_hash = excluded.content_hash, revision = excluded.revision
+      WHERE (nodes.kind, nodes.name, nodes.qualified_name, nodes.path,
+        nodes.start_offset, nodes.end_offset, nodes.start_line, nodes.start_column,
+        nodes.end_line, nodes.end_column, nodes.content_hash)
+      IS NOT (excluded.kind, excluded.name, excluded.qualified_name, excluded.path,
+        excluded.start_offset, excluded.end_offset, excluded.start_line, excluded.start_column,
+        excluded.end_line, excluded.end_column, excluded.content_hash)`
+        : ""
+    }`);
       for (const node of graph.nodes) {
         const { range, ...fields } = node;
         insertNode.run({ ...fields, ...rangeParameters(range), revision });
       }
       const insertEdge =
         database.prepare(`INSERT INTO edges (project_id, id, source_id, target_id, kind, revision)
-      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision)`);
+      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision)
+      ${
+        incremental
+          ? `ON CONFLICT(project_id, id) DO UPDATE SET
+        source_id = excluded.source_id, target_id = excluded.target_id,
+        kind = excluded.kind, revision = excluded.revision
+        WHERE (edges.source_id, edges.target_id, edges.kind)
+        IS NOT (excluded.source_id, excluded.target_id, excluded.kind)`
+          : ""
+      }`);
       for (const edge of graph.edges) insertEdge.run({ ...edge, revision });
       const insertDiagnostic = database.prepare(`INSERT INTO diagnostics (
       project_id, path, start_offset, end_offset, start_line, start_column, end_line, end_column,
