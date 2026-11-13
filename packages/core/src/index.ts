@@ -6,3 +6,5 @@ export { createGraphQueries } from "./queries.js";
 export type { GraphQueries } from "./queries.js";
 export { openIndexedProject } from "./project.js";
 export type { IndexedProject, IndexedProjectOptions } from "./project.js";
+export { watchSourceFiles } from "./watcher.js";
+export type { SourceChange, SourceWatcherOptions } from "./watcher.js";

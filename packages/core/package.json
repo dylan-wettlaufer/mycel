@@ -19,9 +19,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mycel/parser": "workspace:*",
     "@mycel/db": "workspace:*",
+    "@mycel/parser": "workspace:*",
     "@mycel/shared": "workspace:*",
+    "chokidar": "^6.0.0",
     "ignore": "7.0.14",
     "picomatch": "4.0.7"
   },

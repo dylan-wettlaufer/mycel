@@ -7,7 +7,7 @@ import type { IndexingSettings } from "@mycel/shared";
 import { isMissing, readRepositoryText } from "./files.js";
 import { resolveIndexingSettings } from "./settings.js";
 
-const excludedDirectories = new Set([
+export const excludedDirectories = new Set([
   ".git",
   "node_modules",
   "dist",
