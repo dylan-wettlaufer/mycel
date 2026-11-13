@@ -126,15 +126,28 @@ facade. The facade fixes the project ID and reads the latest committed graph
 on each call. Pass it as `graph` to the server's `AppOptions`; see
 [server usage](../server/README.md).
 
-## Next stages
+## Relationship resolution
 
-This stage stores structural nodes and containment only. Import/export and call
-facts are available to the indexing pipeline from the parser; resolution into
-`IMPORTS` and `CALLS` edges remains the next task. The
-background indexing/progress API, watcher, content-hash skipping, event history,
-and dashboard graph integration remain separate work. Full scans do not
-retain a previous valid per-file graph when syntax changes; they store the
-currently recoverable structure and diagnostics.
+Initial and incremental indexes resolve `IMPORTS` edges between local files and
+`CALLS` edges for identifiable structural targets. Relative module resolution
+supports `.ts`, `.tsx`, `.d.ts`, directory index files, and emitted `.js`/`.jsx`
+specifiers. Named, default, namespace, aliased, and chained re-exports are
+supported, with cycle guards and ambiguity checks. Type-only imports contribute
+file dependencies but never runtime calls. Missing relative modules produce
+resolver diagnostics, which disappear when the module becomes available.
+
+Calls can resolve to lexical functions, imported functions/classes, namespace
+members, static class methods, and `this` methods. Module-level calls originate
+at the file node. This is structural resolution, not TypeScript semantic type
+checking: package/tsconfig aliases, dynamic imports, arbitrary receiver types,
+and runtime binding/shadowing analysis are outside its scope. Unknown or
+ambiguous targets produce no edge.
+
+After a batch, relationships are recomputed from all cached parse facts. This
+covers transitive re-exports, deleted targets, and previously missing modules
+without reparsing consumers. SQLite reconciliation preserves unchanged nodes
+and edges, including their last-written revisions. Dependency-directed resolver
+invalidation can narrow this work later if measurements warrant it.
 
 ## Verify
 

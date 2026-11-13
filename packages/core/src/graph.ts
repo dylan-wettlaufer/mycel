@@ -1,4 +1,6 @@
-import { createHash } from "node:crypto";
+import { hashContent, hashIdentity } from "./hash.js";
+export { hashContent, hashIdentity } from "./hash.js";
+import { resolveRelationships } from "./resolver.js";
 import { posix } from "node:path";
 import type { ParseResult } from "@mycel/parser";
 import type { ProjectGraph } from "@mycel/db";
@@ -9,11 +11,6 @@ import type {
   Project,
   SourceRange,
 } from "@mycel/shared";
-
-export const hashContent = (source: string): string =>
-  createHash("sha256").update(source, "utf8").digest("hex");
-export const hashIdentity = (parts: readonly string[]): string =>
-  hashContent(JSON.stringify(parts));
 
 export interface CapturedFile {
   source: string;
@@ -85,5 +82,8 @@ export function buildProjectGraph(
     }
     diagnostics.push(...parsed.diagnostics);
   }
+  const relationships = resolveRelationships(project, files);
+  edges.push(...relationships.edges);
+  diagnostics.push(...relationships.diagnostics);
   return { project, nodes, edges, diagnostics };
 }

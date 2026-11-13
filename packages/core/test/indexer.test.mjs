@@ -256,7 +256,15 @@ test("indexes all discovered files into nodes, lexical containment, hashes, and 
       hash(source.slice(node.start_offset, node.end_offset)),
     );
   assert.equal(edges.length, result.edgeCount);
-  assert.ok(edges.every((edge) => edge.kind === "CONTAINS"));
+  assert.ok(edges.some((edge) => edge.kind === "CONTAINS"));
+  assert.ok(
+    edges.some(
+      (edge) =>
+        edge.kind === "CALLS" &&
+        edge.source_id === save.id &&
+        edge.target_id === nested.id,
+    ),
+  );
   assert.ok(result.diagnosticCount > 0);
   assert.equal(
     db

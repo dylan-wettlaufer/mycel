@@ -108,3 +108,54 @@ test("reconciles saves made during initial capture before exposing the live inde
   assert.ok(setup.nodes().some((n) => n.name === "latest"));
   assert.equal(setup.revision(), 2);
 });
+
+test("re-resolves unchanged consumers after export/symbol edits, target deletion, addition, and rename", async (t) => {
+  const { root, db, parsed, nodes, errors } = await fixture(t, {
+    "lib.ts": "function first() {} function second() {} export {first as run};",
+    "barrel.ts": "export {run} from './lib';",
+    "main.ts": "import {run} from './barrel'; function caller() { run(); }",
+  });
+  const calls = () =>
+    db
+      .prepare(
+        "SELECT target.name FROM edges e JOIN nodes target ON target.id = e.target_id AND target.project_id = e.project_id WHERE e.kind = 'CALLS' ORDER BY target.name",
+      )
+      .all()
+      .map((n) => n.name);
+  assert.deepEqual(calls(), ["first"]);
+  const consumer = nodes().filter((n) => n.path === "main.ts");
+  parsed.length = 0;
+  await writeFile(
+    join(root, "lib.ts"),
+    "function first() {} function second() {} export {second as run};",
+  );
+  await until(() => calls()[0] === "second");
+  assert.deepEqual(parsed, ["lib.ts"]);
+  assert.deepEqual(
+    nodes().filter((n) => n.path === "main.ts"),
+    consumer,
+  );
+  await rm(join(root, "lib.ts"));
+  await until(() => !nodes().some((n) => n.path === "lib.ts"));
+  assert.deepEqual(calls(), []);
+  assert.ok(
+    db
+      .prepare("SELECT id FROM diagnostics WHERE code = 'unresolved-module'")
+      .get(),
+  );
+  await writeFile(join(root, "lib.ts"), "export function run() {}");
+  await until(() => calls()[0] === "run");
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM diagnostics").get().n, 0);
+  await rename(join(root, "lib.ts"), join(root, "renamed.ts"));
+  await until(() => !nodes().some((n) => n.path === "lib.ts"));
+  assert.deepEqual(calls(), []);
+  await writeFile(join(root, "barrel.ts"), "export {run} from './renamed';");
+  await until(() => calls()[0] === "run");
+  await writeFile(
+    join(root, "main.ts"),
+    "import {run} from './missing'; function caller() { run(); }",
+  );
+  await until(() => calls().length === 0);
+  assert.deepEqual(db.pragma("foreign_key_check"), []);
+  assert.deepEqual(errors, []);
+});
