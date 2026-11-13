@@ -8,3 +8,5 @@ export { openIndexedProject } from "./project.js";
 export type { IndexedProject, IndexedProjectOptions } from "./project.js";
 export { watchSourceFiles } from "./watcher.js";
 export type { SourceChange, SourceWatcherOptions } from "./watcher.js";
+export { createSourceChangeQueue } from "./changes.js";
+export type { SourceBatch, SourceChangeQueueOptions } from "./changes.js";
