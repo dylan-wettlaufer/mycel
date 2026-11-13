@@ -78,3 +78,88 @@ test("project replacement rejects cross-project input, identity reassignment, an
     1,
   );
 });
+
+test("incremental reconciliation commits one revision and atomically rolls back late diagnostic failures", async (t) => {
+  const { applyProjectGraph } = await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const project = {
+    id: "p",
+    name: "initial",
+    root: "/fixture",
+    indexing: { extensions: [".ts"], exclude: [], respectGitignore: true },
+  };
+  const range = {
+    start: 0,
+    end: 1,
+    startLine: 1,
+    endLine: 1,
+    startColumn: 1,
+    endColumn: 2,
+  };
+  const node = {
+    id: "file",
+    projectId: "p",
+    name: "a.ts",
+    qualifiedName: "a.ts",
+    path: "a.ts",
+    kind: "file",
+    range,
+    contentHash: "0".repeat(64),
+  };
+  const diagnostic = {
+    path: "a.ts",
+    range,
+    severity: "error",
+    source: "parser",
+    code: "syntax",
+    message: "original",
+  };
+  const graph = {
+    project,
+    nodes: [node],
+    edges: [],
+    diagnostics: [diagnostic, diagnostic],
+  };
+  replaceProjectGraph(db, graph);
+  const snapshot = () =>
+    Object.fromEntries(
+      ["projects", "revisions", "nodes", "edges", "diagnostics"].map(
+        (table) => [
+          table,
+          db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+        ],
+      ),
+    );
+  const before = snapshot();
+  db.exec(
+    "CREATE TRIGGER reject_diagnostic BEFORE INSERT ON diagnostics WHEN NEW.message = 'reject' BEGIN SELECT RAISE(ABORT, 'late failure'); END",
+  );
+  const changed = {
+    project: { ...project, name: "changed" },
+    nodes: [{ ...node, contentHash: "1".repeat(64) }],
+    edges: [
+      {
+        id: "edge",
+        projectId: "p",
+        kind: "CALLS",
+        sourceId: "file",
+        targetId: "file",
+      },
+    ],
+    diagnostics: [{ ...diagnostic, message: "reject" }],
+  };
+  assert.throws(() => applyProjectGraph(db, changed), /late failure/);
+  assert.deepEqual(snapshot(), before);
+  assert.equal(db.inTransaction, false);
+  db.exec("DROP TRIGGER reject_diagnostic");
+  assert.equal(
+    applyProjectGraph(db, { ...changed, diagnostics: [diagnostic] }),
+    2,
+  );
+  assert.equal(snapshot().nodes[0].revision, 2);
+  assert.equal(snapshot().edges[0].revision, 2);
+  assert.deepEqual(snapshot().diagnostics, [before.diagnostics[0]]);
+  assert.equal(snapshot().projects[0].name, "changed");
+  assert.deepEqual(db.pragma("foreign_key_check"), []);
+});

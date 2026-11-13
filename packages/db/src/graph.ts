@@ -27,6 +27,57 @@ function rangeParameters(range: SourceRange) {
   };
 }
 
+function diagnosticKey(diagnostic: Diagnostic): string {
+  return JSON.stringify([
+    diagnostic.path,
+    diagnostic.severity,
+    diagnostic.source,
+    diagnostic.code,
+    diagnostic.message,
+    ...Object.values(rangeParameters(diagnostic.range)),
+  ]);
+}
+
+/** Keep unchanged diagnostics (including duplicates) and remove obsolete records. */
+function reconcileDiagnostics(
+  database: SqliteDatabase,
+  graph: ProjectGraph,
+): Diagnostic[] {
+  const remaining = new Map<
+    string,
+    { diagnostic: Diagnostic; count: number }
+  >();
+  for (const diagnostic of graph.diagnostics) {
+    const key = diagnosticKey(diagnostic);
+    const entry = remaining.get(key);
+    if (entry) entry.count++;
+    else remaining.set(key, { diagnostic, count: 1 });
+  }
+  const rows = database
+    .prepare<
+      [string],
+      Omit<Diagnostic, "range"> & SourceRange & { id: number }
+    >(
+      `
+    SELECT id, path, severity, source, code, message,
+      start_offset AS start, end_offset AS end, start_line AS startLine,
+      start_column AS startColumn, end_line AS endLine, end_column AS endColumn
+    FROM diagnostics WHERE project_id = ? ORDER BY id`,
+    )
+    .all(graph.project.id);
+  const remove = database.prepare(
+    "DELETE FROM diagnostics WHERE project_id = ? AND id = ?",
+  );
+  for (const row of rows) {
+    const entry = remaining.get(diagnosticKey({ ...row, range: row }));
+    if (entry && entry.count > 0) entry.count--;
+    else remove.run(graph.project.id, row.id);
+  }
+  return [...remaining.values()].flatMap(({ diagnostic, count }) =>
+    Array.from({ length: count }, () => diagnostic),
+  );
+}
+
 /** Replace one project's current graph and allocate its revision atomically. */
 export function replaceProjectGraph(
   database: SqliteDatabase,
@@ -115,9 +166,13 @@ function writeProjectGraph(
           .prepare("DELETE FROM nodes WHERE project_id = ?")
           .run(project.id);
       }
-      database
-        .prepare("DELETE FROM diagnostics WHERE project_id = ?")
-        .run(project.id);
+      const diagnostics = incremental
+        ? reconcileDiagnostics(database, graph)
+        : graph.diagnostics;
+      if (!incremental)
+        database
+          .prepare("DELETE FROM diagnostics WHERE project_id = ?")
+          .run(project.id);
 
       const insertNode = database.prepare(`INSERT INTO nodes (
       project_id, id, kind, name, qualified_name, path,
@@ -167,7 +222,7 @@ function writeProjectGraph(
       @projectId, @path, @start, @end, @startLine, @startColumn, @endLine, @endColumn,
       @severity, @source, @code, @message, @revision
     )`);
-      for (const diagnostic of graph.diagnostics) {
+      for (const diagnostic of diagnostics) {
         const { range, ...fields } = diagnostic;
         insertDiagnostic.run({
           ...fields,
