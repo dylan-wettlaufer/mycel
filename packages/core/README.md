@@ -1,8 +1,8 @@
 # @mycel/core
 
-Full-repository structural indexing, independent of the HTTP server and browser.
+Full-repository and incremental indexing, independent of the HTTP server and browser.
 The current entry points are `discoverSourceFiles`, `indexRepository`,
-`createGraphQueries`, and `openIndexedProject`.
+`createGraphQueries`, `watchRepository`, and `openIndexedProject`.
 
 ```ts
 import { openDatabase } from "@mycel/db";
@@ -98,8 +98,9 @@ working tree, not an atomic filesystem snapshot.
 
 ## Indexed project lifecycle
 
-`openIndexedProject({ project, databasePath?, indexing? })` opens the project's
-database, runs a full initial index, and returns `{ project, graph, close }`.
+`openIndexedProject({ project, databasePath?, indexing?, debounceMs?, onError? })`
+opens storage, starts watching before the initial scan, and returns
+`{ project, graph, flush, lastUpdate, close }` after reconciling startup saves.
 Storage defaults to the per-repository database outside the source tree.
 The returned `graph` is a project-scoped query facade ready to use. `close()`
 releases storage and is safe to call more than once; indexing failures close
@@ -107,8 +108,8 @@ the connection before rejecting. Restarting reindexes the current source and
 allocates a new revision in the existing database.
 
 The CLI and standalone server use this lifecycle through `startIndexedServer`.
-Startup waits for the initial index; background progress and live updates are
-future work. For temporary indexes, pass `databasePath: ":memory:"`.
+Startup waits for the initial index, then saved changes update graph queries
+automatically. For temporary indexes, pass `databasePath: ":memory:"`.
 
 ## Graph queries
 
@@ -149,6 +150,44 @@ without reparsing consumers. SQLite reconciliation preserves unchanged nodes
 and edges, including their last-written revisions. Dependency-directed resolver
 invalidation can narrow this work later if measurements warrant it.
 
+## Live updates and measurements
+
+`watchRepository({ project, database, indexing?, debounceMs?, onError, parse? })`
+provides the same live pipeline when the caller owns storage. Await `close()`
+before closing that database. `openIndexedProject.close()` stops callbacks and
+releases its owned storage synchronously. `flush()` processes queued changes
+immediately and rejects on capture or database failure; background failures go
+to `onError`. Failed batches retain their pending paths for a later save or
+explicit flush, without advancing content hashes or cached parse facts.
+
+Chokidar reports additions, edits, and deletions; renames are delete plus create.
+Bursts are coalesced with a 75 ms trailing debounce by default. Discovery applies
+the same exclusions as full scans and reconciles `.gitignore` changes. SHA-256
+comparison skips identical saves before parsing. Only changed files are parsed;
+relationship resolution uses cached facts for the complete project.
+
+During live updates, partial parses retain a previous fully parsed file's nodes,
+source hashes, and relationships, with current syntax diagnostics. Parser
+exceptions retain any previous file and produce a `parser-failure` diagnostic.
+Other files can still update. A new invalid file has no valid graph to retain:
+recoverable partial structure is indexed, while a thrown parser produces only a
+diagnostic. A later valid save replaces retained structure and clears parser
+diagnostics; deletion removes both. The initial scan retains the full-index
+behavior described above; last-valid parse caches live for the watcher session.
+
+Every graph update reconciles nodes, edges, and diagnostics in one immediate
+SQLite transaction. Unchanged records keep their revisions and diagnostic IDs.
+
+`lastUpdate` is undefined before the first incremental commit, then exposes a
+read-only `GraphUpdateTiming` with revision, changed/retained paths, monotonic
+`observedAt`/`completedAt` timestamps, and milliseconds for queue/debounce,
+capture/hash, parse, resolve, and database write. `latencyMs` measures the first
+observed filesystem event through the completed commit, including debounce.
+The OS does not expose the editor's exact save time: event delivery delay before
+detection is outside this measurement. No-op saves and failed transactions do
+not replace the last successful timing. Read it after `flush()` or after polling
+the committed graph revision; it is exposed on both live entry points.
+
 ## Verify
 
 ```sh
@@ -161,3 +200,8 @@ pnpm test
 Fixtures cover nested ignore rules (checked against Git), custom globs,
 unsupported/generated files, symlinks, TSX, partial syntax, UTF-16 ranges,
 stable IDs, project isolation, rescans, persistence, and atomic failure cases.
+
+The [import/call fixture](test/fixtures/import-call/README.md) checks a real
+two-file repository through extraction, indexing, and query dependencies/callers
+without manually seeded edges. Import and call resolution assertions pass as
+regular acceptance tests.

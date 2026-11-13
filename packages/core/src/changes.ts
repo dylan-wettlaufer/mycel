@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import type { IndexingSettings } from "@mycel/shared";
 import { discoverSourceFiles } from "./discovery.js";
 import { isMissing, readRepositoryText } from "./files.js";
@@ -8,6 +9,8 @@ export interface SourceBatch {
   /** Null represents a deletion or a file excluded by current ignore rules. */
   files: ReadonlyMap<string, string | null>;
   observedAt: number;
+  captureStartedAt: number;
+  capturedAt: number;
 }
 
 export interface SourceChangeQueueOptions {
@@ -38,6 +41,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
 
   async function process() {
     if (closed || !pending.size) return;
+    const captureStartedAt = performance.now();
     const changes = pending;
     pending = new Map();
     try {
@@ -80,6 +84,8 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
       await options.onBatch({
         files,
         observedAt: Math.min(...changes.values()),
+        captureStartedAt,
+        capturedAt: performance.now(),
       });
       for (const [path, hash] of nextHashes) {
         if (hash === null) hashes.delete(path);

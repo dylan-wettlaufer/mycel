@@ -1,5 +1,6 @@
 import { openDatabase } from "@mycel/db";
 import type { IndexingSettings, Project, ProjectInfo } from "@mycel/shared";
+import type { GraphUpdateTiming } from "./live-index.js";
 import { watchRepository } from "./live-index.js";
 import { createGraphQueries } from "./queries.js";
 import type { GraphQueries } from "./queries.js";
@@ -16,6 +17,7 @@ export interface IndexedProjectOptions {
 export interface IndexedProject {
   project: Project;
   graph: GraphQueries;
+  readonly lastUpdate: GraphUpdateTiming | undefined;
   flush(): Promise<void>;
   close(): void;
 }
@@ -45,6 +47,9 @@ export async function openIndexedProject(
     return {
       project: live.project,
       graph: createGraphQueries(database, live.project.id),
+      get lastUpdate() {
+        return live.lastUpdate;
+      },
       flush: live.flush,
       close: () => {
         void live.close();

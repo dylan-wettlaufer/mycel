@@ -19,8 +19,10 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
   facade for server consumers.
 - `openIndexedProject` owns the database and initial scan, exposes queries after
   the commit, and closes storage on shutdown or startup failure.
-- Import/call resolution, engine lifecycle, and live updates
-  remain planned. See [usage and boundaries](../../packages/core/README.md).
+- Live updates watch source files, skip unchanged hashes, preserve valid graphs
+  through parser failures, and expose per-stage commit timings. Import/call
+  relationships are resolved from cached parse facts. The broader engine/event
+  lifecycle remains planned. See [usage and boundaries](../../packages/core/README.md).
 
 ## Tasks
 
@@ -42,28 +44,29 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
       its new revision atomically; remove stale/deleted/excluded file records.
 - [ ] Extend discovery when `.mts`/`.cts` support is added to the parser and
       shared extension contract. Those extensions are currently excluded.
-- [ ] Resolve relative imports to files, including extension and `index`
+- [x] Resolve relative imports to files, including extension and `index`
       resolution.
 - [ ] Decide how far to honor `tsconfig` `paths`, `baseUrl`, and workspace
       packages in the first version (open decision 7).
-- [ ] Resolve calls to imported or same-file symbols. Leave everything else
+- [x] Resolve calls to imported or same-file symbols. Leave everything else
       unresolved and record a diagnostic where useful.
 - [ ] Report progress (files indexed of total) for `/api/health`.
 
 ### Phase 3: live updates
 
-- [ ] Add Chokidar to watch the same file set as the indexer.
-- [ ] Debounce events per path and coalesce bursts of writes.
-- [ ] Skip files whose content hash has not changed.
-- [ ] Reparse only changed files and replace their nodes and edges.
-- [ ] Re-resolve edges in files that import the changed file when its exports
-      change.
-- [ ] Handle deletion (remove nodes and incoming edges) and rename (open
+- [x] Add Chokidar to watch the same file set as the indexer.
+- [x] Debounce events per path and coalesce bursts of writes.
+- [x] Skip files whose content hash has not changed.
+- [x] Reparse only changed files and replace their nodes and edges.
+- [x] Re-resolve edges in files that import the changed file when its exports
+      change. Resolution currently recomputes from all cached facts.
+- [x] Handle deletion (remove nodes and incoming edges) and rename (open
       decision 5: pair unlink and add by content hash or treat as delete plus
-      create).
-- [ ] On parse failure, keep the last valid graph for that file and surface a
+      create). Implemented as delete plus create.
+- [x] Apply graph changes and revision allocation in one SQLite transaction.
+- [x] On parse failure, keep the last valid graph for that file and surface a
       diagnostic.
-- [ ] Time each stage (detection, parse, resolve, database write) and expose
+- [x] Time each stage (queue/debounce, capture, parse, resolve, database write) and expose
       the measurements.
 
 ### Phase 4: change detection and events
@@ -83,9 +86,11 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - [x] Verify nested ignore rules against Git and cover custom exclusions,
       unsupported files, generated directories, and symlinks.
 - [x] Failed scans/graph writes preserve the previous graph and revision.
-- [ ] Watcher integration tests: create, edit, delete, and rename files in a
+- [x] Extract and index a checked-in two-file import/call fixture without seeded edges.
+- [x] Pass acceptance tests for `main.ts → utils.ts` imports and `save → validate` calls.
+- [x] Watcher integration tests: create, edit, delete, and rename files in a
       temporary directory and assert the resulting events.
-- [ ] Rapid successive writes produce one consistent final state.
+- [x] Rapid successive writes produce one consistent final state.
 - [ ] A failed database write emits no event.
 - [ ] Restarting the engine does not duplicate events.
 

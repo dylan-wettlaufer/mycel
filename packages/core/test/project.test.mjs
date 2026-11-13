@@ -95,3 +95,30 @@ test("failed startup closes storage and preserves the previous committed graph",
       .get(projectId),
   );
 });
+
+test("project lifecycle exposes live update measurements with query revisions", async (t) => {
+  const options = await fixture(t);
+  const indexed = await openIndexedProject(options);
+  t.after(indexed.close);
+  assert.equal(indexed.lastUpdate, undefined);
+  await writeFile(
+    join(options.project.root, "sample.ts"),
+    "export function saved() {}",
+  );
+  // flush only processes already observed events; wait for OS delivery.
+  const { setTimeout } = await import("node:timers/promises");
+  const deadline = Date.now() + 5000;
+  while (!indexed.lastUpdate) {
+    if (Date.now() > deadline) assert.fail("Timed out waiting for live update");
+    await setTimeout(20);
+  }
+  await indexed.flush();
+  assert.equal(
+    indexed.lastUpdate.revision,
+    indexed.graph.searchSymbols({ q: "saved" }).revision,
+  );
+  assert.equal(
+    indexed.graph.searchSymbols({ q: "saved" }).nodes[0].name,
+    "saved",
+  );
+});

@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { applyProjectGraph, replaceProjectGraph } from "@mycel/db";
+import type { Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
 import { buildProjectGraph, hashContent } from "./graph.js";
@@ -7,6 +8,21 @@ import { captureRepository } from "./indexer.js";
 import type { IndexRepositoryOptions } from "./indexer.js";
 import { watchSourceFiles } from "./watcher.js";
 import type { SourceChange } from "./watcher.js";
+
+/** Monotonic milliseconds, measured from the first observed filesystem event. */
+export interface GraphUpdateTiming {
+  readonly revision: number;
+  readonly changedPaths: readonly string[];
+  readonly retainedPaths: readonly string[];
+  readonly observedAt: number;
+  readonly completedAt: number;
+  readonly latencyMs: number;
+  readonly queueMs: number;
+  readonly captureMs: number;
+  readonly parseMs: number;
+  readonly resolveMs: number;
+  readonly writeMs: number;
+}
 
 export interface WatchRepositoryOptions extends IndexRepositoryOptions {
   debounceMs?: number;
@@ -38,6 +54,8 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       options.database,
       buildProjectGraph(project, [...files.values()]),
     );
+    let failures = new Map<string, Diagnostic[]>();
+    let lastUpdate: GraphUpdateTiming | undefined;
     queue = createSourceChangeQueue({
       root: project.root,
       indexing: project.indexing,
@@ -52,16 +70,74 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         : { debounceMs: options.debounceMs }),
       onError: options.onError,
       onBatch: async (batch) => {
+        const parseStartedAt = performance.now();
         const next = new Map(files);
+        const nextFailures = new Map(failures);
+        const retainedPaths: string[] = [];
         for (const [path, source] of batch.files) {
-          if (source === null) next.delete(path);
-          else next.set(path, { source, parsed: parse(path, source) });
+          nextFailures.delete(path);
+          if (source === null) {
+            next.delete(path);
+            continue;
+          }
+          const previous = files.get(path);
+          try {
+            const parsed = parse(path, source);
+            if (
+              parsed.status === "partial" &&
+              previous?.parsed.status === "parsed"
+            ) {
+              nextFailures.set(path, parsed.diagnostics);
+              retainedPaths.push(path);
+            } else next.set(path, { source, parsed });
+          } catch (error) {
+            nextFailures.set(path, [
+              {
+                path,
+                source: "parser",
+                severity: "error",
+                code: "parser-failure",
+                message: error instanceof Error ? error.message : String(error),
+                range: {
+                  start: 0,
+                  end: 0,
+                  startLine: 1,
+                  startColumn: 1,
+                  endLine: 1,
+                  endColumn: 1,
+                },
+              },
+            ]);
+            if (previous) retainedPaths.push(path);
+          }
         }
-        applyProjectGraph(
-          options.database,
-          buildProjectGraph(project, [...next.values()]),
-        );
+        const parsedAt = performance.now();
+        const graph = buildProjectGraph(project, [...next.values()]);
+        // Current syntax diagnostics accompany retained nodes and relationships.
+        graph.diagnostics = [
+          ...graph.diagnostics.filter(
+            (d) => d.source !== "parser" || !nextFailures.has(d.path),
+          ),
+          ...[...nextFailures.values()].flat(),
+        ];
+        const resolvedAt = performance.now();
+        const revision = applyProjectGraph(options.database, graph);
+        const completedAt = performance.now();
         files = next;
+        failures = nextFailures;
+        lastUpdate = Object.freeze({
+          revision,
+          changedPaths: Object.freeze([...batch.files.keys()]),
+          retainedPaths: Object.freeze(retainedPaths),
+          observedAt: batch.observedAt,
+          completedAt,
+          latencyMs: completedAt - batch.observedAt,
+          queueMs: batch.captureStartedAt - batch.observedAt,
+          captureMs: batch.capturedAt - batch.captureStartedAt,
+          parseMs: parsedAt - parseStartedAt,
+          resolveMs: resolvedAt - parsedAt,
+          writeMs: completedAt - resolvedAt,
+        });
       },
     });
     // Recheck the startup snapshot even if OS events have not arrived yet.
@@ -71,6 +147,9 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     await queue.flush();
     return {
       project,
+      get lastUpdate(): GraphUpdateTiming | undefined {
+        return lastUpdate;
+      },
       flush: queue.flush,
       close(): Promise<void> {
         // Stop callbacks synchronously, before the owner closes storage.
