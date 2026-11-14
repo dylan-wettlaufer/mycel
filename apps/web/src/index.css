@@ -188,3 +188,34 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+.react-flow {
+  --xy-background-color: var(--card);
+  --xy-node-background-color: var(--background);
+  --xy-node-color: var(--foreground);
+  --xy-node-border: 1px solid var(--border);
+  --xy-edge-label-background-color: var(--card);
+  --xy-edge-label-color: var(--muted-foreground);
+  --xy-controls-button-background-color: var(--background);
+  --xy-controls-button-color: var(--foreground);
+}
+.react-flow .graph-node {
+  border-left-width: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.react-flow .graph-node-file {
+  border-left-color: var(--chart-1);
+}
+.react-flow .graph-node-function {
+  border-left-color: var(--primary);
+}
+.react-flow .graph-node-class {
+  border-left-color: var(--warning);
+}
+.react-flow .graph-node-method {
+  border-left-color: var(--chart-3);
+}
+.react-flow .graph-node.selected {
+  outline: 2px solid var(--primary);
+}

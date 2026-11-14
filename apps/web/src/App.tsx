@@ -1,3 +1,4 @@
+import { GraphPanel } from "@/features/graph/graph-panel";
 import { Explorer } from "@/features/explorer/explorer";
 import type { GraphNode } from "@mycel/shared";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import { useProject } from "@/hooks/use-project";
 export function App() {
   const [view, setView] = useState<WorkspaceView>("Dashboard");
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [root, setRoot] = useState<GraphNode | null>(null);
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
 
@@ -26,8 +28,16 @@ export function App() {
         <Explorer
           onSelect={(node) => {
             setSelected(node);
+            setRoot(node);
             setView("Graph");
           }}
+        />
+      ) : view === "Graph" && root && selected ? (
+        <GraphPanel
+          key={root.id}
+          root={root}
+          selected={selected}
+          onSelect={setSelected}
         />
       ) : (
         <section>

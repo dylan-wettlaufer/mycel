@@ -32,3 +32,22 @@ export function isSearchResult(value: unknown): value is SearchResult {
     typeof value.truncated === "boolean"
   );
 }
+
+export function isNeighborhood(
+  value: unknown,
+): value is import("@mycel/shared").Neighborhood {
+  return (
+    isSearchResult(value) &&
+    isRecord(value) &&
+    typeof value.rootId === "string" &&
+    Array.isArray(value.edges) &&
+    value.edges.every(
+      (edge) =>
+        isRecord(edge) &&
+        typeof edge.id === "string" &&
+        typeof edge.sourceId === "string" &&
+        typeof edge.targetId === "string" &&
+        ["CALLS", "CONTAINS", "IMPORTS"].includes(String(edge.kind)),
+    )
+  );
+}
