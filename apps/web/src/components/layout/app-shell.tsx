@@ -8,56 +8,69 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ConnectionStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
-  label: string;
+  label: WorkspaceView;
   icon: LucideIcon;
-  /** Only the dashboard exists so far; the rest are planned (PRD phase 5). */
-  enabled: boolean;
 }
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, enabled: true },
-  { label: "Graph", icon: Network, enabled: false },
-  { label: "Activity", icon: Activity, enabled: false },
-  { label: "Explorer", icon: FolderTree, enabled: false },
+  { label: "Dashboard", icon: LayoutDashboard },
+  { label: "Graph", icon: Network },
+  { label: "Activity", icon: Activity },
+  { label: "Explorer", icon: FolderTree },
 ];
 
+export type WorkspaceView = "Dashboard" | "Graph" | "Activity" | "Explorer";
+
 interface AppShellProps {
+  view: WorkspaceView;
+  onNavigate: (view: WorkspaceView) => void;
   projectName: string;
   connection: ConnectionStatus;
   children: ReactNode;
 }
 
-export function AppShell({ projectName, connection, children }: AppShellProps) {
+export function AppShell({
+  projectName,
+  connection,
+  children,
+  view,
+  onNavigate,
+}: AppShellProps) {
   return (
-    <div className="flex min-h-svh bg-background text-foreground">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
+    <div className="flex min-h-svh flex-col flex-row bg-background text-foreground">
+      <aside className="w-full md:w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex">
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <Waypoints className="size-5 text-sidebar-primary" aria-hidden />
           <span className="text-base font-semibold tracking-tight">Mycel</span>
         </div>
-        <nav aria-label="Primary" className="flex flex-col gap-1 p-2">
-          {navItems.map(({ label, icon: Icon, enabled }) => (
-            <button
+        <nav
+          aria-label="Primary"
+          className="flex md:flex-col gap-1 p-2 overflow-x-auto"
+        >
+          {navItems.map(({ label, icon: Icon }) => (
+            <Button
               key={label}
               type="button"
-              disabled={!enabled}
-              aria-current={label === "Dashboard" ? "page" : undefined}
+              variant="ghost"
+              onClick={() => onNavigate(label)}
+              aria-current={label === view ? "page" : undefined}
               className={cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                label === "Dashboard"
+                "justify-start",
+                label === view
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
               )}
             >
               <Icon className="size-4" aria-hidden />
               {label}
-            </button>
+            </Button>
           ))}
         </nav>
       </aside>

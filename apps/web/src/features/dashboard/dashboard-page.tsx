@@ -1,3 +1,4 @@
+import type { ProjectInfo } from "@mycel/shared";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -105,4 +106,3 @@ export function DashboardPage({ project, projectError }: DashboardPageProps) {
     </div>
   );
 }
-import type { ProjectInfo } from "@mycel/shared";

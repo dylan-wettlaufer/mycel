@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
@@ -42,4 +42,17 @@ test("invalid repository metadata is reported without showing a fake project", a
   render(<App />);
   await screen.findByText("Repository details unavailable");
   expect(screen.getByRole("heading", { name: "Mycel" })).toBeTruthy();
+});
+
+test("primary navigation switches workspace views", () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(Response.json({ status: "ok" })),
+  );
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+  expect(screen.getByRole("heading", { name: "Graph" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Graph" }).getAttribute("aria-current"),
+  ).toBe("page");
 });
