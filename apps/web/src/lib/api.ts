@@ -43,3 +43,15 @@ export async function fetchProject(signal: AbortSignal): Promise<ProjectInfo> {
   }
   return { name: body.name, root: body.root };
 }
+
+export async function request<T>(
+  url: string,
+  validate: (value: unknown) => value is T,
+  signal: AbortSignal,
+): Promise<T> {
+  const response = await fetch(url, { signal, cache: "no-store" });
+  if (!response.ok) throw new Error(`Request failed: HTTP ${response.status}`);
+  const value: unknown = await response.json();
+  if (!validate(value)) throw new Error("Invalid server response");
+  return value;
+}
