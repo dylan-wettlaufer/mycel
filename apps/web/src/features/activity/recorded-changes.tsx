@@ -1,5 +1,7 @@
+import { eventNode } from "./event-node";
+import { HistoricalSource } from "@/features/source/historical-source";
+import type { GraphNode } from "@mycel/shared";
 import { HistoryNode } from "./history-node";
-import { useState } from "react";
 import type { ChangeEvent } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,14 +13,24 @@ export function RecordedChanges({
   loading,
   cursor,
   loadMore,
+  selectedEvent,
+  onSelectEvent,
+  onNode,
+  onSource,
+  showSource,
 }: {
   events: ChangeEvent[];
   error?: string | undefined;
   loading: boolean;
   cursor: string | null;
   loadMore: () => void;
+  selectedEvent?: ChangeEvent | undefined;
+  onSelectEvent: (id: string) => void;
+  onNode: (node: GraphNode) => void;
+  onSource: () => void;
+  showSource: boolean;
 }) {
-  const [changeId, setChangeId] = useState<string | null>(null);
+  const selectedNode = selectedEvent ? eventNode(selectedEvent) : null;
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-semibold">Activity</h2>
@@ -39,7 +51,7 @@ export function RecordedChanges({
             <Button
               variant="ghost"
               className="h-auto w-full justify-start py-3"
-              onClick={() => setChangeId(event.id)}
+              onClick={() => onSelectEvent(event.id)}
             >
               <Badge
                 variant="outline"
@@ -80,10 +92,23 @@ export function RecordedChanges({
           {loading ? "Loading…" : "Load older changes"}
         </Button>
       )}
-      {events.find((event) => event.id === changeId) && (
-        <HistoryNode event={events.find((event) => event.id === changeId)!} />
+      {selectedEvent && (
+        <div className="space-y-4">
+          <HistoryNode event={selectedEvent} />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onSource}>
+              Open recorded source
+            </Button>
+            {selectedNode && selectedEvent.action !== "deleted" && (
+              <Button onClick={() => onNode(selectedNode)}>
+                Open live graph
+              </Button>
+            )}
+          </div>
+          {showSource && <HistoricalSource event={selectedEvent} />}
+          <DiffPanel changeId={selectedEvent.id} />
+        </div>
       )}
-      {changeId && <DiffPanel changeId={changeId} />}
     </section>
   );
 }

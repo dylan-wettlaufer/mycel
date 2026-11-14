@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
 
+beforeEach(() => window.history.replaceState(null, "", "/"));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -44,14 +45,14 @@ test("invalid repository metadata is reported without showing a fake project", a
   expect(screen.getByRole("heading", { name: "Mycel" })).toBeTruthy();
 });
 
-test("primary navigation switches workspace views", () => {
+test("primary navigation switches workspace views", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(Response.json({ status: "ok" })),
   );
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Graph" }));
-  expect(screen.getByRole("heading", { name: "Graph" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Graph" })).toBeTruthy();
   expect(
     screen.getByRole("button", { name: "Graph" }).getAttribute("aria-current"),
   ).toBe("page");

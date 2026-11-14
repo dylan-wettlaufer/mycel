@@ -171,3 +171,13 @@ test("idle streams send heartbeats and engine shutdown releases subscribers", as
   await reader.cancel();
   assert.equal((await app.request("/events")).status, 503);
 });
+
+test("individual changes can be reopened without loading every history page", async (t) => {
+  const { app } = fixture(t);
+  const response = await app.request("/api/changes/1");
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).id, "1");
+  assert.equal((await app.request("/api/changes/0")).status, 404);
+  assert.equal((await app.request("/api/changes/999")).status, 404);
+  assert.equal((await app.request("/api/changes/invalid")).status, 400);
+});

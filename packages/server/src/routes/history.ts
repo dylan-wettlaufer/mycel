@@ -52,6 +52,17 @@ export function createHistoryRoutes(
       }),
     );
   });
+  routes.get("/changes/:id", (c) => {
+    const id = cursor(c.req.param("id"))!;
+    if (!history) return c.json({ error: "History unavailable" }, 503);
+    const event =
+      Number(id) > 0
+        ? history
+            .getEventsAfter(String(Number(id) - 1), 1)
+            .find((event) => event.id === id)
+        : undefined;
+    return event ? c.json(event) : c.json({ error: "Change not found" }, 404);
+  });
   routes.get("/changes/:id/diff", (c) => {
     const id = cursor(c.req.param("id"))!;
     if (!history) return c.json({ error: "History unavailable" }, 503);

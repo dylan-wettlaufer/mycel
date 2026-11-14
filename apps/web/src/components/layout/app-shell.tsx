@@ -45,7 +45,7 @@ export function AppShell({
   onNavigate,
 }: AppShellProps) {
   return (
-    <div className="flex min-h-svh flex-col flex-row bg-background text-foreground">
+    <div className="flex min-h-svh flex-col md:flex-row bg-background text-foreground">
       <aside className="w-full md:w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex">
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <Waypoints className="size-5 text-sidebar-primary" aria-hidden />

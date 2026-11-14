@@ -14,20 +14,21 @@ export function useResource<T>(
   }>();
   useEffect(() => {
     if (!url) return;
+    let disposed = false;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     void request(url, validate, controller.signal)
       .then(
         (data) => {
-          if (!controller.signal.aborted) setState({ url, data });
+          if (!disposed) setState({ url, data });
         },
         (error) => {
-          if (!controller.signal.aborted)
-            setState({ url, error: String(error) });
+          if (!disposed) setState({ url, error: String(error) });
         },
       )
       .finally(() => clearTimeout(timeout));
     return () => {
+      disposed = true;
       clearTimeout(timeout);
       controller.abort();
     };
