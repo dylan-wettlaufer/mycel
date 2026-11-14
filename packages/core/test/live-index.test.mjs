@@ -361,3 +361,15 @@ test("subscribers see committed events only; failures publish nothing and listen
   );
   assert.equal(events.length, count);
 });
+test("monitoring sessions record the starting revision and end on close", async (t) => {
+  const { db, live } = await fixture(t, { "a.ts": "function a() {}" });
+  const session = db.prepare("SELECT * FROM sessions").get();
+  assert.equal(session.starting_revision, 0);
+  assert.equal(session.ended_at, null);
+  assert.equal(
+    db.prepare("SELECT session_id FROM change_events").get().session_id,
+    live.sessionId,
+  );
+  await live.close();
+  assert.ok(db.prepare("SELECT ended_at FROM sessions").get().ended_at);
+});

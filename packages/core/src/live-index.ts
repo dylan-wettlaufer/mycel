@@ -1,5 +1,10 @@
 import { performance } from "node:perf_hooks";
-import { commitChangeSet, readGraphState } from "@mycel/db";
+import {
+  commitChangeSet,
+  readGraphState,
+  startMonitoringSession,
+  endMonitoringSession,
+} from "@mycel/db";
 import { diffGraph } from "./history.js";
 import type { ChangeEvent, Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
@@ -51,6 +56,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         }
       }
   };
+  let sessionId: string | undefined;
   const startup: SourceChange[] = [];
   let queue: ReturnType<typeof createSourceChangeQueue> | undefined;
   const watcher = watchSourceFiles({
@@ -68,12 +74,14 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     const captured = await captureRepository(options, parse);
     const { project } = captured;
     let files = new Map(captured.files.map((file) => [file.parsed.path, file]));
+    sessionId = startMonitoringSession(options.database, project);
     const initialGraph = buildProjectGraph(project, [...files.values()]);
     const initialChanges = diffGraph(
       readGraphState(options.database, project.id),
       initialGraph,
     );
     const initialCommit = commitChangeSet(options.database, {
+      sessionId,
       graph: initialGraph,
       sources: new Map([...files].map(([path, file]) => [path, file.source])),
       changes: initialChanges,
@@ -147,6 +155,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         ];
         const resolvedAt = performance.now();
         const { revision, events } = commitChangeSet(options.database, {
+          sessionId: sessionId!,
           graph,
           sources: new Map(
             [...next].map(([path, file]) => [path, file.source]),
@@ -182,6 +191,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     await queue.flush();
     return {
       project,
+      sessionId,
       onEvent(listener: (event: ChangeEvent) => void) {
         listeners.add(listener);
         return () => {
@@ -193,12 +203,16 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       },
       flush: queue.flush,
       close(): Promise<void> {
+        if (options.database.open)
+          endMonitoringSession(options.database, sessionId!);
         listeners.clear();
         // Stop callbacks synchronously, before the owner closes storage.
         return Promise.all([queue!.close(), watcher.close()]).then(() => {});
       },
     };
   } catch (error) {
+    if (sessionId && options.database.open)
+      endMonitoringSession(options.database, sessionId);
     await queue?.close();
     await watcher.close();
     throw error;
