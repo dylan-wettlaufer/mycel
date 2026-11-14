@@ -218,9 +218,30 @@ export function getDiff(
   return {
     changeId: id,
     path: row.path,
-    beforeContent: content(row.beforeRevision),
-    afterContent: content(row.afterRevision),
+    beforeContent: content((row.afterRevision ?? row.beforeRevision! + 1) - 1),
+    afterContent: content(row.afterRevision ?? row.beforeRevision! + 1),
     beforeRevision: row.beforeRevision,
     afterRevision: row.afterRevision,
   };
+}
+
+/** Opt-in pruning. Keep current snapshots and every source side of retained events. */
+export function pruneHistory(
+  db: SqliteDatabase,
+  projectId: string,
+  beforeId: string,
+): void {
+  const cutoff = parseChangeId(beforeId);
+  db.transaction(() => {
+    db.prepare("DELETE FROM change_events WHERE project_id = ? AND id < ?").run(
+      projectId,
+      cutoff,
+    );
+    db.prepare(
+      `DELETE FROM snapshots AS s WHERE s.project_id = ?
+      AND s.revision <> (SELECT MAX(revision) FROM revisions WHERE project_id = s.project_id)
+      AND NOT EXISTS (SELECT 1 FROM change_events e WHERE e.project_id = s.project_id AND e.path = s.path
+        AND s.revision IN (COALESCE(e.after_revision, e.before_revision + 1), COALESCE(e.after_revision, e.before_revision + 1) - 1))`,
+    ).run(projectId);
+  }).immediate();
 }

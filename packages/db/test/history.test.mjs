@@ -115,3 +115,33 @@ test("diffs reconstruct created modified and deleted source including empty cont
   assert.equal(getDiff(db, "p", "3").afterContent, null);
   assert.equal(getDiff(db, "other", "1"), undefined);
 });
+test("explicit pruning preserves reachable diffs, current source and increasing ids", async (t) => {
+  const { pruneHistory, getDiff, listChanges } =
+    await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const set = changeSet();
+  commitChangeSet(db, set);
+  set.changes[0] = { ...set.changes[0], action: "modified", before: node };
+  for (let i = 2; i <= 4; i++) {
+    set.sources.set("a.ts", String(i));
+    commitChangeSet(db, set);
+  }
+  const before = getDiff(db, "p", "4");
+  pruneHistory(db, "p", "4");
+  assert.deepEqual(
+    listChanges(db, "p").items.map((e) => e.id),
+    ["4"],
+  );
+  assert.deepEqual(getDiff(db, "p", "4"), before);
+  assert.deepEqual(
+    db
+      .prepare("SELECT revision FROM snapshots ORDER BY revision")
+      .all()
+      .map((r) => r.revision),
+    [3, 4],
+  );
+  pruneHistory(db, "p", "999");
+  assert.equal(db.prepare("SELECT content FROM snapshots").get().content, "4");
+  assert.equal(commitChangeSet(db, set).events[0].id, "5");
+});

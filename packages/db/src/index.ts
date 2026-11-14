@@ -18,3 +18,4 @@ export type { EntityChange, ChangeSet } from "./history.js";
 export { listChanges, parseChangeId } from "./history.js";
 export { getEventsAfter } from "./history.js";
 export { getDiff } from "./history.js";
+export { pruneHistory } from "./history.js";
