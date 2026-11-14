@@ -177,3 +177,19 @@ export function listChanges(
     cursor: rows.length > limit ? String(rows[limit - 1]!.id) : null,
   };
 }
+
+/** Oldest first; bounded replay batches prevent unbounded allocations. */
+export function getEventsAfter(
+  db: SqliteDatabase,
+  projectId: string,
+  id = "0",
+  limit = 1000,
+): ChangeEvent[] {
+  historyLimit(limit);
+  return db
+    .prepare<[string, number, number], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id > ? ORDER BY id LIMIT ?`,
+    )
+    .all(projectId, parseChangeId(id), limit)
+    .map(toEvent);
+}

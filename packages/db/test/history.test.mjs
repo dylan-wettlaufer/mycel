@@ -83,3 +83,15 @@ test("history pagination is exclusive, bounded and project scoped", async (t) =>
   assert.throws(() => listChanges(db, "p", "-1"), /cursor/);
   assert.throws(() => listChanges(db, "p", undefined, 1001), /limit/);
 });
+test("replay returns chronological events after an exclusive cursor", async (t) => {
+  const { getEventsAfter } = await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  for (let i = 0; i < 3; i++) commitChangeSet(db, changeSet());
+  assert.deepEqual(
+    getEventsAfter(db, "p", "1", 1).map((e) => e.id),
+    ["2"],
+  );
+  assert.deepEqual(getEventsAfter(db, "p", "3"), []);
+  assert.deepEqual(getEventsAfter(db, "other", "0"), []);
+});
