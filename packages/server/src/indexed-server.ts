@@ -26,6 +26,11 @@ export async function startIndexedServer(
         : { webDistPath: options.webDistPath }),
     });
     server.once("close", indexed.close);
+    const close = server.close.bind(server);
+    server.close = ((callback?: (error?: Error) => void) => {
+      indexed.close();
+      return close(callback);
+    }) as typeof server.close;
     await once(server, "listening");
     return server;
   } catch (error) {

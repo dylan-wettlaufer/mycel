@@ -10,7 +10,16 @@ function cursor(value: string | undefined): string | undefined {
     throw new HTTPException(400, { message: "Invalid event cursor" });
   return value;
 }
-export function createHistoryRoutes(history?: HistoryQueries) {
+export function createHistoryRoutes(
+  history?: HistoryQueries,
+  heartbeatMs = 15_000,
+) {
+  if (
+    !Number.isSafeInteger(heartbeatMs) ||
+    heartbeatMs < 1 ||
+    heartbeatMs > 0x7fffffff
+  )
+    throw new RangeError("Invalid heartbeat interval");
   const routes = new Hono();
   routes.onError((error, c) => {
     if (error instanceof HTTPException)
@@ -56,9 +65,11 @@ export function createHistoryRoutes(history?: HistoryQueries) {
     return streamSSE(c, async (stream) => {
       let stopped = false;
       let wake: (() => void) | undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const unsubscribe = history.onEvent(() => wake?.());
       const stop = () => {
         stopped = true;
+        clearTimeout(timer);
         unsubscribe();
         wake?.();
       };
@@ -79,10 +90,18 @@ export function createHistoryRoutes(history?: HistoryQueries) {
             });
             lastId = event.id;
           }
-          if (!events.length && !stopped)
+          if (!events.length && !stopped) {
+            let heartbeat = false;
             await new Promise<void>((resolve) => {
               wake = resolve;
+              timer = setTimeout(() => {
+                heartbeat = true;
+                resolve();
+              }, heartbeatMs);
             });
+            clearTimeout(timer);
+            if (heartbeat && !stopped) await stream.write(": heartbeat\n\n");
+          }
           wake = undefined;
         }
       } finally {

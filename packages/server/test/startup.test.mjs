@@ -55,3 +55,21 @@ test("a busy port rejects startup and closes the indexed project's database", as
   });
   assert.equal(existsSync(`${options.databasePath}-wal`), false);
 });
+test("server shutdown closes active SSE streams before waiting for connections", async (t) => {
+  const options = await fixture(t);
+  const server = await startIndexedServer(0, options);
+  t.after(() => {
+    if (server.listening) {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/events`,
+  );
+  const reader = response.body.getReader();
+  await reader.read();
+  await close(server);
+  await reader.cancel();
+  assert.equal(existsSync(`${options.databasePath}-wal`), false);
+});

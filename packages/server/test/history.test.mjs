@@ -59,7 +59,7 @@ function fixture(t) {
     return events;
   };
   commit();
-  return { app: createApp({ history }), commit, listeners, shutdown };
+  return { app: createApp({ history }), history, commit, listeners, shutdown };
 }
 test("changes routes paginate and reject invalid parameters", async (t) => {
   const { app, commit } = fixture(t);
@@ -149,4 +149,25 @@ test("SSE replays after Last-Event-ID in order and hands off to rapid live commi
       .status,
     400,
   );
+});
+test("idle streams send heartbeats and engine shutdown releases subscribers", async (t) => {
+  const { createHistoryRoutes } = await import("../dist/routes/history.js");
+  const { history, listeners, shutdown } = fixture(t);
+  const app = createHistoryRoutes(history, 20);
+  const response = await app.request("/events", {
+    headers: { "Last-Event-ID": "1" },
+  });
+  const reader = response.body.getReader();
+  t.after(() => reader.cancel());
+  const decoder = new TextDecoder();
+  let text = "";
+  while (!text.includes(": heartbeat")) {
+    const chunk = await reader.read();
+    text += decoder.decode(chunk.value);
+  }
+  assert.equal(listeners.size, 1);
+  shutdown.abort();
+  assert.equal(listeners.size, 0);
+  await reader.cancel();
+  assert.equal((await app.request("/events")).status, 503);
 });
