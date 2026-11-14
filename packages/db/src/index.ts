@@ -6,6 +6,7 @@ export { resolveDatabasePath } from "./paths.js";
 export { replaceProjectGraph, applyProjectGraph } from "./graph.js";
 export type { ProjectGraph } from "./graph.js";
 export {
+  getFileContent,
   getNode,
   getNodeDetails,
   searchSymbols,

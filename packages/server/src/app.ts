@@ -37,6 +37,25 @@ export function createApp({
     return context.json(project);
   });
 
+  app.get("/api/files/content", (context) => {
+    const paths = context.req.queries("path");
+    const path = paths?.[0];
+    if (
+      paths?.length !== 1 ||
+      !path ||
+      path.startsWith("/") ||
+      path.includes("\\") ||
+      path.split("/").some((part) => !part || part === "." || part === "..")
+    )
+      return context.json({ error: "Invalid repository-relative path" }, 400);
+    if (!graph?.getFileContent)
+      return context.json({ error: "Source queries unavailable" }, 503);
+    const file = graph.getFileContent(path);
+    return file
+      ? context.json(file)
+      : context.json({ error: "Indexed file not found" }, 404);
+  });
+
   app.route("/api/graph", createGraphRoutes(graph));
   app.route("/api", createHistoryRoutes(history));
 

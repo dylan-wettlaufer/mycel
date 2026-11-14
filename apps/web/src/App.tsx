@@ -1,3 +1,4 @@
+import { SourcePanel } from "@/features/source/source-panel";
 import { NodeDetailsPanel } from "@/features/details/node-details";
 import { GraphPanel } from "@/features/graph/graph-panel";
 import { Explorer } from "@/features/explorer/explorer";
@@ -13,6 +14,7 @@ export function App() {
   const [view, setView] = useState<WorkspaceView>("Dashboard");
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [root, setRoot] = useState<GraphNode | null>(null);
+  const [source, setSource] = useState<GraphNode | null>(null);
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
 
@@ -45,6 +47,7 @@ export function App() {
             node={selected}
             onSelect={setSelected}
             onScope={setRoot}
+            onSource={setSource}
           />
         </div>
       ) : (
@@ -56,6 +59,11 @@ export function App() {
               : "Select a file or symbol to explore its connections."}
           </p>
         </section>
+      )}
+      {source && (
+        <div className="mt-5">
+          <SourcePanel node={source} />
+        </div>
       )}
     </AppShell>
   );

@@ -295,3 +295,37 @@ export function getNodeDetails(
     };
   })();
 }
+
+/** Serve captured source only for a current file in this project and revision. */
+export function getFileContent(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+  path: string,
+): import("@mycel/shared").FileContent | undefined {
+  return database.transaction(() => {
+    const revision = getRevision(database, projectId);
+    const row = database
+      .prepare<
+        [string, string, number],
+        { content: string; contentHash: string }
+      >(
+        `
+      SELECT s.content, n.content_hash AS contentHash FROM nodes n JOIN snapshots s
+      ON s.project_id = n.project_id AND s.path = n.path
+      WHERE n.project_id = ? AND n.path = ? AND n.kind = 'file' AND s.revision = ?
+    `,
+      )
+      .get(projectId, path, revision);
+    return row
+      ? {
+          projectId,
+          revision,
+          path,
+          language: path.endsWith(".tsx")
+            ? ("tsx" as const)
+            : ("typescript" as const),
+          ...row,
+        }
+      : undefined;
+  })();
+}

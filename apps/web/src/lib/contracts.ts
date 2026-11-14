@@ -76,3 +76,17 @@ export function isNodeDetails(
     )
   );
 }
+
+export function isFileContent(
+  value: unknown,
+): value is import("@mycel/shared").FileContent {
+  return (
+    isRecord(value) &&
+    typeof value.projectId === "string" &&
+    typeof value.revision === "number" &&
+    typeof value.path === "string" &&
+    typeof value.content === "string" &&
+    typeof value.contentHash === "string" &&
+    ["typescript", "tsx"].includes(String(value.language))
+  );
+}

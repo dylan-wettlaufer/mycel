@@ -28,19 +28,17 @@ test("relationships navigate to nodes and source preserves the symbol range", as
   const caller = { ...node, id: "caller", name: "invoke" };
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          projectId: "p",
-          revision: 1,
-          node,
-          callers: { nodes: [caller], truncated: true },
-          dependencies: { nodes: [], truncated: false },
-          relatedFiles: { nodes: [], truncated: false },
-          diagnostics: [],
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      Response.json({
+        projectId: "p",
+        revision: 1,
+        node,
+        callers: { nodes: [caller], truncated: true },
+        dependencies: { nodes: [], truncated: false },
+        relatedFiles: { nodes: [], truncated: false },
+        diagnostics: [],
+      }),
+    ),
   );
   const select = vi.fn(),
     source = vi.fn(),

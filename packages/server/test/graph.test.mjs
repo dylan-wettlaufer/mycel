@@ -310,3 +310,48 @@ test("graph queries are served over loopback HTTP alongside the existing API", a
   const details = await fetch(`${base}/api/graph/nodes/node%3Asave`);
   assert.equal((await details.json()).node.id, "node:save");
 });
+
+test("source route serves committed captures and rejects paths outside the indexed project", async (t) => {
+  const { app, database } = fixture(t);
+  database
+    .prepare(
+      "INSERT INTO snapshots (project_id, path, revision, content) VALUES (?, ?, ?, ?)",
+    )
+    .run(project.id, "src/save.ts", 1, "export function save() {}\n");
+  const response = await app.request("/api/files/content?path=src%2Fsave.ts");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    projectId: project.id,
+    revision: 1,
+    path: "src/save.ts",
+    language: "typescript",
+    content: "export function save() {}\n",
+    contentHash: "a".repeat(64),
+  });
+  for (const path of [
+    "../secret.ts",
+    "/etc/passwd",
+    "src/../secret.ts",
+    "src\\save.ts",
+    "",
+    "src//save.ts",
+  ]) {
+    assert.equal(
+      (await app.request(`/api/files/content?path=${encodeURIComponent(path)}`))
+        .status,
+      400,
+    );
+  }
+  assert.equal(
+    (await app.request("/api/files/content?path=src/save.ts&path=x.ts")).status,
+    400,
+  );
+  assert.equal(
+    (await app.request("/api/files/content?path=missing.ts")).status,
+    404,
+  );
+  assert.equal(
+    (await createApp().request("/api/files/content?path=a.ts")).status,
+    503,
+  );
+});

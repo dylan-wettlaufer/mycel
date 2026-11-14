@@ -1,4 +1,9 @@
-import { getNeighborhood, getNodeDetails, searchSymbols } from "@mycel/db";
+import {
+  getFileContent,
+  getNeighborhood,
+  getNodeDetails,
+  searchSymbols,
+} from "@mycel/db";
 import type { SqliteDatabase } from "@mycel/db";
 import type {
   Neighborhood,
@@ -13,6 +18,9 @@ import type {
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getFileContent?(
+    path: string,
+  ): import("@mycel/shared").FileContent | undefined;
   searchSymbols(query: SearchQuery): SearchResult;
   getNodeDetails(id: NodeId, query?: NodeDetailsQuery): NodeDetails | undefined;
   getNeighborhood(
@@ -27,6 +35,7 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getFileContent: (path) => getFileContent(database, projectId, path),
     searchSymbols: ({ q, limit }) =>
       searchSymbols(database, projectId, q, limit),
     getNodeDetails: (id, { limit } = {}) =>

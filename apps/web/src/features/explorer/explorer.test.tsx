@@ -26,16 +26,14 @@ afterEach(() => {
 test("search selects a symbol and filters file results", async () => {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          projectId: "p",
-          revision: 1,
-          nodes: [node],
-          truncated: true,
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      Response.json({
+        projectId: "p",
+        revision: 1,
+        nodes: [node],
+        truncated: true,
+      }),
+    ),
   );
   const select = vi.fn();
   render(<Explorer onSelect={select} />);
