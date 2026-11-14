@@ -64,14 +64,22 @@ test("change sets atomically persist graph, snapshots and events; late failures 
 });
 
 test("history pagination is exclusive, bounded and project scoped", async (t) => {
- const { listChanges } = await import("../dist/index.js");
- const db = openDatabase({ databasePath: ":memory:" }); t.after(() => db.close());
- for (let i = 0; i < 4; i++) commitChangeSet(db, changeSet());
- const page = listChanges(db, "p", undefined, 2);
- assert.deepEqual(page.items.map((e) => e.id), ["4", "3"]); assert.equal(page.cursor, "3");
- assert.deepEqual(listChanges(db, "p", page.cursor, 2).items.map((e) => e.id), ["2", "1"]);
- assert.equal(listChanges(db, "p", "3", 2).cursor, null);
- assert.deepEqual(listChanges(db, "other").items, []);
- assert.throws(() => listChanges(db, "p", "-1"), /cursor/);
- assert.throws(() => listChanges(db, "p", undefined, 1001), /limit/);
+  const { listChanges } = await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  for (let i = 0; i < 4; i++) commitChangeSet(db, changeSet());
+  const page = listChanges(db, "p", undefined, 2);
+  assert.deepEqual(
+    page.items.map((e) => e.id),
+    ["4", "3"],
+  );
+  assert.equal(page.cursor, "3");
+  assert.deepEqual(
+    listChanges(db, "p", page.cursor, 2).items.map((e) => e.id),
+    ["2", "1"],
+  );
+  assert.equal(listChanges(db, "p", "3", 2).cursor, null);
+  assert.deepEqual(listChanges(db, "other").items, []);
+  assert.throws(() => listChanges(db, "p", "-1"), /cursor/);
+  assert.throws(() => listChanges(db, "p", undefined, 1001), /limit/);
 });

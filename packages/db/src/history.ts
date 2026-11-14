@@ -146,16 +146,34 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
 }
 
 export function parseChangeId(id: string): number {
-  if (!/^(0|[1-9][0-9]*)$/.test(id) || !Number.isSafeInteger(Number(id))) throw new RangeError("Invalid event cursor");
+  if (!/^(0|[1-9][0-9]*)$/.test(id) || !Number.isSafeInteger(Number(id)))
+    throw new RangeError("Invalid event cursor");
   return Number(id);
 }
 function historyLimit(limit: number) {
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError("History limit must be between 1 and 1000");
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000)
+    throw new RangeError("History limit must be between 1 and 1000");
   return limit;
 }
 /** Newest first; the cursor is exclusive and stable when newer events arrive. */
-export function listChanges(db: SqliteDatabase, projectId: string, cursor?: string, limit = 50): import("@mycel/shared").ChangesPage {
+export function listChanges(
+  db: SqliteDatabase,
+  projectId: string,
+  cursor?: string,
+  limit = 50,
+): import("@mycel/shared").ChangesPage {
   historyLimit(limit);
-  const rows = db.prepare<[string, number, number], EventRow>(`SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id < ? ORDER BY id DESC LIMIT ?`).all(projectId, cursor === undefined ? Number.MAX_SAFE_INTEGER : parseChangeId(cursor), limit + 1);
-  return { items: rows.slice(0, limit).map(toEvent), cursor: rows.length > limit ? String(rows[limit - 1]!.id) : null };
+  const rows = db
+    .prepare<[string, number, number], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id < ? ORDER BY id DESC LIMIT ?`,
+    )
+    .all(
+      projectId,
+      cursor === undefined ? Number.MAX_SAFE_INTEGER : parseChangeId(cursor),
+      limit + 1,
+    );
+  return {
+    items: rows.slice(0, limit).map(toEvent),
+    cursor: rows.length > limit ? String(rows[limit - 1]!.id) : null,
+  };
 }
