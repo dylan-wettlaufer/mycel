@@ -13,3 +13,6 @@ export {
   getCallers,
   getDependencies,
 } from "./queries.js";
+export { commitChangeSet, currentRevision, readGraphState } from "./history.js";
+export type { EntityChange, ChangeSet } from "./history.js";
+export { listChanges, parseChangeId } from "./history.js";
