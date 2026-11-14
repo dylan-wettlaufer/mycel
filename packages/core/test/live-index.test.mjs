@@ -373,3 +373,46 @@ test("monitoring sessions record the starting revision and end on close", async 
   await live.close();
   assert.ok(db.prepare("SELECT ended_at FROM sessions").get().ended_at);
 });
+
+test("restart reconciles offline edits without duplicating events, with ids increasing across database reopen", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "mycel-restart-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const root = join(directory, "repo");
+  await mkdir(root);
+  const path = join(root, "a.ts");
+  await writeFile(path, "function a() {}");
+  const options = {
+    project: { name: "fixture", root },
+    onError: (e) => {
+      throw e;
+    },
+  };
+  const databasePath = join(directory, "graph.sqlite");
+  let db = openDatabase({ projectRoot: root, databasePath });
+  let live = await watchRepository({ ...options, database: db });
+  const ids = () =>
+    db
+      .prepare("SELECT id FROM change_events ORDER BY id")
+      .all()
+      .map((e) => e.id);
+  const first = ids();
+  await live.close();
+  db.close();
+  db = openDatabase({ projectRoot: root, databasePath });
+  live = await watchRepository({ ...options, database: db });
+  assert.deepEqual(ids(), first);
+  await live.close();
+  db.close();
+  await writeFile(path, "function b() {}");
+  db = openDatabase({ projectRoot: root, databasePath });
+  t.after(() => db.close());
+  live = await watchRepository({ ...options, database: db });
+  t.after(() => live.close());
+  const next = ids();
+  assert.ok(next.length > first.length);
+  assert.ok(next[first.length] > first.at(-1));
+  assert.ok(
+    db.prepare("SELECT 1 FROM change_events WHERE action = 'deleted'").get(),
+  );
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sessions").get().n, 3);
+});
