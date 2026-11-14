@@ -17,3 +17,4 @@ export { commitChangeSet, currentRevision, readGraphState } from "./history.js";
 export type { EntityChange, ChangeSet } from "./history.js";
 export { listChanges, parseChangeId } from "./history.js";
 export { getEventsAfter } from "./history.js";
+export { getDiff } from "./history.js";

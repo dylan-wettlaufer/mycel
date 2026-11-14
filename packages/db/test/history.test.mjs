@@ -95,3 +95,23 @@ test("replay returns chronological events after an exclusive cursor", async (t) 
   assert.deepEqual(getEventsAfter(db, "p", "3"), []);
   assert.deepEqual(getEventsAfter(db, "other", "0"), []);
 });
+test("diffs reconstruct created modified and deleted source including empty content", async (t) => {
+  const { getDiff } = await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const set = changeSet();
+  commitChangeSet(db, set);
+  set.changes[0] = { ...set.changes[0], action: "modified", before: node };
+  set.sources.set("a.ts", "");
+  commitChangeSet(db, set);
+  set.changes[0] = { ...set.changes[0], action: "deleted", after: null };
+  set.graph.nodes = [];
+  set.sources.clear();
+  commitChangeSet(db, set);
+  assert.equal(getDiff(db, "p", "1").beforeContent, null);
+  assert.equal(getDiff(db, "p", "2").beforeContent, "a");
+  assert.equal(getDiff(db, "p", "2").afterContent, "");
+  assert.equal(getDiff(db, "p", "3").beforeContent, "");
+  assert.equal(getDiff(db, "p", "3").afterContent, null);
+  assert.equal(getDiff(db, "other", "1"), undefined);
+});

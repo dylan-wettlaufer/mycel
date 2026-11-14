@@ -193,3 +193,34 @@ export function getEventsAfter(
     .all(projectId, parseChangeId(id), limit)
     .map(toEvent);
 }
+
+export function getDiff(
+  db: SqliteDatabase,
+  projectId: string,
+  id: string,
+): import("@mycel/shared").ChangeDiff | undefined {
+  const row = db
+    .prepare<[string, number], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id = ?`,
+    )
+    .get(projectId, parseChangeId(id));
+  if (!row) return undefined;
+  const content = (revision: number | null) => {
+    if (revision === null) return null;
+    return (
+      db
+        .prepare<[string, string, number], { content: string }>(
+          "SELECT content FROM snapshots WHERE project_id = ? AND path = ? AND revision = ?",
+        )
+        .get(projectId, row.path, revision)?.content ?? null
+    );
+  };
+  return {
+    changeId: id,
+    path: row.path,
+    beforeContent: content(row.beforeRevision),
+    afterContent: content(row.afterRevision),
+    beforeRevision: row.beforeRevision,
+    afterRevision: row.afterRevision,
+  };
+}
