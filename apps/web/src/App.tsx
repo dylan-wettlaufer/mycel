@@ -1,3 +1,4 @@
+import { NodeDetailsPanel } from "@/features/details/node-details";
 import { GraphPanel } from "@/features/graph/graph-panel";
 import { Explorer } from "@/features/explorer/explorer";
 import type { GraphNode } from "@mycel/shared";
@@ -33,12 +34,19 @@ export function App() {
           }}
         />
       ) : view === "Graph" && root && selected ? (
-        <GraphPanel
-          key={root.id}
-          root={root}
-          selected={selected}
-          onSelect={setSelected}
-        />
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <GraphPanel
+            key={root.id}
+            root={root}
+            selected={selected}
+            onSelect={setSelected}
+          />
+          <NodeDetailsPanel
+            node={selected}
+            onSelect={setSelected}
+            onScope={setRoot}
+          />
+        </div>
       ) : (
         <section>
           <h2 className="text-xl font-semibold">{view}</h2>

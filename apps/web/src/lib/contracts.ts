@@ -51,3 +51,28 @@ export function isNeighborhood(
     )
   );
 }
+
+export function isNodeDetails(
+  value: unknown,
+): value is import("@mycel/shared").NodeDetails {
+  if (
+    !isRecord(value) ||
+    !isNode(value.node) ||
+    typeof value.revision !== "number" ||
+    typeof value.projectId !== "string"
+  )
+    return false;
+  return (
+    [value.callers, value.dependencies, value.relatedFiles].every(
+      (list) =>
+        isRecord(list) &&
+        Array.isArray(list.nodes) &&
+        list.nodes.every(isNode) &&
+        typeof list.truncated === "boolean",
+    ) &&
+    Array.isArray(value.diagnostics) &&
+    value.diagnostics.every(
+      (item) => isRecord(item) && typeof item.message === "string",
+    )
+  );
+}
