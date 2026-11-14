@@ -329,3 +329,29 @@ export function getFileContent(
       : undefined;
   })();
 }
+
+export function getGraphStats(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+): import("@mycel/shared").GraphStats {
+  return database.transaction(() => {
+    const counts = database
+      .prepare<[string], { fileCount: number; symbolCount: number }>(
+        "SELECT COUNT(CASE WHEN kind = 'file' THEN 1 END) AS fileCount, COUNT(CASE WHEN kind != 'file' THEN 1 END) AS symbolCount FROM nodes WHERE project_id = ?",
+      )
+      .get(projectId)!;
+    const count = (table: "edges" | "diagnostics") =>
+      database
+        .prepare<[string], { count: number }>(
+          `SELECT COUNT(*) AS count FROM ${table} WHERE project_id = ?`,
+        )
+        .get(projectId)!.count;
+    return {
+      projectId,
+      revision: getRevision(database, projectId),
+      ...counts,
+      edgeCount: count("edges"),
+      diagnosticCount: count("diagnostics"),
+    };
+  })();
+}

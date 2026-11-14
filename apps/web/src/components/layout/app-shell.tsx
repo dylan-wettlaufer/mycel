@@ -32,12 +32,14 @@ interface AppShellProps {
   onNavigate: (view: WorkspaceView) => void;
   projectName: string;
   connection: ConnectionStatus;
+  liveConnection: ConnectionStatus;
   children: ReactNode;
 }
 
 export function AppShell({
   projectName,
   connection,
+  liveConnection,
   children,
   view,
   onNavigate,
@@ -78,24 +80,36 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b px-4 md:px-6">
           <h1 className="truncate text-sm font-medium">{projectName}</h1>
-          <Badge variant="outline" className="gap-1.5" role="status">
+          <div className="flex items-center gap-3">
             <span
-              aria-hidden
-              className={cn(
-                "size-1.5 rounded-full",
-                connection === "connected"
-                  ? "bg-success"
-                  : connection === "checking"
-                    ? "bg-muted-foreground"
-                    : "bg-destructive",
-              )}
-            />
-            {connection === "connected"
-              ? "Connected"
-              : connection === "checking"
-                ? "Checking…"
-                : "Disconnected"}
-          </Badge>
+              className="text-xs text-muted-foreground"
+              aria-label="Live connection"
+            >
+              {liveConnection === "connected"
+                ? "Live updates"
+                : liveConnection === "checking"
+                  ? "Connecting live…"
+                  : "Live reconnecting…"}
+            </span>
+            <Badge variant="outline" className="gap-1.5" role="status">
+              <span
+                aria-hidden
+                className={cn(
+                  "size-1.5 rounded-full",
+                  connection === "connected"
+                    ? "bg-success"
+                    : connection === "checking"
+                      ? "bg-muted-foreground"
+                      : "bg-destructive",
+                )}
+              />
+              {connection === "connected"
+                ? "Connected"
+                : connection === "checking"
+                  ? "Checking…"
+                  : "Disconnected"}
+            </Badge>
+          </div>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>

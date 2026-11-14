@@ -147,3 +147,24 @@ export function isChangeDiff(
     (value.afterRevision === null || typeof value.afterRevision === "number")
   );
 }
+
+export function isGraphStats(
+  value: unknown,
+): value is import("@mycel/shared").GraphStats {
+  return (
+    isRecord(value) &&
+    typeof value.projectId === "string" &&
+    [
+      "revision",
+      "fileCount",
+      "symbolCount",
+      "edgeCount",
+      "diagnosticCount",
+    ].every(
+      (key) =>
+        typeof value[key] === "number" &&
+        Number.isSafeInteger(value[key]) &&
+        value[key] >= 0,
+    )
+  );
+}

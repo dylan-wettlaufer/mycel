@@ -1,106 +1,73 @@
-import type { ProjectInfo } from "@mycel/shared";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { formatRelativeTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
-
-import { activity, stats } from "./mock-data";
-import type { ChangeKind } from "./types";
-
-const changeStyles: Record<ChangeKind, string> = {
-  created: "text-success border-success/40",
-  modified: "text-warning border-warning/40",
-  deleted: "text-destructive border-destructive/40",
-};
-
-interface DashboardPageProps {
+import type { ProjectInfo, ChangeEvent } from "@mycel/shared";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useResource } from "@/hooks/use-resource";
+import { isGraphStats } from "@/lib/contracts";
+export function DashboardPage({
+  project,
+  projectError,
+  revision = 0,
+  events = [],
+  onActivity,
+}: {
   project: ProjectInfo | null;
   projectError: boolean;
-}
-
-export function DashboardPage({ project, projectError }: DashboardPageProps) {
+  revision?: number;
+  events?: ChangeEvent[];
+  onActivity?: () => void;
+}) {
+  const { data, error } = useResource(
+    "/api/graph/stats",
+    isGraphStats,
+    revision,
+  );
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
+        <h2 className="text-xl font-semibold">Overview</h2>
         <p className="text-sm text-muted-foreground">
           {project?.root ??
             (projectError
               ? "Repository details unavailable"
               : "Connecting to repository…")}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Indexing is not implemented yet. Statistics and activity below are
-          sample data.
-        </p>
       </div>
-
+      {error && <p role="alert">Statistics unavailable. {error}</p>}
       <section
         aria-label="Project statistics"
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
-        {stats.map((stat) => (
-          <Card key={stat.id} className="gap-2 py-4">
-            <CardHeader className="px-4">
-              <CardDescription>{stat.label}</CardDescription>
-              <CardTitle className="font-mono text-2xl">{stat.value}</CardTitle>
+        {[
+          ["Files", data?.fileCount],
+          ["Symbols", data?.symbolCount],
+          ["Connections", data?.edgeCount],
+          ["Diagnostics", data?.diagnosticCount],
+        ].map(([label, count]) => (
+          <Card key={label}>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">
+                {label}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="px-4 text-xs text-muted-foreground">
-              {stat.detail}
+            <CardContent className="font-mono text-2xl">
+              {count ?? "—"}
             </CardContent>
           </Card>
         ))}
       </section>
-
       <Card>
         <CardHeader>
-          <CardTitle>Recent activity</CardTitle>
-          <CardDescription>
-            Latest structural changes detected in the repository.
-          </CardDescription>
+          <CardTitle>Repository activity</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ul className="divide-y">
-            {activity.map((event) => (
-              <li
-                key={event.id}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "w-20 justify-center",
-                    changeStyles[event.kind],
-                  )}
-                >
-                  {event.kind}
-                </Badge>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    <span className="mr-2 text-xs font-normal text-muted-foreground">
-                      {event.symbolKind}
-                    </span>
-                    {event.name}
-                  </p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">
-                    {event.path}
-                  </p>
-                </div>
-                <time
-                  dateTime={event.occurredAt}
-                  className="shrink-0 text-xs text-muted-foreground"
-                >
-                  {formatRelativeTime(event.occurredAt)}
-                </time>
-              </li>
-            ))}
-          </ul>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {events.length
+              ? `${events.length} loaded changes · latest: ${events[0]?.path}`
+              : "Changes appear here as files are edited."}
+          </p>
+          <Button variant="outline" onClick={onActivity}>
+            Open activity feed
+          </Button>
         </CardContent>
       </Card>
     </div>

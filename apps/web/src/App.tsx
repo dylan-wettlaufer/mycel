@@ -1,3 +1,4 @@
+import { useActivity } from "@/hooks/use-activity";
 import { RecordedChanges } from "@/features/activity/recorded-changes";
 import { SourcePanel } from "@/features/source/source-panel";
 import { NodeDetailsPanel } from "@/features/details/node-details";
@@ -16,6 +17,7 @@ export function App() {
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [root, setRoot] = useState<GraphNode | null>(null);
   const [source, setSource] = useState<GraphNode | null>(null);
+  const activity = useActivity();
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
 
@@ -25,13 +27,21 @@ export function App() {
       onNavigate={setView}
       projectName={project?.name ?? "Mycel"}
       connection={connection}
+      liveConnection={activity.connection}
     >
       {view === "Dashboard" ? (
-        <DashboardPage project={project} projectError={error} />
+        <DashboardPage
+          project={project}
+          projectError={error}
+          revision={activity.revision}
+          events={activity.events}
+          onActivity={() => setView("Activity")}
+        />
       ) : view === "Activity" ? (
-        <RecordedChanges />
+        <RecordedChanges {...activity} />
       ) : view === "Explorer" ? (
         <Explorer
+          revision={activity.revision}
           onSelect={(node) => {
             setSelected(node);
             setRoot(node);
@@ -43,11 +53,13 @@ export function App() {
           <GraphPanel
             key={root.id}
             root={root}
+            revision={activity.revision}
             selected={selected}
             onSelect={setSelected}
           />
           <NodeDetailsPanel
             node={selected}
+            revision={activity.revision}
             onSelect={setSelected}
             onScope={setRoot}
             onSource={setSource}
@@ -65,7 +77,7 @@ export function App() {
       )}
       {source && (
         <div className="mt-5">
-          <SourcePanel node={source} />
+          <SourcePanel node={source} revision={activity.revision} />
         </div>
       )}
     </AppShell>

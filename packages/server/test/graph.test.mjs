@@ -355,3 +355,17 @@ test("source route serves committed captures and rejects paths outside the index
     503,
   );
 });
+
+test("statistics count only the selected project's committed graph", async (t) => {
+  const { app } = fixture(t);
+  const response = await app.request("/api/graph/stats");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    projectId: project.id,
+    revision: 1,
+    fileCount: 3,
+    symbolCount: 7,
+    edgeCount: 6,
+    diagnosticCount: 1,
+  });
+});

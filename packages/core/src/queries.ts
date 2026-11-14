@@ -1,4 +1,5 @@
 import {
+  getGraphStats,
   getFileContent,
   getNeighborhood,
   getNodeDetails,
@@ -18,6 +19,7 @@ import type {
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getStats?(): import("@mycel/shared").GraphStats;
   getFileContent?(
     path: string,
   ): import("@mycel/shared").FileContent | undefined;
@@ -35,6 +37,7 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getStats: () => getGraphStats(database, projectId),
     getFileContent: (path) => getFileContent(database, projectId, path),
     searchSymbols: ({ q, limit }) =>
       searchSymbols(database, projectId, q, limit),

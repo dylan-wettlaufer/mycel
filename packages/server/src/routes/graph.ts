@@ -46,6 +46,12 @@ export function createGraphRoutes(graph?: GraphQueries) {
     );
   });
 
+  routes.get("/stats", (context) =>
+    graph?.getStats
+      ? context.json(graph.getStats())
+      : context.json({ error: "Graph queries unavailable" }, 503),
+  );
+
   routes.get("/search", (context) => {
     const values = context.req.queries("q");
     const q = values?.[0]?.trim();
