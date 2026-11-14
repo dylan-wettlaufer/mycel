@@ -1,3 +1,4 @@
+import { RecordedChanges } from "@/features/activity/recorded-changes";
 import { SourcePanel } from "@/features/source/source-panel";
 import { NodeDetailsPanel } from "@/features/details/node-details";
 import { GraphPanel } from "@/features/graph/graph-panel";
@@ -27,6 +28,8 @@ export function App() {
     >
       {view === "Dashboard" ? (
         <DashboardPage project={project} projectError={error} />
+      ) : view === "Activity" ? (
+        <RecordedChanges />
       ) : view === "Explorer" ? (
         <Explorer
           onSelect={(node) => {

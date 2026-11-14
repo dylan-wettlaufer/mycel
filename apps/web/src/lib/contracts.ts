@@ -90,3 +90,60 @@ export function isFileContent(
     ["typescript", "tsx"].includes(String(value.language))
   );
 }
+
+export function isChangeEvent(
+  value: unknown,
+): value is import("@mycel/shared").ChangeEvent {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== "string" ||
+    !/^\d+$/.test(value.id) ||
+    typeof value.projectId !== "string" ||
+    typeof value.entityId !== "string" ||
+    typeof value.path !== "string" ||
+    typeof value.timestamp !== "string" ||
+    !Number.isFinite(Date.parse(value.timestamp)) ||
+    !["created", "modified", "deleted"].includes(String(value.action))
+  )
+    return false;
+  const isEntity = (entity: unknown) =>
+    value.entityType === "node"
+      ? isNode(entity)
+      : isRecord(entity) &&
+        typeof entity.id === "string" &&
+        typeof entity.sourceId === "string" &&
+        typeof entity.targetId === "string" &&
+        ["CALLS", "CONTAINS", "IMPORTS"].includes(String(entity.kind));
+  return (
+    ["node", "edge"].includes(String(value.entityType)) &&
+    (value.before === null || isEntity(value.before)) &&
+    (value.after === null || isEntity(value.after)) &&
+    (value.beforeRevision === null ||
+      typeof value.beforeRevision === "number") &&
+    (value.afterRevision === null || typeof value.afterRevision === "number")
+  );
+}
+export function isChangesPage(
+  value: unknown,
+): value is import("@mycel/shared").ChangesPage {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.every(isChangeEvent) &&
+    (value.cursor === null || typeof value.cursor === "string")
+  );
+}
+export function isChangeDiff(
+  value: unknown,
+): value is import("@mycel/shared").ChangeDiff {
+  return (
+    isRecord(value) &&
+    typeof value.changeId === "string" &&
+    typeof value.path === "string" &&
+    (value.beforeContent === null || typeof value.beforeContent === "string") &&
+    (value.afterContent === null || typeof value.afterContent === "string") &&
+    (value.beforeRevision === null ||
+      typeof value.beforeRevision === "number") &&
+    (value.afterRevision === null || typeof value.afterRevision === "number")
+  );
+}
