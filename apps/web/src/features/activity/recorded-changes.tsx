@@ -1,3 +1,4 @@
+import { HistoryNode } from "./history-node";
 import { useState } from "react";
 import type { ChangeEvent } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,9 @@ export function RecordedChanges({
         <Button variant="outline" disabled={loading} onClick={loadMore}>
           {loading ? "Loading…" : "Load older changes"}
         </Button>
+      )}
+      {events.find((event) => event.id === changeId) && (
+        <HistoryNode event={events.find((event) => event.id === changeId)!} />
       )}
       {changeId && <DiffPanel changeId={changeId} />}
     </section>

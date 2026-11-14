@@ -219,3 +219,11 @@
 .react-flow .graph-node.selected {
   outline: 2px solid var(--primary);
 }
+.react-flow .graph-node.recent-created {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--success) 25%, transparent);
+}
+.react-flow .graph-node.recent-modified {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--warning) 25%, transparent);
+}

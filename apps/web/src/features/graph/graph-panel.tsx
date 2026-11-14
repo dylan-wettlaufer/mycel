@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { recentChanges } from "@/features/activity/event-node";
+import { useEffect, useMemo, useState } from "react";
 import { Background, Controls, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { GraphNode } from "@mycel/shared";
+import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
 import { isNeighborhood } from "@/lib/contracts";
@@ -12,12 +13,19 @@ export function GraphPanel({
   selected,
   onSelect,
   revision = 0,
+  events = [],
 }: {
   root: GraphNode;
   selected: GraphNode;
   onSelect: (node: GraphNode) => void;
   revision?: number;
+  events?: ChangeEvent[];
 }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
   const [depth, setDepth] = useState(1);
   const { data, error } = useResource(
     `/api/graph/nodes/${encodeURIComponent(root.id)}/neighborhood?depth=${depth}&limit=100`,
@@ -26,8 +34,10 @@ export function GraphPanel({
   );
   const layout = useMemo(
     () =>
-      data ? layoutNeighborhood(data, selected.id) : { nodes: [], edges: [] },
-    [data, selected.id],
+      data
+        ? layoutNeighborhood(data, selected.id, recentChanges(events, now))
+        : { nodes: [], edges: [] },
+    [data, selected.id, events, now],
   );
   return (
     <section className="space-y-3" aria-label="Scoped graph">

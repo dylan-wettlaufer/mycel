@@ -1,10 +1,11 @@
 import dagre from "@dagrejs/dagre";
 import { MarkerType, Position, type Node, type Edge } from "@xyflow/react";
-import type { Neighborhood } from "@mycel/shared";
+import type { ChangeAction, Neighborhood } from "@mycel/shared";
 
 export function layoutNeighborhood(
   graph: Neighborhood,
   selectedId: string,
+  recent: Map<string, ChangeAction> = new Map(),
 ): { nodes: Node[]; edges: Edge[] } {
   const layout = new dagre.graphlib.Graph({
     multigraph: true,
@@ -20,12 +21,14 @@ export function layoutNeighborhood(
       const position = layout.node(node.id);
       return {
         id: node.id,
-        data: { label: `${node.kind} · ${node.name}` },
+        data: {
+          label: `${node.kind} · ${node.name}${recent.has(node.id) ? ` · ${recent.get(node.id)}` : ""}`,
+        },
         position: { x: position.x - 110, y: position.y - 35 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         selected: node.id === selectedId,
-        className: `graph-node graph-node-${node.kind}`,
+        className: `graph-node graph-node-${node.kind}${recent.has(node.id) ? ` recent-${recent.get(node.id)}` : ""}`,
         style: { width: 220, minHeight: 70 },
       };
     }),

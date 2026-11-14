@@ -53,6 +53,7 @@ export function App() {
           <GraphPanel
             key={root.id}
             root={root}
+            events={activity.events}
             revision={activity.revision}
             selected={selected}
             onSelect={setSelected}
