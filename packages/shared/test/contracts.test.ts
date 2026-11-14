@@ -237,3 +237,15 @@ export const change = {
   before: null,
   after: null,
 } satisfies import("@mycel/shared").ChangeEvent;
+export const changesPage = {
+  items: [change],
+  cursor: null,
+} satisfies import("@mycel/shared").ChangesPage;
+export const diff = {
+  changeId: "1",
+  path: "main.ts",
+  beforeContent: "",
+  afterContent: null,
+  beforeRevision: 1,
+  afterRevision: null,
+} satisfies import("@mycel/shared").ChangeDiff;

@@ -42,3 +42,4 @@ export type {
   ActivityEvent,
   ChangeKind,
 } from "./history.js";
+export type { ChangesQuery, ChangesPage, ChangeDiff } from "./history.js";

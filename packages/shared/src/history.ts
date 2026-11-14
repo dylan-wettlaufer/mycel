@@ -32,3 +32,20 @@ export interface ActivityEvent {
   occurredAt: string;
 }
 export type ChangeKind = ChangeAction;
+
+export interface ChangesQuery {
+  cursor?: ChangeId;
+  limit?: number;
+}
+export interface ChangesPage {
+  items: ChangeEvent[];
+  cursor: ChangeId | null;
+}
+export interface ChangeDiff {
+  changeId: ChangeId;
+  path: string;
+  beforeContent: string | null;
+  afterContent: string | null;
+  beforeRevision: Revision | null;
+  afterRevision: Revision | null;
+}
