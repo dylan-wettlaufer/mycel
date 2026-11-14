@@ -330,3 +330,34 @@ test("exposes timings only for committed updates and includes debounce latency",
   await setTimeout(200);
   assert.equal(live.lastUpdate, timing);
 });
+
+test("subscribers see committed events only; failures publish nothing and listener errors do not retry", async (t) => {
+  const { root, db, live, errors } = await fixture(t, {
+    "a.ts": "function a() {}",
+  });
+  const events = [];
+  const off = live.onEvent((e) => {
+    assert.ok(db.prepare("SELECT 1 FROM change_events WHERE id = ?").get(e.id));
+    events.push(e);
+  });
+  live.onEvent(() => {
+    throw new Error("listener failure");
+  });
+  db.exec(
+    "CREATE TRIGGER reject_history BEFORE INSERT ON change_events BEGIN SELECT RAISE(ABORT, 'reject history'); END",
+  );
+  await writeFile(join(root, "a.ts"), "function b() {}");
+  await until(() => errors.length > 0);
+  assert.equal(events.length, 0);
+  db.exec("DROP TRIGGER reject_history");
+  await live.flush();
+  assert.ok(events.length > 0);
+  assert.ok(errors.some((e) => e.message === "listener failure"));
+  const count = events.length;
+  off();
+  await writeFile(join(root, "a.ts"), "function c() {}");
+  await until(() =>
+    db.prepare("SELECT name FROM nodes WHERE name = 'c'").get(),
+  );
+  assert.equal(events.length, count);
+});

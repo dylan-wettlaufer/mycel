@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { commitChangeSet, readGraphState } from "@mycel/db";
 import { diffGraph } from "./history.js";
-import type { Diagnostic } from "@mycel/shared";
+import type { ChangeEvent, Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
 import { buildProjectGraph, hashContent } from "./graph.js";
@@ -27,6 +27,7 @@ export interface GraphUpdateTiming {
 
 export interface WatchRepositoryOptions extends IndexRepositoryOptions {
   debounceMs?: number;
+  onEvent?(event: ChangeEvent): void;
   onError(error: unknown): void;
   /** Alternate parser for engine integrations; defaults to the TypeScript parser. */
   parse?: typeof parseFile;
@@ -34,6 +35,22 @@ export interface WatchRepositoryOptions extends IndexRepositoryOptions {
 
 /** Watch before capture so saves during startup are reconciled before returning. */
 export async function watchRepository(options: WatchRepositoryOptions) {
+  const listeners = new Set<(event: ChangeEvent) => void>();
+  if (options.onEvent) listeners.add(options.onEvent);
+  const publish = (events: ChangeEvent[]) => {
+    for (const event of events)
+      for (const listener of listeners) {
+        try {
+          listener(event);
+        } catch (error) {
+          try {
+            options.onError(error);
+          } catch {
+            /* Observers cannot invalidate a commit. */
+          }
+        }
+      }
+  };
   const startup: SourceChange[] = [];
   let queue: ReturnType<typeof createSourceChangeQueue> | undefined;
   const watcher = watchSourceFiles({
@@ -56,11 +73,12 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       readGraphState(options.database, project.id),
       initialGraph,
     );
-    commitChangeSet(options.database, {
+    const initialCommit = commitChangeSet(options.database, {
       graph: initialGraph,
       sources: new Map([...files].map(([path, file]) => [path, file.source])),
       changes: initialChanges,
     });
+    publish(initialCommit.events);
     let failures = new Map<string, Diagnostic[]>();
     let lastUpdate: GraphUpdateTiming | undefined;
     queue = createSourceChangeQueue({
@@ -128,7 +146,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           ...[...nextFailures.values()].flat(),
         ];
         const resolvedAt = performance.now();
-        const { revision } = commitChangeSet(options.database, {
+        const { revision, events } = commitChangeSet(options.database, {
           graph,
           sources: new Map(
             [...next].map(([path, file]) => [path, file.source]),
@@ -154,6 +172,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           resolveMs: resolvedAt - parsedAt,
           writeMs: completedAt - resolvedAt,
         });
+        publish(events);
       },
     });
     // Recheck the startup snapshot even if OS events have not arrived yet.
@@ -163,11 +182,18 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     await queue.flush();
     return {
       project,
+      onEvent(listener: (event: ChangeEvent) => void) {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
       get lastUpdate(): GraphUpdateTiming | undefined {
         return lastUpdate;
       },
       flush: queue.flush,
       close(): Promise<void> {
+        listeners.clear();
         // Stop callbacks synchronously, before the owner closes storage.
         return Promise.all([queue!.close(), watcher.close()]).then(() => {});
       },
