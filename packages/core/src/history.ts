@@ -18,8 +18,9 @@ export function diffGraph(
   for (const entityType of ["node", "edge"] as const) {
     const key = entityType === "node" ? "nodes" : "edges";
     const strip = (entity: State[typeof key][number]) => {
-      const { revision: _revision, ...rest } = entity;
-      return rest;
+      const value = { ...entity };
+      delete value.revision;
+      return value;
     };
     const before = new Map(
       previous[key].map((entity) => [entity.id, strip(entity)]),

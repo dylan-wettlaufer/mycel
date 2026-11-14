@@ -6,4 +6,3 @@ export interface DashboardStat {
   value: string;
   detail: string;
 }
-
