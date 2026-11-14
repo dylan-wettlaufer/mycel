@@ -54,15 +54,15 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 
 ### Phase 4: history
 
-- [ ] Create tables: `snapshots` (path, revision, content), `change_events`
+- [x] Create tables: `snapshots` (path, revision, content), `change_events`
       (monotonic integer id, timestamp, entity, action, before and after
       revision, attribution), and `sessions`.
-- [ ] `commitChangeSet(...)`: one transaction that writes graph changes,
+- [x] `commitChangeSet(...)`: one transaction that writes graph changes,
       snapshots, events, and the new revision, and returns the inserted events.
-- [ ] `listChanges(cursor, limit)` for pagination.
-- [ ] `getEventsAfter(id)` for SSE replay.
-- [ ] `getDiff(changeId)` returning before and after content from snapshots.
-- [ ] Retention policy (open decision 4): prune old snapshots and events
+- [x] `listChanges(cursor, limit)` for pagination.
+- [x] `getEventsAfter(id)` for SSE replay.
+- [x] `getDiff(changeId)` returning before and after content from snapshots.
+- [x] Retention policy (open decision 4): prune old snapshots and events
       without breaking diffs that are still reachable.
 
 ### Phase 7: robustness
@@ -79,8 +79,8 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - [x] Constraints, project isolation, cascading cleanup, WAL persistence, and
       external storage paths (including symlinks).
 - [x] Queries against an in-memory database seeded with a fixture graph.
-- [ ] A failing write inside `commitChangeSet` leaves no partial state.
-- [ ] Event ids are strictly increasing across restarts.
+- [x] A failing write inside `commitChangeSet` leaves no partial state.
+- [x] Event ids are strictly increasing across restarts.
 
 ## Done when
 
@@ -90,5 +90,5 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - The database file is never created inside the target repository.
 
 The schema/connection, full-project writes, and public graph queries are
-complete. Stats, per-file graph replacement, and history/event writes remain
+complete. Stats and per-file graph replacement remain
 unchecked above.

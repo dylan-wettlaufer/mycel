@@ -92,5 +92,7 @@ pnpm test
 The shared test script builds the public declarations and compiles consumer
 fixtures against the package entry point, including expected failures for
 invalid contracts. It runs without a runtime test framework or Node type
-dependencies. Phase 4 history/event and post-MVP attribution contracts remain
+dependencies. Post-MVP attribution contracts remain
 separate work.
+
+History and SSE contracts are exported from `history.ts`. See [history semantics](../../docs/HISTORY.md).

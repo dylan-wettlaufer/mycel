@@ -44,13 +44,13 @@ See [architecture](../ARCHITECTURE.md#http-api).
 
 ### Phase 4: history and events
 
-- [ ] `GET /api/changes` with cursor pagination.
-- [ ] `GET /api/changes/:id/diff`.
-- [ ] `GET /api/events` as an SSE stream using Hono's streaming helpers. Send
+- [x] `GET /api/changes` with cursor pagination.
+- [x] `GET /api/changes/:id/diff`.
+- [x] `GET /api/events` as an SSE stream using Hono's streaming helpers. Send
       each committed event with its id.
-- [ ] Support `Last-Event-ID` so reconnecting clients receive missed events
+- [x] Support `Last-Event-ID` so reconnecting clients receive missed events
       from the database.
-- [ ] Send periodic heartbeats and clean up subscribers when clients
+- [x] Send periodic heartbeats and clean up subscribers when clients
       disconnect.
 
 ### Security
@@ -72,7 +72,7 @@ See [architecture](../ARCHITECTURE.md#http-api).
       project isolation, and loopback HTTP. File/history routes remain below.
 - [ ] Path traversal (`..`, absolute paths, symlinks out of the root) is
       rejected by `/api/files/content`.
-- [ ] SSE delivers events in order and replays after `Last-Event-ID`.
+- [x] SSE delivers events in order and replays after `Last-Event-ID`.
 - [ ] Requests with a foreign `Host` or `Origin` are rejected.
 
 ## Done when

@@ -324,20 +324,20 @@ agreed implementation plan.
 
 **Estimated: 3--4 days**
 
--   [ ] Define change event types for node and edge creation,
+-   [x] Define change event types for node and edge creation,
     modification, and deletion.
--   [ ] Compare previous and updated graph states to generate change
+-   [x] Compare previous and updated graph states to generate change
     events.
--   [ ] Persist events with timestamps, affected entities, and
+-   [x] Persist events with timestamps, affected entities, and
     before/after references.
--   [ ] Store versioned source or snapshots sufficient to display
+-   [x] Store versioned source or snapshots sufficient to display
     historical diffs.
--   [ ] Introduce a local monitoring session with a starting graph
+-   [x] Introduce a local monitoring session with a starting graph
     revision.
--   [ ] Add an SSE endpoint that broadcasts committed changes to
+-   [x] Add an SSE endpoint that broadcasts committed changes to
     connected clients.
--   [ ] Implement event replay on reconnection using an event cursor.
--   [ ] Test chronological ordering, rapid changes, and reconnect
+-   [x] Implement event replay on reconnection using an event cursor.
+-   [x] Test chronological ordering, rapid changes, and reconnect
     behavior.
 
 ## Phase 5 --- Interactive browser dashboard

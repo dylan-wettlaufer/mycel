@@ -46,14 +46,14 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
 
 ### Phase 4: change history contracts
 
-- [ ] Define `ChangeAction` (`created`, `modified`, `deleted`) and
+- [x] Define `ChangeAction` (`created`, `modified`, `deleted`) and
       `ChangeEvent`: monotonic id, timestamp, entity type and id, action,
       before and after revision, optional attribution.
-- [ ] Define `ChangesPage` (items plus cursor) and `ChangeDiff` (path, before
+- [x] Define `ChangesPage` (items plus cursor) and `ChangeDiff` (path, before
       content, after content, revisions).
-- [ ] Define SSE message types as a discriminated union, for example
+- [x] Define SSE message types as a discriminated union, for example
       `change`, `index-status`, `diagnostics`.
-- [ ] Move `ChangeKind` and `ActivityEvent` out of
+- [x] Move `ChangeKind` and `ActivityEvent` out of
       `apps/web/src/features/dashboard/types.ts` once shared event versions exist.
       Its node kinds already come from shared contracts.
 

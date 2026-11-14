@@ -191,9 +191,9 @@ dashboard HTML.
 | GET | `/api/graph/nodes/:id` | Node details, relationships, and diagnostics | Current |
 | GET | `/api/graph/nodes/:id/neighborhood` | Bounded connected subgraph | Current |
 | GET | `/api/files/content?path=` | Source content, constrained to the repository root | Planned |
-| GET | `/api/changes` | Paginated change history | Planned |
-| GET | `/api/changes/:id/diff` | Before and after source for a change | Planned |
-| GET | `/api/events` | SSE stream of committed events, resumable with `Last-Event-ID` | Planned |
+| GET | `/api/changes` | Paginated change history | Current |
+| GET | `/api/changes/:id/diff` | Before and after source for a change | Current |
+| GET | `/api/events` | SSE stream of committed events, resumable with `Last-Event-ID` | Current |
 
 Graph routes validate numeric bounds and return shared query contracts with
 snapshot revisions; see [limits and usage](../packages/server/README.md).
@@ -328,3 +328,6 @@ These need a decision before or during the relevant phase:
    configured yet (for example ESLint plus Prettier, or Biome).
 7. **Import resolution scope.** How far to honor `tsconfig` `paths`,
    `baseUrl`, package `exports`, and workspace packages in the first version.
+
+Phase 4 history storage, retention, sessions, and SSE behavior are documented in
+[Change history and live events](HISTORY.md).

@@ -71,12 +71,12 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 
 ### Phase 4: change detection and events
 
-- [ ] Diff the previous and new graph for a file into created, modified, and
+- [x] Diff the previous and new graph for a file into created, modified, and
       deleted node and edge changes.
-- [ ] Commit the change set, snapshots, and events in one db transaction.
-- [ ] Emit events to subscribers only after the commit succeeds.
-- [ ] Start a monitoring session on launch that records the starting revision.
-- [ ] On startup, reconcile the database with the working tree. Files changed
+- [x] Commit the change set, snapshots, and events in one db transaction.
+- [x] Emit events to subscribers only after the commit succeeds.
+- [x] Start a monitoring session on launch that records the starting revision.
+- [x] On startup, reconcile the database with the working tree. Files changed
       while Mycel was not running should produce events.
 
 ## Tests
@@ -91,8 +91,8 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - [x] Watcher integration tests: create, edit, delete, and rename files in a
       temporary directory and assert the resulting events.
 - [x] Rapid successive writes produce one consistent final state.
-- [ ] A failed database write emits no event.
-- [ ] Restarting the engine does not duplicate events.
+- [x] A failed database write emits no event.
+- [x] Restarting the engine does not duplicate events.
 
 ## Done when
 
