@@ -76,3 +76,5 @@ export default function MonacoView({
     />
   );
 }
+
+export { monaco };
