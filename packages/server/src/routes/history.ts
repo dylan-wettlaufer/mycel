@@ -52,7 +52,7 @@ export function createHistoryRoutes(history?: HistoryQueries) {
   routes.get("/events", (c) => {
     if (!history) return c.json({ error: "History unavailable" }, 503);
     if (history.signal.aborted) return c.json({ error: "History closed" }, 503);
-    let lastId = "0";
+    let lastId = cursor(c.req.header("Last-Event-ID")) ?? "0";
     return streamSSE(c, async (stream) => {
       let stopped = false;
       let wake: (() => void) | undefined;

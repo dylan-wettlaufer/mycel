@@ -128,3 +128,25 @@ test("SSE streams committed changes with ids and removes disconnected subscriber
   assert.equal(listeners.size, 0);
   assert.equal((await createApp().request("/api/events")).status, 503);
 });
+test("SSE replays after Last-Event-ID in order and hands off to rapid live commits", async (t) => {
+  const { app, commit } = fixture(t);
+  commit();
+  commit();
+  const response = await app.request("/api/events", {
+    headers: { "Last-Event-ID": "1" },
+  });
+  const reader = response.body.getReader();
+  t.after(() => reader.cancel());
+  assert.equal((await nextChange(reader)).id, "2");
+  assert.equal((await nextChange(reader)).id, "3");
+  commit();
+  commit();
+  assert.equal((await nextChange(reader)).id, "4");
+  assert.equal((await nextChange(reader)).id, "5");
+  await reader.cancel();
+  assert.equal(
+    (await app.request("/api/events", { headers: { "Last-Event-ID": "bad" } }))
+      .status,
+    400,
+  );
+});
