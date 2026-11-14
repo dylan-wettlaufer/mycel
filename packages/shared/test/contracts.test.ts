@@ -249,3 +249,10 @@ export const diff = {
   beforeRevision: 1,
   afterRevision: null,
 } satisfies import("@mycel/shared").ChangeDiff;
+export function eventId(
+  message: import("@mycel/shared").SseMessage,
+): string | undefined {
+  if (message.type === "change") return message.data.id;
+  if (message.type === "diagnostics") return String(message.data.revision);
+  return message.data.status;
+}

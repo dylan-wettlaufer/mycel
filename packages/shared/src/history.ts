@@ -49,3 +49,15 @@ export interface ChangeDiff {
   beforeRevision: Revision | null;
   afterRevision: Revision | null;
 }
+
+export type SseMessage =
+  | { type: "change"; data: ChangeEvent }
+  | { type: "index-status"; data: import("./types.js").IndexProgress }
+  | {
+      type: "diagnostics";
+      data: {
+        projectId: ProjectId;
+        revision: Revision;
+        items: import("./types.js").Diagnostic[];
+      };
+    };
