@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
-import { applyProjectGraph, replaceProjectGraph } from "@mycel/db";
+import { commitChangeSet, readGraphState } from "@mycel/db";
+import { diffGraph } from "./history.js";
 import type { Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
@@ -50,10 +51,16 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     const captured = await captureRepository(options, parse);
     const { project } = captured;
     let files = new Map(captured.files.map((file) => [file.parsed.path, file]));
-    replaceProjectGraph(
-      options.database,
-      buildProjectGraph(project, [...files.values()]),
+    const initialGraph = buildProjectGraph(project, [...files.values()]);
+    const initialChanges = diffGraph(
+      readGraphState(options.database, project.id),
+      initialGraph,
     );
+    commitChangeSet(options.database, {
+      graph: initialGraph,
+      sources: new Map([...files].map(([path, file]) => [path, file.source])),
+      changes: initialChanges,
+    });
     let failures = new Map<string, Diagnostic[]>();
     let lastUpdate: GraphUpdateTiming | undefined;
     queue = createSourceChangeQueue({
@@ -121,7 +128,16 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           ...[...nextFailures.values()].flat(),
         ];
         const resolvedAt = performance.now();
-        const revision = applyProjectGraph(options.database, graph);
+        const { revision } = commitChangeSet(options.database, {
+          graph,
+          sources: new Map(
+            [...next].map(([path, file]) => [path, file.source]),
+          ),
+          changes: diffGraph(
+            readGraphState(options.database, project.id),
+            graph,
+          ),
+        });
         const completedAt = performance.now();
         files = next;
         failures = nextFailures;
