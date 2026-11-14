@@ -42,5 +42,11 @@ export function createHistoryRoutes(history?: HistoryQueries) {
       }),
     );
   });
+  routes.get("/changes/:id/diff", (c) => {
+    const id = cursor(c.req.param("id"))!;
+    if (!history) return c.json({ error: "History unavailable" }, 503);
+    const diff = history.getDiff(id);
+    return diff ? c.json(diff) : c.json({ error: "Change not found" }, 404);
+  });
   return routes;
 }

@@ -88,3 +88,14 @@ test("changes routes paginate and reject invalid parameters", async (t) => {
     assert.equal((await app.request(`/api/changes?${query}`)).status, 400);
   assert.equal((await createApp().request("/api/changes")).status, 503);
 });
+test("diff route returns source and handles missing or invalid ids", async (t) => {
+  const { app } = fixture(t);
+  const response = await app.request("/api/changes/1/diff");
+  assert.equal(response.status, 200);
+  const diff = await response.json();
+  assert.equal(diff.afterContent, "");
+  assert.equal(diff.beforeContent, null);
+  assert.equal((await app.request("/api/changes/999/diff")).status, 404);
+  assert.equal((await app.request("/api/changes/abc/diff")).status, 400);
+  assert.equal((await createApp().request("/api/changes/1/diff")).status, 503);
+});
