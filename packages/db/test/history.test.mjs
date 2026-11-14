@@ -145,3 +145,27 @@ test("explicit pruning preserves reachable diffs, current source and increasing 
   assert.equal(db.prepare("SELECT content FROM snapshots").get().content, "4");
   assert.equal(commitChangeSet(db, set).events[0].id, "5");
 });
+test("symbol deletion diffs retain both source sides and their revisions after pruning", async (t) => {
+  const { getDiff, pruneHistory } = await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const set = changeSet();
+  commitChangeSet(db, set);
+  set.changes[0] = {
+    ...set.changes[0],
+    action: "deleted",
+    before: node,
+    after: null,
+  };
+  set.sources.set("a.ts", "remaining code");
+  commitChangeSet(db, set);
+  pruneHistory(db, "p", "2");
+  assert.deepEqual(getDiff(db, "p", "2"), {
+    changeId: "2",
+    path: "a.ts",
+    beforeContent: "a",
+    afterContent: "remaining code",
+    beforeRevision: 1,
+    afterRevision: 2,
+  });
+});

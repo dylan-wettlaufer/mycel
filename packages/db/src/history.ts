@@ -215,13 +215,17 @@ export function getDiff(
         .get(projectId, row.path, revision)?.content ?? null
     );
   };
+  const afterRevision = row.afterRevision ?? row.beforeRevision! + 1;
+  const beforeRevision = afterRevision - 1;
+  const beforeContent = content(beforeRevision);
+  const afterContent = content(afterRevision);
   return {
     changeId: id,
     path: row.path,
-    beforeContent: content((row.afterRevision ?? row.beforeRevision! + 1) - 1),
-    afterContent: content(row.afterRevision ?? row.beforeRevision! + 1),
-    beforeRevision: row.beforeRevision,
-    afterRevision: row.afterRevision,
+    beforeContent,
+    afterContent,
+    beforeRevision: beforeContent === null ? null : beforeRevision,
+    afterRevision: afterContent === null ? null : afterRevision,
   };
 }
 
