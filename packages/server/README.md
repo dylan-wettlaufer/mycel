@@ -21,8 +21,8 @@ curl 'http://127.0.0.1:3000/api/graph/search?q=indexRepository&limit=10'
 The dev server indexes the Mycel checkout before listening on port 3000. The CLI
 does the same for its selected repository on an available port. Both use the
 per-repository SQLite database outside the source tree and close it on server
-shutdown. Each launch performs a full scan; source changes require a restart
-until watching is implemented. Indexing failures abort startup with an error.
+shutdown. Each launch performs a full scan, then watches source files and commits
+changes to the graph and source history. Indexing failures abort startup with an error.
 
 `startIndexedServer(port, { project, webDistPath?, databasePath? })` is the shared
 startup helper. It returns a listening server with graph routes ready. Use
@@ -98,9 +98,9 @@ curl 'http://127.0.0.1:3000/api/graph/nodes/<id>?limit=20'
 curl 'http://127.0.0.1:3000/api/graph/nodes/<id>/neighborhood?depth=2&limit=50'
 ```
 
-Use an ID returned by search, URL-encoded as a path segment. The current
-structural indexer creates `CONTAINS` edges only, so callers and dependencies
-stay empty until import/call resolution is implemented.
+Use an ID returned by search, URL-encoded as a path segment. The indexer creates
+`CONTAINS`, `IMPORTS`, and resolved `CALLS` edges. Unresolved relationships appear
+as diagnostics where supported.
 
 ## Verify
 
@@ -114,3 +114,20 @@ pnpm test
 Tests cover in-memory fixture graphs, project isolation, bounded/truncated
 results, query validation, JSON errors, loopback HTTP, and existing dashboard
 and project/health behavior.
+
+### Dashboard read APIs
+
+- `GET /api/graph/stats` returns project-scoped file, symbol, edge, and diagnostic
+  counts with their committed graph revision.
+- `GET /api/files/content?path=<repository-relative-path>` returns source captured
+  at the current committed graph revision. It only serves indexed files from the
+  selected project's database; it never reads arbitrary disk paths. Absolute
+  paths, traversal segments, backslashes, and duplicate path parameters are
+  rejected.
+- `GET /api/changes/:id` returns one saved event so browser links can reopen it
+  independently of loaded history pages. Unknown IDs return 404.
+- `GET /api/changes/:id/diff` supplies captured before/after file contents. A null
+  side means the file did not exist at that revision; an empty string is an empty
+  file.
+- `GET /api/events` streams ordered changes with SSE IDs and replays after the
+  native browser's `Last-Event-ID` on reconnection.

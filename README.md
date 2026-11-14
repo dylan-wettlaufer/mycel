@@ -51,16 +51,18 @@ together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
 | `packages/shared` | `@mycel/shared` | Shared contracts and utilities |
 | `apps/web` | `@mycel/web` | Browser dashboard |
 
-`apps/web` is a Vite + React + TypeScript app styled with Tailwind CSS v4 and
-shadcn/ui; it currently renders a dashboard shell with placeholder data. The
-Hono backend in `packages/server` serves the built dashboard and exposes a
-health endpoint. The dashboard connection badge polls that endpoint; the
-repository identity comes from `/api/project`. Structural indexing and database
-graph queries are implemented as library APIs. Hono exposes search, node details,
-and neighborhood routes. CLI/dev startup indexes the selected repository and
-attaches its queries automatically; see [server usage](packages/server/README.md).
-Dashboard graph statistics and activity integration remain planned in
-[the PRD](mycel_prd.md).
+`apps/web` is a Vite + React + TypeScript dashboard styled with Tailwind CSS v4
+and shadcn/ui. It provides a searchable file and symbol explorer, scoped React Flow
+graphs, relationship details, and locally bundled Monaco source and diff viewers.
+The overview shows real index counts. Activity arrives through SSE, with recent
+node highlights and saved metadata and source for deleted nodes. Hash-based links
+preserve graph selections, individual changes, and source views across reloads and
+browser Back/Forward navigation.
+
+The Hono backend serves the dashboard and project-scoped graph, captured source,
+history, and SSE APIs. CLI startup indexes the repository and then watches it for
+changes. The header shows backend health and live-stream connection state
+separately; see [server usage](packages/server/README.md).
 
 ## Development
 
@@ -73,6 +75,22 @@ pnpm build
 pnpm typecheck
 pnpm test
 ```
+
+### Browser workflow tests
+
+Install Chromium once, then run the full dashboard workflow:
+
+```sh
+pnpm exec playwright install chromium
+pnpm test:workflow
+```
+
+The test uses a disposable Git repository and a real server, watcher, SQLite database,
+and Chromium browser. It checks search, graph controls, relationships, Monaco source
+and recorded diffs, live creation/modification/deletion, browser navigation, mobile
+layout, and SSE recovery after a server interruption. It also rejects browser runtime
+errors and external asset requests. See [the workflow guide](docs/testing/dashboard-workflow.md)
+for the external coding agent mode and validation evidence.
 
 Code quality commands run across the workspace:
 
@@ -138,7 +156,7 @@ curl 'http://127.0.0.1:<port>/api/health'
 Replace `<port>` with the port printed by `mycel` (or use port 3000 for
 `pnpm dev:server`). The health endpoint currently checks process liveness.
 Startup completes an initial index before listening. Each restart rescans the
-repository; live file watching and progress reporting remain planned. The server binds
+repository and watches source changes while running. Progress reporting remains planned. The server binds
 only to the loopback interface. Stop it with Ctrl+C.
 
 For a fixed-port server without browser launch, build first with `pnpm build`,
