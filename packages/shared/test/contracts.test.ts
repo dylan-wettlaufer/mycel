@@ -223,3 +223,17 @@ acceptHash(new Uint8Array(32));
 acceptNodeId(42);
 // @ts-expect-error Projects also have opaque string identities.
 acceptProjectId(42);
+
+export const change = {
+  id: "1",
+  projectId: project.id,
+  timestamp: "2026-01-01T00:00:00Z",
+  entityType: "node",
+  entityId: "node:1",
+  action: "deleted",
+  path: "main.ts",
+  beforeRevision: 1,
+  afterRevision: null,
+  before: null,
+  after: null,
+} satisfies import("@mycel/shared").ChangeEvent;

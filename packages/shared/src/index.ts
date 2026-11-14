@@ -35,3 +35,10 @@ export type {
   SearchQuery,
   SearchResult,
 } from "./queries.js";
+export type {
+  ChangeAction,
+  ChangeId,
+  ChangeEvent,
+  ActivityEvent,
+  ChangeKind,
+} from "./history.js";
