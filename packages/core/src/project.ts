@@ -1,3 +1,5 @@
+import { createHistoryQueries } from "./history-queries.js";
+import type { HistoryQueries } from "./history-queries.js";
 import { openDatabase } from "@mycel/db";
 import type { IndexingSettings, Project, ProjectInfo } from "@mycel/shared";
 import type { GraphUpdateTiming } from "./live-index.js";
@@ -17,6 +19,7 @@ export interface IndexedProjectOptions {
 export interface IndexedProject {
   project: Project;
   graph: GraphQueries;
+  history: HistoryQueries;
   readonly lastUpdate: GraphUpdateTiming | undefined;
   flush(): Promise<void>;
   close(): void;
@@ -44,14 +47,22 @@ export async function openIndexedProject(
         : { debounceMs: options.debounceMs }),
       ...(options.indexing === undefined ? {} : { indexing: options.indexing }),
     });
+    const shutdown = new AbortController();
     return {
       project: live.project,
       graph: createGraphQueries(database, live.project.id),
+      history: createHistoryQueries(
+        database,
+        live.project.id,
+        live.onEvent,
+        shutdown.signal,
+      ),
       get lastUpdate() {
         return live.lastUpdate;
       },
       flush: live.flush,
       close: () => {
+        shutdown.abort();
         void live.close();
         if (database.open) database.close();
       },

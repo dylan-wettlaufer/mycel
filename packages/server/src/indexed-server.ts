@@ -20,6 +20,7 @@ export async function startIndexedServer(
     server = startServer(port, {
       project: options.project,
       graph: indexed.graph,
+      history: indexed.history,
       ...(options.webDistPath === undefined
         ? {}
         : { webDistPath: options.webDistPath }),

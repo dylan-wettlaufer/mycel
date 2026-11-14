@@ -15,3 +15,6 @@ export type {
   GraphUpdateTiming,
   WatchRepositoryOptions,
 } from "./live-index.js";
+
+export { createHistoryQueries } from "./history-queries.js";
+export type { HistoryQueries } from "./history-queries.js";
