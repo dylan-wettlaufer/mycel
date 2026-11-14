@@ -99,3 +99,32 @@ test("diff route returns source and handles missing or invalid ids", async (t) =
   assert.equal((await app.request("/api/changes/abc/diff")).status, 400);
   assert.equal((await createApp().request("/api/changes/1/diff")).status, 503);
 });
+async function nextChange(reader) {
+  const decoder = new TextDecoder();
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) throw new Error("Stream ended");
+    text += decoder.decode(value, { stream: true });
+    if (text.includes("event: change") && text.endsWith("\n\n"))
+      return JSON.parse(
+        text
+          .split("\n")
+          .find((line) => line.startsWith("data: "))
+          .slice(6),
+      );
+  }
+}
+test("SSE streams committed changes with ids and removes disconnected subscribers", async (t) => {
+  const { app, commit, listeners } = fixture(t);
+  const response = await app.request("/api/events");
+  assert.match(response.headers.get("content-type"), /text\/event-stream/);
+  const reader = response.body.getReader();
+  t.after(() => reader.cancel());
+  assert.equal((await nextChange(reader)).id, "1");
+  commit();
+  assert.equal((await nextChange(reader)).id, "2");
+  await reader.cancel();
+  assert.equal(listeners.size, 0);
+  assert.equal((await createApp().request("/api/events")).status, 503);
+});

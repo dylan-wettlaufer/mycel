@@ -1,3 +1,4 @@
+import { streamSSE } from "hono/streaming";
 import { Hono } from "hono";
 import type { HistoryQueries } from "@mycel/core";
 import { HTTPException } from "hono/http-exception";
@@ -47,6 +48,49 @@ export function createHistoryRoutes(history?: HistoryQueries) {
     if (!history) return c.json({ error: "History unavailable" }, 503);
     const diff = history.getDiff(id);
     return diff ? c.json(diff) : c.json({ error: "Change not found" }, 404);
+  });
+  routes.get("/events", (c) => {
+    if (!history) return c.json({ error: "History unavailable" }, 503);
+    if (history.signal.aborted) return c.json({ error: "History closed" }, 503);
+    let lastId = "0";
+    return streamSSE(c, async (stream) => {
+      let stopped = false;
+      let wake: (() => void) | undefined;
+      const unsubscribe = history.onEvent(() => wake?.());
+      const stop = () => {
+        stopped = true;
+        unsubscribe();
+        wake?.();
+      };
+      const abort = () => stream.abort();
+      stream.onAbort(stop);
+      history.signal.addEventListener("abort", abort, { once: true });
+      c.req.raw.signal.addEventListener("abort", abort, { once: true });
+      try {
+        await stream.write(": connected\n\n");
+        while (!stopped) {
+          const events = history.getEventsAfter(lastId, 100);
+          for (const event of events) {
+            if (stopped) break;
+            await stream.writeSSE({
+              id: event.id,
+              event: "change",
+              data: JSON.stringify(event),
+            });
+            lastId = event.id;
+          }
+          if (!events.length && !stopped)
+            await new Promise<void>((resolve) => {
+              wake = resolve;
+            });
+          wake = undefined;
+        }
+      } finally {
+        stop();
+        history.signal.removeEventListener("abort", abort);
+        c.req.raw.signal.removeEventListener("abort", abort);
+      }
+    });
   });
   return routes;
 }
