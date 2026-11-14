@@ -145,14 +145,18 @@ test("initializes a strict, indexed schema with foreign keys and a busy timeout"
     .all()
     .map((row) => row.name);
   assert.deepEqual(tables, [
+    "change_events",
     "diagnostics",
     "edges",
     "nodes",
     "projects",
     "revisions",
     "schema_migrations",
+    "sessions",
+    "snapshots",
+    "sqlite_sequence",
   ]);
-  for (const table of tables)
+  for (const table of tables.filter((name) => name !== "sqlite_sequence"))
     assert.equal(
       db.pragma("table_list").find((row) => row.name === table).strict,
       1,
@@ -185,8 +189,8 @@ test("reapplying migrations preserves metadata and stored graph data", (t) => {
   insertProject(db);
   insertNode(db);
   const before = db.prepare("SELECT * FROM schema_migrations").all();
-  assert.equal(migrateDatabase(db), 1);
-  assert.equal(migrateDatabase(db), 1);
+  assert.equal(migrateDatabase(db), migrations.length);
+  assert.equal(migrateDatabase(db), migrations.length);
   assert.deepEqual(db.prepare("SELECT * FROM schema_migrations").all(), before);
   const stored = db.prepare("SELECT * FROM nodes").get();
   assert.equal(stored.content_hash, hash);
@@ -218,7 +222,7 @@ test("disk connections enable WAL, create parents, and persist across reopen", a
   assert.equal(
     reopened.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get()
       .count,
-    1,
+    migrations.length,
   );
   assert.deepEqual(reopened.pragma("integrity_check"), [
     { integrity_check: "ok" },
@@ -250,12 +254,12 @@ test("a failed migration batch rolls back DDL and history without losing existin
   insertProject(db);
   insertNode(db);
   const second = {
-    version: 2,
+    version: migrations.length + 1,
     name: "marker",
     sql: "CREATE TABLE marker(value TEXT) STRICT; INSERT INTO marker VALUES ('ok');",
   };
   const third = {
-    version: 3,
+    version: migrations.length + 2,
     name: "broken",
     sql: "INSERT INTO missing_table VALUES (1)",
   };
@@ -270,11 +274,14 @@ test("a failed migration batch rolls back DDL and history without losing existin
   assert.equal(
     db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()
       .version,
-    1,
+    migrations.length,
   );
   assert.equal(db.prepare("SELECT id FROM nodes").get().id, "save");
   assert.equal(db.inTransaction, false);
-  assert.equal(migrateDatabase(db, [...migrations, second]), 2);
+  assert.equal(
+    migrateDatabase(db, [...migrations, second]),
+    migrations.length + 1,
+  );
   assert.equal(db.prepare("SELECT value FROM marker").get().value, "ok");
 });
 
@@ -312,7 +319,7 @@ test("detects edited migration history and refuses newer schemas on reopen", asy
     /history mismatch/,
   );
   db.prepare(
-    "INSERT INTO schema_migrations (version, name, checksum) VALUES (2, 'future', ?)",
+    "INSERT INTO schema_migrations (version, name, checksum) VALUES (99, 'future', ?)",
   ).run("0".repeat(64));
   assert.throws(() => migrateDatabase(db), /newer/);
   db.close();
