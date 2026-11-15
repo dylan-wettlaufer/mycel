@@ -1,8 +1,12 @@
 import type { SemanticExtraction } from "@mycel/shared";
 import { createSemanticContext } from "./context.js";
 import type { SemanticContext, SemanticInput } from "./context.js";
+import { extractServiceCandidates } from "./services.js";
 import { extractNext } from "./next.js";
-import { extractAnnotations } from "./annotations.js";
+import {
+  extractAnnotations,
+  extractFeatureAnnotations,
+} from "./annotations.js";
 import { extractReferences } from "./references.js";
 import { extractReact } from "./react.js";
 
@@ -19,6 +23,8 @@ export function extractSemanticGraph(
     extractReact,
     extractNext,
     extractAnnotations,
+    extractServiceCandidates,
+    extractFeatureAnnotations,
   ],
 ): SemanticExtraction {
   const context = createSemanticContext(input);

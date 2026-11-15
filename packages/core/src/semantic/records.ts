@@ -1,25 +1,29 @@
 import type {
   SemanticEntityKind,
+  SemanticProvenance,
   SemanticExtraction,
   SemanticRelationshipKind,
   SemanticSource,
 } from "@mycel/shared";
 import { hashIdentity } from "../hash.js";
 
+type EvidenceStrength = Pick<SemanticProvenance, "kind" | "confidence">;
+
 /** Accumulate distinct evidence for stable entities and directed relationships. */
 export function semanticRecords(
   projectId: string,
   extractor: string,
   version: string,
+  strength: EvidenceStrength = { kind: "deterministic", confidence: 1 },
 ) {
   const entities: SemanticExtraction["entities"] = [];
   const relationships: SemanticExtraction["relationships"] = [];
-  const provenance = (rule: string) => ({
-    kind: "deterministic" as const,
+  const provenance = (rule: string, evidence: EvidenceStrength) => ({
+    kind: evidence.kind,
     extractor,
     version,
     rule,
-    confidence: 1,
+    confidence: evidence.confidence,
   });
   function addSource(sources: SemanticSource[], source: SemanticSource) {
     if (
@@ -39,11 +43,17 @@ export function semanticRecords(
     source: SemanticSource,
     rule: string,
     attributes: Record<string, string> = {},
+    evidence: EvidenceStrength = strength,
   ) {
     const id = `semantic:${hashIdentity([projectId, kind, identity])}`;
     const existing = entities.find((item) => item.id === id);
-    if (existing) addSource(existing.sources, source);
-    else
+    if (existing) {
+      addSource(existing.sources, source);
+      existing.provenance.confidence = Math.max(
+        existing.provenance.confidence,
+        evidence.confidence,
+      );
+    } else
       entities.push({
         id,
         projectId,
@@ -51,7 +61,7 @@ export function semanticRecords(
         name,
         attributes,
         sources: [source],
-        provenance: provenance(rule),
+        provenance: provenance(rule, evidence),
       });
     return id;
   }
@@ -61,11 +71,17 @@ export function semanticRecords(
     targetId: string,
     source: SemanticSource,
     rule: string,
+    evidence: EvidenceStrength = strength,
   ) {
     const id = `semantic-edge:${hashIdentity([projectId, kind, sourceId, targetId, extractor, rule])}`;
     const existing = relationships.find((item) => item.id === id);
-    if (existing) addSource(existing.sources, source);
-    else
+    if (existing) {
+      addSource(existing.sources, source);
+      existing.provenance.confidence = Math.max(
+        existing.provenance.confidence,
+        evidence.confidence,
+      );
+    } else
       relationships.push({
         id,
         projectId,
@@ -73,7 +89,7 @@ export function semanticRecords(
         targetId,
         kind,
         sources: [source],
-        provenance: provenance(rule),
+        provenance: provenance(rule, evidence),
       });
   }
   return { entity, relationship, entities, relationships };

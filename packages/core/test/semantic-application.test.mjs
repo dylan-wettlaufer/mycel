@@ -168,20 +168,21 @@ test("live source, export, annotation, deletion, and manifest changes remove sta
   );
   await until(() => live.lastUpdate?.retainedPaths.includes(servicePath));
   assertPath(read(), [component, "CALLS", operation]);
-  // Removing a declaration annotation removes the operation and all dependent edges.
+  // Without its explicit role tag, a directly called services/ function is a candidate.
   await writeFile(
     join(input.root, servicePath),
     original.replace(" * @mycelService\n", ""),
   );
   await until(
-    () => !read().entities.some((entity) => entity.id === operation.id),
+    () =>
+      read().entities.find((entity) => entity.id === operation.id)?.provenance
+        .kind === "heuristic",
   );
-  assert.ok(
-    !read().relationships.some(
-      (edge) =>
-        edge.targetId === operation.id || edge.sourceId === operation.id,
-    ),
-  );
+  assertPath(read(), [
+    component,
+    "CALLS",
+    find(read(), "service_operation", "listOrders"),
+  ]);
   await rm(join(input.root, "src/components/OrdersPanel.tsx"));
   await until(
     () => !read().entities.some((entity) => entity.id === component.id),
@@ -190,6 +191,16 @@ test("live source, export, annotation, deletion, and manifest changes remove sta
     !read().relationships.some(
       (edge) =>
         edge.targetId === component.id || edge.sourceId === component.id,
+    ),
+  );
+  await rm(join(input.root, servicePath));
+  await until(
+    () => !read().entities.some((entity) => entity.id === operation.id),
+  );
+  assert.ok(
+    !read().relationships.some(
+      (edge) =>
+        edge.sourceId === operation.id || edge.targetId === operation.id,
     ),
   );
   // Metadata changes re-evaluate framework conventions without changing source.

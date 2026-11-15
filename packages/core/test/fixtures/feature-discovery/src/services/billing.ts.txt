@@ -1,0 +1,2 @@
+import { send } from './transport';
+export function loadBilling() { return send(); }

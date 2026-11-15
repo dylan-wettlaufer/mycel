@@ -1,6 +1,7 @@
 import ts from "typescript";
 import type { SemanticExtraction } from "@mycel/shared";
 import type { SemanticContext } from "./context.js";
+import { runtimeReference } from "./bindings.js";
 import { walkImplementation } from "./context.js";
 import { jsxReturnExpressions } from "./react.js";
 import { semanticRecords } from "./records.js";
@@ -108,20 +109,8 @@ export function extractReferences(
         expression = node.tagName;
         kind = "RENDERS";
       } else return;
-      if (
-        !ts.isIdentifier(expression) &&
-        !ts.isPropertyAccessExpression(expression)
-      )
-        return;
-      // Property calls are supported only for imported namespaces, never instances.
-      if (ts.isPropertyAccessExpression(expression)) {
-        if (!ts.isIdentifier(expression.expression)) return;
-        const declaration = context.checker.getSymbolAtLocation(
-          expression.expression,
-        )?.declarations;
-        if (declaration?.length !== 1 || !ts.isNamespaceImport(declaration[0]!))
-          return;
-      }
+      const reference = runtimeReference(context, expression);
+      if (!reference) return;
       // Lowercase JSX names are host elements even when a lexical binding exists.
       if (
         kind === "RENDERS" &&
@@ -129,7 +118,6 @@ export function extractReferences(
         !/^[A-Z]/.test(expression.text)
       )
         return;
-      if (!context.runtimeBindingIsKnown(expression)) return;
       const evidence = context.evidence(node, callable.anchor);
       const external = externalTarget(expression);
       if (external) {

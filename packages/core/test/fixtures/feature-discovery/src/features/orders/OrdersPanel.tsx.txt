@@ -1,0 +1,3 @@
+import { SharedButton } from '../../components/SharedButton';
+import { loadOrders } from '../../services/orders';
+export function OrdersPanel() { loadOrders(); return <section><SharedButton /></section>; }

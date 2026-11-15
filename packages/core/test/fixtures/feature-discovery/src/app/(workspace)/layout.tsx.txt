@@ -1,0 +1,4 @@
+import { Navigation } from '../../components/Navigation';
+export default function WorkspaceLayout({ children }) {
+  return <main><Navigation />{children}</main>;
+}

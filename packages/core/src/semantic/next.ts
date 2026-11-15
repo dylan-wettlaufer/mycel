@@ -1,5 +1,6 @@
 import { posix } from "node:path";
 import ts from "typescript";
+import type { SemanticExtraction } from "@mycel/shared";
 import type { SemanticContext, SemanticCallable } from "./context.js";
 import { semanticRecords } from "./records.js";
 
@@ -13,7 +14,7 @@ const methods = new Set([
   "OPTIONS",
 ]);
 
-function exportedCallable(
+export function exportedCallable(
   context: SemanticContext,
   source: ts.SourceFile,
   name: string,
@@ -41,7 +42,7 @@ function exportedCallable(
 }
 
 /** Root app/ or src/app/, normal/group/dynamic segments; no slots or interception. */
-function routePattern(context: SemanticContext, path: string) {
+export function nextRouteLocation(context: SemanticContext, path: string) {
   const root = context.resolution?.dependencyRoot?.(path, "next");
   if (root === undefined) return;
   const app = posix.join(root, "app");
@@ -73,30 +74,70 @@ function routePattern(context: SemanticContext, path: string) {
       return;
     url.push(segment);
   }
-  return { pattern: `/${url.join("/")}`, directory };
+  return {
+    pattern: `/${url.join("/")}`,
+    directory,
+    packageRoot: root,
+    segments,
+    groups: segments
+      .filter((segment) => segment.startsWith("("))
+      .map((segment) => segment.slice(1, -1)),
+    publicSegments: url,
+  };
 }
 
-export function extractNext(context: SemanticContext) {
+export function extractNext(
+  context: SemanticContext,
+  current: Readonly<SemanticExtraction>,
+) {
   const records = semanticRecords(context.project.id, "next-app-router", "1");
   const candidates = [...context.sourceFiles.values()].flatMap((source) => {
     const name = posix.basename(source.fileName);
-    if (name !== "page.tsx" && name !== "route.ts") return [];
-    const route = routePattern(context, source.fileName);
+    if (name !== "page.tsx" && name !== "route.ts" && name !== "layout.tsx")
+      return [];
+    const route = nextRouteLocation(context, source.fileName);
     return route ? [{ source, name, ...route }] : [];
   });
   for (const candidate of candidates) {
     const { source, name, pattern, directory } = candidate;
     // Duplicate public paths are invalid Next applications; do not pick an owner.
     if (
+      name !== "layout.tsx" &&
       candidates.some(
         (other) =>
           other !== candidate &&
+          other.name !== "layout.tsx" &&
           other.directory === directory &&
           other.pattern === pattern,
       )
     )
       continue;
-    if (name === "page.tsx") {
+    if (name === "layout.tsx") {
+      const callable = exportedCallable(context, source, "default");
+      if (
+        !callable ||
+        current.entities.some(
+          (entity) =>
+            entity.kind === "component" &&
+            entity.sources.some(
+              (source) => source.nodeId === callable.anchor.id,
+            ),
+        )
+      )
+        continue;
+      records.entity(
+        "component",
+        callable.anchor.id,
+        callable.anchor.name,
+        {
+          nodeId: callable.anchor.id,
+          path: callable.anchor.path,
+          range: callable.anchor.range,
+        },
+        "default-layout-export",
+        { nextRole: "layout" },
+      );
+    } else if (name === "page.tsx") {
       const callable = exportedCallable(context, source, "default");
       if (!callable) continue;
       const evidence = {

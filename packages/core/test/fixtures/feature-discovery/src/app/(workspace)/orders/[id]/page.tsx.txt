@@ -1,0 +1,2 @@
+import { OrdersPanel } from '../../../../features/orders/OrdersPanel';
+export default function OrderPage() { return <OrdersPanel />; }

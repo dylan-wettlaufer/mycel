@@ -1,0 +1,6 @@
+import { SharedButton } from '../../../components/SharedButton';
+import { loadBilling } from '../../../services/billing';
+export default function BillingPage() {
+  loadBilling();
+  return <SharedButton />;
+}
