@@ -1,0 +1,1 @@
+export default function MarketingPage() { return <h1>Welcome</h1>; }

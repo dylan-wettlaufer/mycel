@@ -10,6 +10,7 @@ export interface ModuleResolver {
   isLocal(from: string, specifier: string): boolean;
   diagnostics: Diagnostic[];
   /** Nearest owning package directory, only when it declares this dependency. */
+  packageRoot?(from: string): string | undefined;
   dependencyRoot?(from: string, dependency: string): string | undefined;
 }
 function record(value: unknown): value is Record<string, unknown> {
@@ -341,6 +342,15 @@ export async function loadModuleResolver(
   const cache = new Map<string, string | undefined>();
   return {
     diagnostics,
+    packageRoot(from) {
+      for (
+        let directory = posix.dirname(absolute(from));
+        inside(directory, base);
+        directory = posix.dirname(directory)
+      )
+        if (metadata.has(posix.join(directory, "package.json")))
+          return posix.relative(base, directory);
+    },
     dependencyRoot(from, dependency) {
       for (
         let directory = posix.dirname(absolute(from));

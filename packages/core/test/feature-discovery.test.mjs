@@ -4,14 +4,20 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { setTimeout } from "node:timers/promises";
 import { openDatabase } from "@mycel/db";
-import { createGraphQueries, indexRepository } from "../dist/index.js";
+import {
+  createGraphQueries,
+  indexRepository,
+  watchRepository,
+} from "../dist/index.js";
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "mycel-features-"));
@@ -34,10 +40,8 @@ async function fixture(t) {
 test("unannotated fixture recognizes Next layouts and only called exported service candidates", async (t) => {
   const input = await fixture(t);
   const indexed = await indexRepository(input);
-  const graph = createGraphQueries(
-    input.database,
-    indexed.projectId,
-  ).getSemanticGraph(500);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  const graph = queries.getSemanticGraph(500);
   const operations = graph.entities.filter(
     (entity) => entity.kind === "service_operation",
   );
@@ -75,4 +79,280 @@ test("unannotated fixture recognizes Next layouts and only called exported servi
         .includes(operation.name),
     );
   }
+});
+
+const entity = (graph, name, kind) => {
+  const found = graph.entities.find(
+    (item) => item.name === name && (!kind || item.kind === kind),
+  );
+  assert.ok(found, `Missing ${kind ?? "entity"} ${name}`);
+  return found;
+};
+const memberships = (graph, target) =>
+  new Set(
+    graph.relationships
+      .filter(
+        (edge) => edge.kind === "IMPLEMENTS" && edge.sourceId === target.id,
+      )
+      .map(
+        (edge) =>
+          graph.entities.find((item) => item.id === edge.targetId)?.name,
+      ),
+  );
+async function until(check) {
+  const deadline = Date.now() + 8000;
+  while (!check()) {
+    if (Date.now() > deadline)
+      assert.fail("Timed out waiting for feature discovery");
+    await setTimeout(25);
+  }
+}
+
+test("discovers route areas, group-root pages, named feature directories, layouts, and nonexclusive shared dependencies", async (t) => {
+  const input = await fixture(t);
+  const indexed = await indexRepository(input);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  const graph = queries.getSemanticGraph(500);
+  const features = graph.entities.filter((item) => item.kind === "feature");
+  assert.deepEqual(features.map((item) => item.name).sort(), [
+    "billing",
+    "marketing",
+    "orders",
+    "reports",
+  ]);
+  assert.ok(
+    features.every(
+      (item) =>
+        item.attributes.status === "candidate" &&
+        item.provenance.kind === "heuristic" &&
+        item.provenance.confidence < 1,
+    ),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "SharedButton")),
+    new Set(["orders", "billing"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "send")),
+    new Set(["orders", "billing"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "WorkspaceLayout")),
+    new Set(["orders", "billing"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "Navigation")),
+    new Set(["orders", "billing"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "RootLayout")),
+    new Set(["orders", "billing", "marketing"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "/orders/[id]", "route")),
+    new Set(["orders"]),
+  );
+  assert.equal(memberships(graph, entity(graph, "SharedPanel")).size, 0);
+  const associations = graph.relationships.filter(
+    (edge) => edge.kind === "IMPLEMENTS",
+  );
+  assert.ok(associations.every((edge) => edge.provenance.kind === "heuristic"));
+  const send = entity(graph, "send");
+  const orders = entity(graph, "orders", "feature");
+  const path = associations.find(
+    (edge) => edge.sourceId === send.id && edge.targetId === orders.id,
+  );
+  assert.ok(
+    path.sources.some((source) => source.path.endsWith("orders/page.tsx")),
+  );
+  assert.ok(
+    path.sources.some(
+      (source) =>
+        input.sources
+          .get(source.path)
+          .slice(source.range.start, source.range.end) === "send()",
+    ),
+  );
+  for (const record of [...features, ...associations])
+    for (const source of record.sources) {
+      const structural = queries.getNodeDetails(source.nodeId).node;
+      assert.equal(structural.path, source.path);
+      assert.ok(
+        source.range.start >= structural.range.start &&
+          source.range.end <= structural.range.end,
+      );
+      assert.ok(
+        input.sources
+          .get(source.path)
+          .slice(source.range.start, source.range.end).length > 0,
+      );
+    }
+  assert.deepEqual(input.database.pragma("foreign_key_check"), []);
+});
+
+test("explicit feature tags override route seeds and candidate roles and remain authoritative during propagation", async (t) => {
+  const input = await fixture(t);
+  for (const path of [
+    "src/app/(workspace)/orders/page.tsx",
+    "src/app/(workspace)/orders/[id]/page.tsx",
+  ])
+    await writeFile(
+      join(input.root, path),
+      input.sources
+        .get(path)
+        .replace(
+          "export default",
+          "/** @mycelFeature purchases */\nexport default",
+        ),
+    );
+  const service = "src/services/orders.ts";
+  await writeFile(
+    join(input.root, service),
+    input.sources
+      .get(service)
+      .replace(
+        "export function loadOrders",
+        "/** @mycelFeature fulfilment */\nexport function loadOrders",
+      ),
+  );
+  const report = "src/features/reports/ReportsPanel.tsx";
+  await writeFile(
+    join(input.root, report),
+    "/** @mycelFeature billing */\n" + input.sources.get(report),
+  );
+  const indexed = await indexRepository(input);
+  const graph = createGraphQueries(
+    input.database,
+    indexed.projectId,
+  ).getSemanticGraph(500);
+  assert.deepEqual(
+    memberships(graph, entity(graph, "/orders", "route")),
+    new Set(["purchases"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "OrdersPage", "page")),
+    new Set(["purchases"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "loadOrders")),
+    new Set(["fulfilment"]),
+  );
+  assert.deepEqual(
+    memberships(graph, entity(graph, "send")),
+    new Set(["fulfilment", "billing"]),
+  );
+  const fulfilment = entity(graph, "fulfilment", "feature");
+  assert.equal(fulfilment.attributes.status, "declared");
+  assert.equal(fulfilment.provenance.kind, "deterministic");
+  assert.ok(
+    graph.relationships.some(
+      (edge) =>
+        edge.sourceId === entity(graph, "loadOrders").id &&
+        edge.targetId === fulfilment.id &&
+        edge.provenance.kind === "deterministic",
+    ),
+  );
+  const billing = graph.entities.filter(
+    (item) => item.kind === "feature" && item.name === "billing",
+  );
+  assert.equal(billing.length, 1);
+  assert.equal(billing[0].attributes.status, "declared");
+  assert.ok(
+    graph.relationships.some(
+      (edge) =>
+        edge.sourceId === entity(graph, "/billing", "route").id &&
+        edge.targetId === billing[0].id &&
+        edge.provenance.kind === "heuristic",
+    ),
+  );
+  const orders = entity(graph, "orders", "feature");
+  assert.equal(orders.provenance.rule, "feature-directory");
+  assert.ok(
+    orders.sources.every((source) => source.path.includes("features/orders/")),
+  );
+});
+
+test("live discovery removes stale memberships after reference edits, feature/group renames, source moves, and route deletion", async (t) => {
+  const input = await fixture(t);
+  const errors = [];
+  const live = await watchRepository({
+    ...input,
+    debounceMs: 20,
+    onError: (error) => errors.push(error),
+  });
+  t.after(() => live.close());
+  const queries = createGraphQueries(input.database, live.project.id);
+  const read = () => queries.getSemanticGraph(500);
+  const initial = read();
+  const shared = entity(initial, "SharedButton");
+  const report = entity(initial, "reports", "feature");
+  const group = entity(initial, "marketing", "feature");
+  const operation = entity(initial, "loadOrders");
+  const panel = "src/features/orders/OrdersPanel.tsx";
+  await writeFile(
+    join(input.root, panel),
+    input.sources.get(panel).replace("<SharedButton />", "<span />"),
+  );
+  await until(() => !memberships(read(), shared).has("orders"));
+  assert.deepEqual(memberships(read(), shared), new Set(["billing"]));
+  await rename(
+    join(input.root, "src/features/reports"),
+    join(input.root, "src/features/analytics"),
+  );
+  await until(
+    () =>
+      read().entities.some(
+        (item) => item.kind === "feature" && item.name === "analytics",
+      ) && !read().entities.some((item) => item.id === report.id),
+  );
+  assert.ok(
+    !read().relationships.some(
+      (edge) => edge.sourceId === report.id || edge.targetId === report.id,
+    ),
+  );
+  await rename(
+    join(input.root, "src/app/(marketing)"),
+    join(input.root, "src/app/(public)"),
+  );
+  await until(
+    () =>
+      read().entities.some(
+        (item) => item.kind === "feature" && item.name === "public",
+      ) && !read().entities.some((item) => item.id === group.id),
+  );
+  assert.ok(!read().relationships.some((edge) => edge.targetId === group.id));
+  await mkdir(join(input.root, "src/lib"));
+  await rename(
+    join(input.root, "src/services/orders.ts"),
+    join(input.root, "src/lib/orders.ts"),
+  );
+  await writeFile(
+    join(input.root, panel),
+    input.sources
+      .get(panel)
+      .replace("../../services/orders", "../../lib/orders")
+      .replace("<SharedButton />", "<span />"),
+  );
+  await until(() => !read().entities.some((item) => item.id === operation.id));
+  assert.ok(
+    !read().relationships.some(
+      (edge) =>
+        edge.sourceId === operation.id || edge.targetId === operation.id,
+    ),
+  );
+  const billing = entity(read(), "billing", "feature");
+  await rm(join(input.root, "src/app/(workspace)/billing/page.tsx"));
+  await until(() => !read().entities.some((item) => item.id === billing.id));
+  assert.equal(memberships(read(), shared).size, 0);
+  assert.ok(
+    !read()
+      .entities.flatMap((item) => item.sources)
+      .some(
+        (source) =>
+          source.path.startsWith("src/features/reports/") ||
+          source.path.startsWith("src/app/(marketing)/"),
+      ),
+  );
+  assert.deepEqual(errors, []);
+  assert.deepEqual(input.database.pragma("foreign_key_check"), []);
 });

@@ -103,7 +103,9 @@ test("indexes a complete Next application path and explicit semantic declaration
     ),
   );
   for (const record of [...graph.entities, ...graph.relationships]) {
-    assert.equal(record.provenance.kind, "deterministic");
+    if (record.provenance.kind === "heuristic")
+      assert.equal(record.provenance.extractor, "feature-discovery");
+    else assert.equal(record.provenance.kind, "deterministic");
     for (const source of record.sources) {
       const structural = queries.getNodeDetails(source.nodeId).node;
       assert.equal(structural.path, source.path);
