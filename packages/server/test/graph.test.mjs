@@ -430,3 +430,60 @@ test("file drill-down returns every declaration in the file including nested met
       404,
     );
 });
+
+test("semantic routes validate bounds, preserve project scope, and report missing entities", async (t) => {
+  const { app, database } = fixture(t);
+  const provenance = {
+    kind: "deterministic",
+    extractor: "fixture",
+    version: "1",
+    rule: "explicit",
+    confidence: 1,
+  };
+  replaceProjectGraph(database, {
+    project,
+    nodes,
+    edges,
+    diagnostics: [],
+    semantic: {
+      entities: [
+        {
+          id: "semantic:save",
+          projectId: project.id,
+          kind: "service_operation",
+          name: "save",
+          attributes: {},
+          provenance,
+          sources: [{ nodeId: "node:save", path: "src/save.ts", range }],
+        },
+      ],
+      relationships: [],
+    },
+  });
+  const response = await app.request(
+    "/api/graph/semantic?projectId=project:other",
+  );
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.projectId, project.id);
+  assert.equal(result.entities.length, 1);
+  assert.equal(result.entities[0].sources[0].nodeId, "node:save");
+  const neighborhood = await app.request(
+    "/api/graph/semantic/semantic%3Asave/neighborhood?depth=0",
+  );
+  assert.equal(neighborhood.status, 200);
+  assert.equal((await neighborhood.json()).entities[0].id, "semantic:save");
+  assert.equal(
+    (await app.request("/api/graph/semantic/missing/neighborhood")).status,
+    404,
+  );
+  for (const path of [
+    "semantic?limit=0",
+    "semantic?limit=501",
+    "semantic?limit=1&limit=2",
+    "semantic/x/neighborhood?depth=6",
+    "semantic/x/neighborhood?depth=-1",
+  ])
+    assert.equal((await app.request(`/api/graph/${path}`)).status, 400);
+  assert.equal((await createApp().request("/api/graph/semantic")).status, 503);
+});

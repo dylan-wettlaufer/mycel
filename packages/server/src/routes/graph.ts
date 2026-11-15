@@ -46,6 +46,41 @@ export function createGraphRoutes(graph?: GraphQueries) {
     );
   });
 
+  routes.get("/semantic", (context) => {
+    const limit = integerParameter(
+      context.req.queries("limit"),
+      "limit",
+      100,
+      1,
+      500,
+    );
+    return graph?.getSemanticGraph
+      ? context.json(graph.getSemanticGraph(limit))
+      : context.json({ error: "Semantic queries unavailable" }, 503);
+  });
+
+  routes.get("/semantic/:id/neighborhood", (context) => {
+    const query: NeighborhoodQuery = {
+      depth: integerParameter(context.req.queries("depth"), "depth", 1, 0, 5),
+      limit: integerParameter(
+        context.req.queries("limit"),
+        "limit",
+        100,
+        1,
+        500,
+      ),
+    };
+    if (!graph?.getSemanticNeighborhood)
+      return context.json({ error: "Semantic queries unavailable" }, 503);
+    const result = graph.getSemanticNeighborhood(
+      context.req.param("id"),
+      query,
+    );
+    return result
+      ? context.json(result)
+      : context.json({ error: "Semantic entity not found" }, 404);
+  });
+
   routes.get("/repository", (context) =>
     graph?.getRepositoryGraph
       ? context.json(graph.getRepositoryGraph())

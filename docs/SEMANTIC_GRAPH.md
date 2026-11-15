@@ -57,3 +57,14 @@ Current-state queries return bounded snapshots and neighborhoods (both direction
 0–5 hops, up to 500 entities), including only relationships whose endpoints are
 returned. Each response identifies its project and structural snapshot revision.
 Semantic history is outside this milestone.
+
+## Query API
+
+- `GET /api/graph/semantic?limit=100`: current semantic snapshot, sorted by identity.
+- `GET /api/graph/semantic/:id/neighborhood?depth=1&limit=100`: bounded traversal.
+
+Limits are 1–500 and depth is 0–5. Missing entities return 404; unavailable query
+providers return 503. The project is bound by the server, not chosen by request
+parameters. Truncation describes omitted entities; only induced relationships are
+returned. The same methods are available on `createGraphQueries`, and the database
+package exports `getSemanticGraph` and `getSemanticNeighborhood`.

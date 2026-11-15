@@ -1,4 +1,6 @@
 import {
+  getSemanticGraph,
+  getSemanticNeighborhood,
   getFileSymbols,
   getRepositoryGraph,
   getGraphStats,
@@ -17,10 +19,16 @@ import type {
   ProjectId,
   SearchQuery,
   SearchResult,
+  SemanticGraph,
 } from "@mycel/shared";
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getSemanticGraph?(limit?: number): SemanticGraph;
+  getSemanticNeighborhood?(
+    id: string,
+    query?: NeighborhoodQuery,
+  ): SemanticGraph | undefined;
   getFileSymbols?(id: NodeId): SearchResult | undefined;
   getRepositoryGraph?(): import("@mycel/shared").RepositoryGraph;
   getStats?(): import("@mycel/shared").GraphStats;
@@ -41,6 +49,9 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getSemanticGraph: (limit) => getSemanticGraph(database, projectId, limit),
+    getSemanticNeighborhood: (id, { depth, limit } = {}) =>
+      getSemanticNeighborhood(database, projectId, id, depth, limit),
     getFileSymbols: (id) => getFileSymbols(database, projectId, id),
     getRepositoryGraph: () => getRepositoryGraph(database, projectId),
     getStats: () => getGraphStats(database, projectId),
