@@ -1,0 +1,10 @@
+import { loadOrders } from 'orders-sdk/client';
+import type { Order } from '@/models/Order';
+
+/**
+ * @mycelService
+ * @mycelFeature orders
+ */
+export function listOrders(): Order[] {
+  return loadOrders();
+}

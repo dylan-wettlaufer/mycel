@@ -1,0 +1,6 @@
+import { OrdersPanel } from '@/components/OrdersPanel';
+
+/** @mycelFeature orders */
+export default function OrdersPage() {
+  return <OrdersPanel />;
+}

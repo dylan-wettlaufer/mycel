@@ -97,3 +97,83 @@ package subpaths. They do not claim an installed package/version. A `DEPENDS_ON`
 edge requires a direct imported call or JSX use within a recognized implementation.
 Type-only imports, unresolved local aliases, and unused imported bindings do not
 produce runtime relationships. Nested callback execution is not assumed.
+
+## Supported Next.js and explicit declarations
+
+The first framework adapter supports the default Next.js App Router conventions.
+The nearest containing package must declare `next` as a dependency, development,
+peer, or optional dependency. A nested package without Next does not inherit this
+classification. Root `app/` takes precedence over `src/app/` within that package.
+Metadata changes re-evaluate this support using the existing module resolver.
+
+- `page.tsx` with a directly resolvable local default function exports a `page`
+  entity and a frontend `route`; the route `RENDERS` that page.
+- `route.ts` with a directly resolvable local `GET`, `POST`, `PUT`, `PATCH`,
+  `DELETE`, `HEAD`, or `OPTIONS` export establishes an `endpoint` and its handler
+  `service_operation`. The operation `HANDLES` the endpoint. Direct calls from
+  either implementation role can point to explicitly designated operations.
+- Normal ASCII path segments, `(groups)`, `[parameters]`, `[...catchAll]`, and
+  `[[...optionalCatchAll]]` are supported. Patterns retain bracket notation;
+  route groups are removed from the public pattern.
+- Private folders, parallel slots, intercepted routes, conflicting public paths,
+  reexported handlers/pages, class components, higher-order wrappers, and custom
+  `pageExtensions` or routing configuration are outside this subset. No endpoints
+  are synthesized for implicit methods. This adapter does not infer fetch-to-API
+  links, layout composition, client/server boundaries, or database behavior.
+
+Features, non-handler operations, and data models require explicit JSDoc tags:
+
+```ts
+/**
+ * @mycelService
+ * @mycelFeature orders
+ */
+export function listOrders() { /* implementation */ }
+
+/** @mycelModel */
+export interface Order { id: string }
+```
+
+`@mycelService` takes no argument and applies to a supported function declaration
+or directly bound arrow/function expression. `@mycelModel` takes no argument and
+applies to a top-level class, interface, or type alias. Merged/duplicate model
+names remain unknown. Models without structural symbol kinds map to their file
+node and exact declaration range. No synthetic structural symbols are created.
+
+`@mycelFeature <name>` declares a project-scoped feature. Names contain letters,
+digits, `_`, `.`, `/`, or `-`, starting with a letter or digit. A tag on a recognized
+component, page, operation, or model also establishes `IMPLEMENTS`. Multiple
+source declarations of the same feature aggregate their source evidence. Tags
+express author declarations; extraction does not evaluate whether they are true.
+`READS` and `WRITES` remain reserved: model imports and return types alone cannot
+establish data access. There are no AI or heuristic extractors in the default set.
+
+Direct semantic calls resolve only to recognized operations. The binding pass
+omits ambiguous star-export chains, type-only value references, overloaded or
+merged targets, unknown dispatch, and unsupported aliases. Invalid ambiguous
+modules and consumers are conservatively excluded from binding-based relations.
+General TypeScript type errors are not turned into new structural diagnostics.
+
+## Fixture and validation
+
+`packages/core/test/fixtures/semantic-next` contains a small source-only orders
+application with a manifest, a path alias, a grouped page route, a React component,
+an annotated operation, an interface model, an HTTP handler, and an SDK import.
+The `.txt` suffix keeps fixture sources out of Mycel's own source discovery. Tests
+materialize the app in a temporary repository; installing or running Next is not
+required.
+
+The queryable frontend path is:
+
+```text
+route /orders --RENDERS--> page OrdersPage --RENDERS--> component OrdersPanel
+  --CALLS--> service_operation listOrders --DEPENDS_ON--> orders-sdk/client
+```
+
+The handler operation `GET` `HANDLES` `GET /api/orders`, `CALLS` `listOrders`,
+and the explicitly tagged implementations `IMPLEMENT` feature `orders`.
+Tests check exact JSX evidence, all structural source anchors, identity stability,
+annotation handling, framework boundaries, query limits, atomic schema upgrade and
+rollback, incremental export/annotation edits, deletion, metadata invalidation, and
+last-good-source retention after syntax errors. Existing structural graph tests
+continue to run unchanged apart from the additive schema table inventory.

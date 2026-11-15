@@ -9,6 +9,8 @@ export interface ModuleResolver {
   resolve(from: string, specifier: string): string | undefined;
   isLocal(from: string, specifier: string): boolean;
   diagnostics: Diagnostic[];
+  /** Nearest owning package directory, only when it declares this dependency. */
+  dependencyRoot?(from: string, dependency: string): string | undefined;
 }
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -339,6 +341,28 @@ export async function loadModuleResolver(
   const cache = new Map<string, string | undefined>();
   return {
     diagnostics,
+    dependencyRoot(from, dependency) {
+      for (
+        let directory = posix.dirname(absolute(from));
+        inside(directory, base);
+        directory = posix.dirname(directory)
+      ) {
+        const path = posix.join(directory, "package.json");
+        if (!metadata.has(path)) continue;
+        const manifest = manifests.get(directory);
+        const declared = [
+          manifest?.dependencies,
+          manifest?.devDependencies,
+          manifest?.peerDependencies,
+          manifest?.optionalDependencies,
+        ].some(
+          (dependencies) =>
+            record(dependencies) &&
+            typeof dependencies[dependency] === "string",
+        );
+        return declared ? posix.relative(base, directory) : undefined;
+      }
+    },
     resolve(from, specifier) {
       const key = JSON.stringify([from, specifier]);
       if (cache.has(key)) return cache.get(key);

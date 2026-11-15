@@ -1,0 +1,5 @@
+import { listOrders } from '@/services/orders';
+
+export async function GET() {
+  return Response.json(listOrders());
+}

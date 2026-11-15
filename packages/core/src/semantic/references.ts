@@ -26,6 +26,14 @@ export function extractReferences(
       const specifier = statement.moduleSpecifier.text;
       const clause = statement.importClause;
       if (
+        clause &&
+        !clause.name &&
+        clause.namedBindings &&
+        ts.isNamedImports(clause.namedBindings) &&
+        clause.namedBindings.elements.every((binding) => binding.isTypeOnly)
+      )
+        continue;
+      if (
         clause?.isTypeOnly ||
         specifier.startsWith(".") ||
         specifier.startsWith("/") ||
@@ -114,6 +122,14 @@ export function extractReferences(
         if (declaration?.length !== 1 || !ts.isNamespaceImport(declaration[0]!))
           return;
       }
+      // Lowercase JSX names are host elements even when a lexical binding exists.
+      if (
+        kind === "RENDERS" &&
+        ts.isIdentifier(expression) &&
+        !/^[A-Z]/.test(expression.text)
+      )
+        return;
+      if (!context.runtimeBindingIsKnown(expression)) return;
       const evidence = context.evidence(node, callable.anchor);
       const external = externalTarget(expression);
       if (external) {
@@ -127,13 +143,6 @@ export function extractReferences(
           );
         return;
       }
-      // Lowercase JSX names are host elements even when a lexical binding exists.
-      if (
-        kind === "RENDERS" &&
-        ts.isIdentifier(expression) &&
-        !/^[A-Z]/.test(expression.text)
-      )
-        return;
       const target = context.target(
         ts.isPropertyAccessExpression(expression)
           ? expression.name

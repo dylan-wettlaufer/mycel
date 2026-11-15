@@ -117,3 +117,70 @@ test("semantic extractors compose over structural captures without changing stru
   assert.equal(result.relationships.length, 0);
   assert.ok(graph.edges.some((edge) => edge.kind === "CALLS") === false);
 });
+
+test("explicit annotations map arrow operations and model declarations without guessing data access or directory meanings", () => {
+  const source = `
+/** @mycelModel */
+export class Order { id = ''; }
+/** @mycelModel */
+export type Receipt = { id: string };
+/** @mycelService */
+export const save = () => 1;
+export function pretendService() { return 1; }
+export interface PretendModel { id: string }
+`;
+  const files = [{ source, parsed: parseFile("services/models.ts", source) }];
+  const graph = buildProjectGraph(project, files);
+  assert.deepEqual(
+    graph.semantic.entities.map((entity) => [entity.kind, entity.name]).sort(),
+    [
+      ["data_model", "Order"],
+      ["data_model", "Receipt"],
+      ["service_operation", "save"],
+    ],
+  );
+  const model = graph.semantic.entities.find(
+    (entity) => entity.name === "Order",
+  );
+  assert.equal(
+    graph.nodes.find((node) => node.id === model.sources[0].nodeId).kind,
+    "class",
+  );
+  const receipt = graph.semantic.entities.find(
+    (entity) => entity.name === "Receipt",
+  );
+  assert.equal(
+    graph.nodes.find((node) => node.id === receipt.sources[0].nodeId).kind,
+    "file",
+  );
+  assert.equal(graph.semantic.relationships.length, 0);
+});
+
+test("ambiguous star exports and type-only bindings never create runtime semantic edges", () => {
+  const sources = {
+    "App.tsx":
+      "import { Card } from './barrel'; export function App() { return <Card/>; }",
+    "Typed.tsx":
+      "import type { Card } from './one'; export function Typed() { return <Card/>; }",
+    "TypeBarrel.tsx":
+      "import { Card } from './types'; export function TypeBarrel() { return <Card/>; }",
+    "Namespace.tsx":
+      "import type * as UI from './one'; export function Namespace() { return <UI.Card/>; }",
+    "TypesOnly.ts": "import { type Config } from 'types-only-sdk';",
+    "Host.tsx":
+      "import { div } from 'host-sdk'; export function Host() { return <div/>; }",
+    "barrel.ts": "export * from './one'; export * from './two';",
+    "types.ts": "export type { Card } from './one';",
+    "one.tsx": "export function Card() { return <div/>; }",
+    "two.tsx": "export function Card() { return <section/>; }",
+  };
+  const files = Object.entries(sources).map(([path, source]) => ({
+    source,
+    parsed: parseFile(path, source),
+  }));
+  const graph = buildProjectGraph(project, files);
+  assert.equal(graph.semantic.relationships.length, 0);
+  assert.ok(
+    !graph.semantic.entities.some((entity) => entity.name === "types-only-sdk"),
+  );
+});

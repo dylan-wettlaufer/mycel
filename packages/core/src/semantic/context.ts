@@ -130,7 +130,53 @@ export function createSemanticContext(input: SemanticInput) {
     ts.forEachChild(node, visit);
   }
   for (const source of sourceFiles.values()) visit(source);
+  let invalidModules: Set<string> | undefined;
+  let invalidReferences: readonly ts.Diagnostic[] = [];
+  function runtimeBindingIsKnown(node: ts.Node): boolean {
+    if (!invalidModules) {
+      // TypeScript may choose the first candidate for an invalid star export. Do
+      // not turn that recovery choice or a type-only alias into a runtime fact.
+      const diagnostics = program.getSemanticDiagnostics();
+      invalidReferences = diagnostics.filter((diagnostic) =>
+        [1361, 1362, 2693].includes(diagnostic.code),
+      );
+      invalidModules = new Set(
+        diagnostics
+          .filter((diagnostic) => diagnostic.code === 2308 && diagnostic.file)
+          .map((diagnostic) => diagnostic.file!.fileName),
+      );
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const file of input.files) {
+          if (invalidModules.has(file.parsed.path)) continue;
+          const dependencies = [...file.parsed.imports, ...file.parsed.exports];
+          if (
+            dependencies.some(
+              (item) =>
+                item.specifier &&
+                invalidModules!.has(
+                  resolve(file.parsed.path, item.specifier) ?? "",
+                ),
+            )
+          ) {
+            invalidModules.add(file.parsed.path);
+            changed = true;
+          }
+        }
+      }
+    }
+    if (invalidModules.has(node.getSourceFile().fileName)) return false;
+    return !invalidReferences.some(
+      (diagnostic) =>
+        diagnostic.file === node.getSourceFile() &&
+        diagnostic.start !== undefined &&
+        diagnostic.start < node.end &&
+        diagnostic.start + (diagnostic.length ?? 1) > node.getStart(),
+    );
+  }
   function symbolAt(node: ts.Node): ts.Symbol | undefined {
+    if (!runtimeBindingIsKnown(node)) return;
     let symbol = checker.getSymbolAtLocation(node);
     const seen = new Set<ts.Symbol>();
     while (symbol && symbol.flags & ts.SymbolFlags.Alias) {
@@ -167,6 +213,7 @@ export function createSemanticContext(input: SemanticInput) {
     callables,
     anchor,
     symbolAt,
+    runtimeBindingIsKnown,
     target,
     evidence,
     resolve,
