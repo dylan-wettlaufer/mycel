@@ -1,3 +1,4 @@
+import { loadModuleResolver } from "./module-resolution.js";
 import { performance } from "node:perf_hooks";
 import {
   commitChangeSet,
@@ -75,7 +76,11 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     const { project } = captured;
     let files = new Map(captured.files.map((file) => [file.parsed.path, file]));
     sessionId = startMonitoringSession(options.database, project);
-    const initialGraph = buildProjectGraph(project, [...files.values()]);
+    const initialGraph = buildProjectGraph(
+      project,
+      [...files.values()],
+      captured.resolution,
+    );
     const initialChanges = diffGraph(
       readGraphState(options.database, project.id),
       initialGraph,
@@ -145,7 +150,16 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           }
         }
         const parsedAt = performance.now();
-        const graph = buildProjectGraph(project, [...next.values()]);
+        const resolution = await loadModuleResolver(
+          project.root,
+          [...next.keys()],
+          batch.metadataPaths,
+        );
+        const graph = buildProjectGraph(
+          project,
+          [...next.values()],
+          resolution,
+        );
         // Current syntax diagnostics accompany retained nodes and relationships.
         graph.diagnostics = [
           ...graph.diagnostics.filter(
@@ -185,7 +199,11 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       },
     });
     // Recheck the startup snapshot even if OS events have not arrived yet.
-    for (const path of [...captured.paths, ".gitignore"])
+    for (const path of [
+      ...captured.paths,
+      ...captured.metadataPaths,
+      ".gitignore",
+    ])
       queue.enqueue({ kind: "change", path, observedAt: performance.now() });
     for (const change of startup) queue.enqueue(change);
     await queue.flush();

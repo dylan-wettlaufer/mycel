@@ -1,3 +1,4 @@
+import { isResolutionMetadata } from "./files.js";
 import { relative, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { watch } from "chokidar";
@@ -39,7 +40,8 @@ export function watchSourceFiles(options: SourceWatcherOptions) {
       path === ".." ||
       path.startsWith("../") ||
       path.includes("\\") ||
-      (!settings.extensions.some((extension) => path.endsWith(extension)) &&
+      (!isResolutionMetadata(path) &&
+        !settings.extensions.some((extension) => path.endsWith(extension)) &&
         !(settings.respectGitignore && path.split("/").at(-1) === ".gitignore"))
     )
       return;

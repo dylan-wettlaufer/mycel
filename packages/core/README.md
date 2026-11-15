@@ -134,13 +134,28 @@ Initial and incremental indexes resolve `IMPORTS` edges between local files and
 supports `.ts`, `.tsx`, `.d.ts`, directory index files, and emitted `.js`/`.jsx`
 specifiers. Named, default, namespace, aliased, and chained re-exports are
 supported, with cycle guards and ambiguity checks. Type-only imports contribute
-file dependencies but never runtime calls. Missing relative modules produce
+file dependencies but never runtime calls. Missing local modules produce
 resolver diagnostics, which disappear when the module becomes available.
+
+TypeScript `paths` and `baseUrl` are read from the nearest `tsconfig.json`,
+including local `extends` files (JSONC) and referenced application configs. Local
+workspace packages are discovered from npm/Yarn `workspaces` or
+`pnpm-workspace.yaml` patterns. Package `exports` (including conditional and
+wildcard subpaths), `main`, and type entries are resolved against indexed source.
+Declared `rootDir`/`outDir`/`declarationDir` mappings and explicit package `source`
+entries connect compiled entry points back to source before a build. External
+dependencies are not indexed, and blocked exports remain unresolved.
+
+Resolution uses TypeScript's module resolver with source/import conditions against
+a captured virtual filesystem. It never executes Vite/Webpack configuration or
+reads source outside the indexed repository. Bundler-only executable aliases and
+external config-package inheritance are outside this scope. Malformed configs
+produce `resolution-config` diagnostics.
 
 Calls can resolve to lexical functions, imported functions/classes, namespace
 members, static class methods, and `this` methods. Module-level calls originate
 at the file node. This is structural resolution, not TypeScript semantic type
-checking: package/tsconfig aliases, dynamic imports, arbitrary receiver types,
+checking: dynamic imports, arbitrary receiver types,
 and runtime binding/shadowing analysis are outside its scope. Unknown or
 ambiguous targets produce no edge.
 
@@ -164,7 +179,9 @@ Chokidar reports additions, edits, and deletions; renames are delete plus create
 Bursts are coalesced with a 75 ms trailing debounce by default. Discovery applies
 the same exclusions as full scans and reconciles `.gitignore` changes. SHA-256
 comparison skips identical saves before parsing. Only changed files are parsed;
-relationship resolution uses cached facts for the complete project.
+relationship resolution uses cached facts for the complete project. Config,
+workspace, and package manifest edits also trigger re-resolution without
+reparsing unchanged source.
 
 During live updates, partial parses retain a previous fully parsed file's nodes,
 source hashes, and relationships, with current syntax diagnostics. Parser

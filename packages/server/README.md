@@ -69,6 +69,8 @@ available. CLI/dev startup uses `startIndexedServer` to attach queries automatic
 
 | GET route | Query parameters | Response |
 | --- | --- | --- |
+| `/api/graph/repository` | None | Complete `RepositoryGraph` of files and directed imports, including isolated files |
+| `/api/graph/nodes/:id/symbols` | None | All declarations in a file, including nested methods, in source order |
 | `/api/graph/search` | Required `q`; optional `limit` (default 20, range 1–100) | `SearchResult` |
 | `/api/graph/nodes/:id` | Optional `limit` for each relationship list (default 100, range 1–100) | `NodeDetails` |
 | `/api/graph/nodes/:id/neighborhood` | Optional `depth` (default 1, range 0–5) and `limit` (default 100, range 1–500) | `Neighborhood` |

@@ -24,7 +24,9 @@
     "@mycel/shared": "workspace:*",
     "chokidar": "^6.0.0",
     "ignore": "7.0.14",
-    "picomatch": "4.0.7"
+    "picomatch": "4.0.7",
+    "typescript": "5.9.3",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

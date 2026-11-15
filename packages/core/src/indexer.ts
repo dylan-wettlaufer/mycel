@@ -1,3 +1,4 @@
+import { loadModuleResolver } from "./module-resolution.js";
 import { performance } from "node:perf_hooks";
 import { replaceProjectGraph } from "@mycel/db";
 import type { SqliteDatabase } from "@mycel/db";
@@ -31,8 +32,9 @@ export async function indexRepository(
   options: IndexRepositoryOptions,
 ): Promise<IndexResult> {
   const started = performance.now();
-  const { project, files, paths } = await captureRepository(options);
-  const graph = buildProjectGraph(project, files);
+  const { project, files, paths, resolution } =
+    await captureRepository(options);
+  const graph = buildProjectGraph(project, files, resolution);
   const revision = replaceProjectGraph(options.database, graph);
   return {
     project,
@@ -71,5 +73,16 @@ export async function captureRepository(
     }
     files.push({ source, parsed: parse(path, source) });
   }
-  return { project, files, paths: discovered.paths };
+  const resolution = await loadModuleResolver(
+    discovered.root,
+    discovered.paths,
+    discovered.metadataPaths,
+  );
+  return {
+    project,
+    files,
+    paths: discovered.paths,
+    resolution,
+    metadataPaths: discovered.metadataPaths,
+  };
 }

@@ -1,3 +1,4 @@
+import type { ModuleResolver } from "./module-resolution.js";
 import { hashContent, hashIdentity } from "./hash.js";
 export { hashContent, hashIdentity } from "./hash.js";
 import { resolveRelationships } from "./resolver.js";
@@ -33,10 +34,11 @@ function fileRange(source: string): SourceRange {
 export function buildProjectGraph(
   project: Project,
   files: readonly CapturedFile[],
+  resolution?: ModuleResolver,
 ): ProjectGraph {
   const nodes: Omit<GraphNode, "revision">[] = [];
   const edges: Omit<GraphEdge, "revision">[] = [];
-  const diagnostics: Diagnostic[] = [];
+  const diagnostics: Diagnostic[] = [...(resolution?.diagnostics ?? [])];
   for (const { source, parsed } of files) {
     const ids = new Map<string, string>();
     const fileId = `node:${hashIdentity([project.id, parsed.fileId])}`;
@@ -82,7 +84,7 @@ export function buildProjectGraph(
     }
     diagnostics.push(...parsed.diagnostics);
   }
-  const relationships = resolveRelationships(project, files);
+  const relationships = resolveRelationships(project, files, resolution);
   edges.push(...relationships.edges);
   diagnostics.push(...relationships.diagnostics);
   return { project, nodes, edges, diagnostics };

@@ -14,7 +14,8 @@ No working repository source is changed.
 
 The workflow verifies:
 
-1. Backend and SSE status, explorer search, graph selection, expansion/collapse,
+1. Backend and SSE status, the default folder overview, file dependencies and
+   symbol drill-down, explorer search, graph selection, expansion/collapse,
    caller navigation, and source navigation to the caller's declaration line.
 2. Creating a new caller updates the graph and highlights the new node.
 3. Modifying a function refreshes its open source and highlights the node.

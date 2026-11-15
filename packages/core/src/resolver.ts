@@ -1,3 +1,4 @@
+import type { ModuleResolver } from "./module-resolution.js";
 import { posix } from "node:path";
 import type { ParsedSymbol } from "@mycel/parser";
 import type {
@@ -10,7 +11,7 @@ import { hashIdentity } from "./hash.js";
 import type { CapturedFile } from "./graph.js";
 
 /** Resolve repository-relative TS/TSX modules, including emitted .js specifiers. */
-function resolveModule(
+function resolveRelativeModule(
   from: string,
   specifier: string,
   paths: ReadonlySet<string>,
@@ -39,11 +40,19 @@ interface Target {
 export function resolveRelationships(
   project: Project,
   captured: readonly CapturedFile[],
+  resolution?: ModuleResolver,
 ) {
   const files = new Map(
     captured.map((file) => [file.parsed.path, file.parsed]),
   );
   const paths = new Set(files.keys());
+  const resolveModule = (
+    from: string,
+    specifier: string,
+    _paths: ReadonlySet<string>,
+  ) =>
+    resolution?.resolve(from, specifier) ??
+    resolveRelativeModule(from, specifier, paths);
   const edges = new Map<string, Omit<GraphEdge, "revision">>();
   const diagnostics: Diagnostic[] = [];
   const nodeId = (localId: string) =>
@@ -223,7 +232,10 @@ export function resolveRelationships(
       const dependency = resolveModule(path, specifier, paths);
       if (dependency)
         edge("IMPORTS", file.fileId, files.get(dependency)!.fileId);
-      else if (specifier.startsWith("."))
+      else if (
+        specifier.startsWith(".") ||
+        resolution?.isLocal(path, specifier)
+      )
         diagnostic(
           path,
           item.range,

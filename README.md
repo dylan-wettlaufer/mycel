@@ -55,7 +55,10 @@ together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
 and shadcn/ui. It provides a searchable file and symbol explorer, scoped React Flow
 graphs, relationship details, and locally bundled Monaco source and diff viewers.
 The default Graph view shows every indexed file grouped into folders, with directed
-import counts between groups. The dashboard shows real index counts. Activity arrives through SSE, with recent
+import counts between groups. Select a folder to inspect file dependencies, then
+select a file to drill into its symbols and source. TypeScript aliases and local
+workspace-package imports connect modules across package boundaries.
+The dashboard shows real index counts. Activity arrives through SSE, with recent
 node highlights and saved metadata and source for deleted nodes. Hash-based links
 preserve graph selections, individual changes, and source views across reloads and
 browser Back/Forward navigation.

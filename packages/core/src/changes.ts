@@ -1,13 +1,18 @@
 import { performance } from "node:perf_hooks";
 import type { IndexingSettings } from "@mycel/shared";
 import { discoverSourceFiles } from "./discovery.js";
-import { isMissing, readRepositoryText } from "./files.js";
+import {
+  isResolutionMetadata,
+  isMissing,
+  readRepositoryText,
+} from "./files.js";
 import { hashContent } from "./graph.js";
 import type { SourceChange } from "./watcher.js";
 
 export interface SourceBatch {
   /** Null represents a deletion or a file excluded by current ignore rules. */
   files: ReadonlyMap<string, string | null>;
+  metadataPaths: readonly string[];
   observedAt: number;
   captureStartedAt: number;
   capturedAt: number;
@@ -80,9 +85,14 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
         files.set(path, source);
         nextHashes.set(path, hash);
       }
-      if (closed || !files.size) return;
+      if (
+        closed ||
+        (!files.size && ![...changes.keys()].some(isResolutionMetadata))
+      )
+        return;
       await options.onBatch({
         files,
+        metadataPaths: discovered.metadataPaths,
         observedAt: Math.min(...changes.values()),
         captureStartedAt,
         capturedAt: performance.now(),

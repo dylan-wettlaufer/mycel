@@ -30,3 +30,8 @@ export async function readRepositoryText(
 export function isMissing(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
+
+/** JSON may be a referenced tsconfig with an arbitrary filename. */
+export function isResolutionMetadata(path: string): boolean {
+  return path.endsWith(".json") || /(^|\/)pnpm-workspace\.ya?ml$/.test(path);
+}

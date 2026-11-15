@@ -4,7 +4,11 @@ import ignore from "ignore";
 import type { Ignore } from "ignore";
 import picomatch from "picomatch";
 import type { IndexingSettings } from "@mycel/shared";
-import { isMissing, readRepositoryText } from "./files.js";
+import {
+  isResolutionMetadata,
+  isMissing,
+  readRepositoryText,
+} from "./files.js";
 import { resolveIndexingSettings } from "./settings.js";
 
 export const excludedDirectories = new Set([
@@ -26,6 +30,7 @@ export interface DiscoveredSources {
   root: string;
   /** Sorted repository-relative paths using forward slashes. */
   paths: string[];
+  metadataPaths: string[];
 }
 
 function isIgnored(
@@ -60,6 +65,7 @@ export async function discoverSourceFiles(
     strictBrackets: true,
   });
   const paths: string[] = [];
+  const metadataPaths: string[] = [];
   const stack: { path: string; rules: IgnoreRules[] }[] = [
     { path: "", rules: [] },
   ];
@@ -101,6 +107,8 @@ export async function discoverSourceFiles(
         isIgnored(path, directory, rules)
       )
         continue;
+      if (child.isFile() && isResolutionMetadata(path))
+        metadataPaths.push(path);
       if (directory) stack.push({ path, rules });
       else if (
         child.isFile() &&
@@ -109,5 +117,5 @@ export async function discoverSourceFiles(
         paths.push(path);
     }
   }
-  return { root, paths: paths.sort() };
+  return { root, paths: paths.sort(), metadataPaths: metadataPaths.sort() };
 }
