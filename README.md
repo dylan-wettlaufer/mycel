@@ -58,8 +58,8 @@ The default Graph view shows every indexed file grouped into folders, with direc
 import counts between groups. Click a node to highlight its direct connections:
 blue links point into it, green links point out, and unrelated links fade. Use
 **Only connections** to hide unrelated nodes, **Focus selection** to frame its
-connections, or **Readable zoom** to restore full-size labels. The legend stays
-visible outside the zoomable canvas, and paths distinguish files with the same
+connections, or **Readable zoom** for a closer view. Compact zoom/focus controls sit at the
+canvas’s top right, and the legend stays fixed in a box at the top left, and paths distinguish files with the same
 name. **Fit all** shows the complete map at a smaller scale.
 
 Select a folder and choose **Open files** to inspect file dependencies, then

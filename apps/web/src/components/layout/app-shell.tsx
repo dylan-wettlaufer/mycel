@@ -31,6 +31,7 @@ interface AppShellProps {
   view: WorkspaceView;
   onNavigate: (view: WorkspaceView) => void;
   projectName: string;
+  projectRoot?: string | undefined;
   connection: ConnectionStatus;
   liveConnection: ConnectionStatus;
   children: ReactNode;
@@ -38,6 +39,7 @@ interface AppShellProps {
 
 export function AppShell({
   projectName,
+  projectRoot,
   connection,
   liveConnection,
   children,
@@ -79,7 +81,9 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b px-4 md:px-6">
-          <h1 className="truncate text-sm font-medium">{projectName}</h1>
+          <h1 className="truncate text-sm font-medium" title={projectRoot}>
+            {projectName}
+          </h1>
           <div className="flex items-center gap-3">
             <span
               className="text-xs text-muted-foreground"

@@ -40,7 +40,7 @@ export function layoutRepositoryGroups(
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   layout.setGraph({ rankdir: "LR", nodesep: 45, ranksep: 60 });
   for (const folder of groups.keys())
-    layout.setNode(folder, { width: 200, height: 120 });
+    layout.setNode(folder, { width: 190, height: 100 });
   for (const edge of connections) layout.setEdge(edge.source, edge.target);
   dagre.layout(layout);
   return {
@@ -48,7 +48,7 @@ export function layoutRepositoryGroups(
       const position = layout.node(folder);
       return {
         id: folder,
-        position: { x: position.x - 100, y: position.y - 60 },
+        position: { x: position.x - 95, y: position.y - 50 },
         type: "code",
         ariaLabel: `Folder ${folder}, ${files.length} files`,
         data: {
@@ -62,7 +62,7 @@ export function layoutRepositoryGroups(
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         className: "graph-node graph-node-file",
-        style: { width: 200, height: 120 },
+        style: { width: 190, height: 100 },
       };
     }),
     edges: connections.map((edge) => ({
@@ -111,7 +111,7 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
   for (const file of graph.files)
-    layout.setNode(file.id, { width: 260, height: 120 });
+    layout.setNode(file.id, { width: 240, height: 100 });
   for (const edge of graph.dependencies)
     layout.setEdge(edge.sourceId, edge.targetId);
   dagre.layout(layout);
@@ -120,7 +120,7 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
       const position = layout.node(file.id);
       return {
         id: file.id,
-        position: { x: position.x - 130, y: position.y - 60 },
+        position: { x: position.x - 120, y: position.y - 50 },
         type: "code",
         ariaLabel: `File ${file.path}`,
         data: {
@@ -132,7 +132,7 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         className: "graph-node graph-node-file",
-        style: { width: 260, height: 120 },
+        style: { width: 240, height: 100 },
       };
     }),
     edges: graph.dependencies.map((edge) => ({

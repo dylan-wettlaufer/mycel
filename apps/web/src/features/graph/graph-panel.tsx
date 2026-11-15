@@ -13,12 +13,14 @@ export function GraphPanel({
   onSelect,
   revision = 0,
   events = [],
+  onOverview,
 }: {
   root: GraphNode;
   selected: GraphNode;
   onSelect: (node: GraphNode) => void;
   revision?: number;
   events?: ChangeEvent[];
+  onOverview: () => void;
 }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -40,31 +42,41 @@ export function GraphPanel({
     [data, selected.id, events, now],
   );
   return (
-    <section className="space-y-3" aria-label="Scoped graph">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-xl font-semibold">Graph</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={depth === 0}
-          onClick={() => setDepth((value) => value - 1)}
-        >
-          Collapse
-        </Button>
-        <span className="text-sm">Depth {depth}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={depth === 5}
-          onClick={() => setDepth((value) => value + 1)}
-        >
-          Expand
-        </Button>
+    <section className="space-y-2" aria-label="Scoped graph">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-semibold" title={root.path}>
+            {root.name}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {data ? `${data.nodes.length} nodes` : "Loading…"}
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={depth === 0}
+            onClick={() => setDepth((value) => value - 1)}
+          >
+            Collapse
+          </Button>
+          <span className="px-1 text-xs text-muted-foreground">
+            Depth {depth}
+          </span>
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={depth === 5}
+            onClick={() => setDepth((value) => value + 1)}
+          >
+            Expand
+          </Button>
+          <Button variant="outline" size="xs" onClick={onOverview}>
+            Repository overview
+          </Button>
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Neighborhood of {root.name} · {data?.nodes.length ?? 0} nodes · maximum
-        100
-      </p>
       {error ? (
         <p role="alert">Graph unavailable. {error}</p>
       ) : !data ? (

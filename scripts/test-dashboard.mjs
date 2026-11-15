@@ -111,6 +111,26 @@ try {
     page.getByRole("heading", { name: "Repository overview", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Graph legend")).toContainText("A imports B");
+  const canvasBounds = await page.locator(".react-flow").boundingBox();
+  const legendBounds = await page.getByLabel("Graph legend").boundingBox();
+  const toolbarBounds = await page
+    .getByLabel("Graph reading controls")
+    .boundingBox();
+  assert.ok(canvasBounds && legendBounds && toolbarBounds);
+  assert.ok(
+    legendBounds.x >= canvasBounds.x &&
+      legendBounds.x - canvasBounds.x <= 16 &&
+      legendBounds.y >= canvasBounds.y &&
+      legendBounds.y - canvasBounds.y <= 16,
+    "legend belongs inside the canvas's top-left corner",
+  );
+  assert.ok(
+    toolbarBounds.x + toolbarBounds.width <=
+      canvasBounds.x + canvasBounds.width &&
+      toolbarBounds.y - canvasBounds.y <= 16 &&
+      toolbarBounds.x >= legendBounds.x + legendBounds.width,
+    "canvas controls sit in the top-right without overlapping the legend",
+  );
   await page.locator(".react-flow__node").filter({ hasText: "(root)" }).click();
   await page.getByRole("button", { name: "Open files", exact: true }).click();
   await expect(

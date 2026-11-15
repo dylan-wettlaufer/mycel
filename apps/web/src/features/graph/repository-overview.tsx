@@ -51,48 +51,51 @@ export function RepositoryOverview({
     [data, scoped, depth, files],
   );
   return (
-    <section className="space-y-4" aria-label="Repository overview">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-xl font-semibold">
-          {files ? "File dependencies" : "Repository overview"}
-        </h2>
-        {files ? (
-          <>
-            <Button variant="outline" size="sm" onClick={onOverview}>
-              Repository overview
-            </Button>
-            {folder && (
-              <Button variant="outline" size="sm" onClick={() => onFiles()}>
+    <section className="space-y-2" aria-label="Repository overview">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">
+            {files ? "File dependencies" : "Repository overview"}
+          </h2>
+          <p className="truncate text-xs text-muted-foreground" title={folder}>
+            {folder ? `${folder} · ` : ""}
+            {data
+              ? `${files && scoped ? scoped.files.length : data.files.length} files · ${files && scoped ? scoped.dependencies.length : data.dependencies.length} imports`
+              : "Loading…"}
+          </p>
+        </div>
+        <div className="ml-auto flex flex-wrap justify-end gap-1">
+          {files ? (
+            <>
+              <Button variant="outline" size="xs" onClick={onOverview}>
+                Repository overview
+              </Button>
+              {folder && (
+                <Button variant="outline" size="xs" onClick={() => onFiles()}>
+                  All file dependencies
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              {[1, 2].map((value) => (
+                <Button
+                  key={value}
+                  variant={depth === value ? "secondary" : "outline"}
+                  size="xs"
+                  aria-pressed={depth === value}
+                  onClick={() => setDepth(value)}
+                >
+                  {value === 1 ? "Top-level folders" : "Nested folders"}
+                </Button>
+              ))}
+              <Button variant="outline" size="xs" onClick={() => onFiles()}>
                 All file dependencies
               </Button>
-            )}
-          </>
-        ) : (
-          <>
-            {[1, 2].map((value) => (
-              <Button
-                key={value}
-                variant={depth === value ? "secondary" : "outline"}
-                size="sm"
-                aria-pressed={depth === value}
-                onClick={() => setDepth(value)}
-              >
-                {value === 1 ? "Top-level folders" : "Nested folders"}
-              </Button>
-            ))}
-            <Button variant="outline" size="sm" onClick={() => onFiles()}>
-              All file dependencies
-            </Button>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        {data
-          ? files && scoped
-            ? `${scoped.files.length} files in view · ${scoped.dependencies.length} imports · ${data.files.length} indexed files in repository · revision ${data.revision}`
-            : `${data.files.length} indexed files · ${data.dependencies.length} file imports · revision ${data.revision}`
-          : "Loading repository…"}
-      </p>
       {error ? (
         <p role="alert">Repository overview unavailable. {error}</p>
       ) : (
@@ -101,11 +104,6 @@ export function RepositoryOverview({
           <p>No indexed TypeScript files yet.</p>
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
-              {files
-                ? `${folder ? `${folder} and its direct connections. ` : ""}Arrows point from an importing file to its dependency. Select a file to trace its connections, then Open file for symbols and source.`
-                : "Every indexed file is included, even without connections. Select a folder to trace its connections, then Open files to inspect it. Arrows point to dependencies; counts show file imports between folders."}
-            </p>
             {files && scoped?.files.length === 0 ? (
               <p>No files in this folder.</p>
             ) : (

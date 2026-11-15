@@ -66,6 +66,7 @@ export function App() {
       view={view}
       onNavigate={(view) => navigate({ view })}
       projectName={project?.name ?? "Mycel"}
+      projectRoot={project?.root}
       connection={connection}
       liveConnection={activity.connection}
     >
@@ -110,12 +111,11 @@ export function App() {
         </>
       ) : !nodeId ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {project?.root ??
-              (error
-                ? "Repository details unavailable"
-                : "Connecting to repository…")}
-          </p>
+          {error && (
+            <p role="alert" className="text-sm text-muted-foreground">
+              Repository details unavailable
+            </p>
+          )}
           <Suspense fallback={<p>Loading repository overview…</p>}>
             <RepositoryOverview
               files={navigation.files}
@@ -156,13 +156,11 @@ export function App() {
         <p>Loading node…</p>
       ) : (
         <div className="space-y-5">
-          <Button variant="outline" onClick={() => navigate({ view: "Graph" })}>
-            Repository overview
-          </Button>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <Suspense fallback={<p>Loading graph…</p>}>
               <GraphPanel
                 key={rootNode.id}
+                onOverview={() => navigate({ view: "Graph" })}
                 root={rootNode}
                 selected={node}
                 onSelect={(next) =>

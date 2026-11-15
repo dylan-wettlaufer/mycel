@@ -1,7 +1,9 @@
+import { Focus, Filter, Scan, ZoomIn } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
+  Panel,
   ReactFlow,
   type Edge,
   type Node,
@@ -47,83 +49,7 @@ export function GraphCanvas({
   const selected = nodes.find((node) => node.id === selectedId);
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2" aria-label="Graph reading controls">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void flow.current?.zoomTo(1, { duration: 200 });
-          }}
-        >
-          Readable zoom
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void flow.current?.fitView({
-              minZoom: 0.03,
-              maxZoom: 1,
-              padding: 0.15,
-              duration: 200,
-            });
-          }}
-        >
-          Fit all
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!selected}
-          onClick={() => {
-            void flow.current?.fitView({
-              nodes: [...connections.ids].map((id) => ({ id })),
-              minZoom: 0.75,
-              maxZoom: 1,
-              padding: 0.2,
-              duration: 200,
-            });
-          }}
-        >
-          Focus selection
-        </Button>
-        <Button
-          variant={onlyConnections ? "secondary" : "outline"}
-          size="sm"
-          disabled={!selected}
-          aria-pressed={Boolean(selected && onlyConnections)}
-          onClick={() => setOnlyConnections((value) => !value)}
-        >
-          Only connections
-        </Button>
-      </div>
-      <div aria-label="Graph legend" className="graph-legend">
-        <span>
-          <i className="graph-legend-arrow" aria-hidden />A → B:{" "}
-          {symbols ? "A imports, calls, or contains B" : "A imports B"}
-        </span>
-        {symbols && (
-          <span>
-            <i className="graph-legend-arrow graph-legend-dashed" aria-hidden />
-            Dashed: contains a declaration
-          </span>
-        )}
-        <span>
-          <i
-            className="graph-legend-swatch graph-swatch-incoming"
-            aria-hidden
-          />
-          Blue: points to selection
-        </span>
-        <span>
-          <i
-            className="graph-legend-swatch graph-swatch-outgoing"
-            aria-hidden
-          />
-          Green: selection points to
-        </span>
-      </div>
-      <div className="graph-canvas h-[600px] overflow-hidden rounded-lg border bg-card">
+      <div className="graph-canvas h-[70svh] min-h-[400px] max-h-[900px] overflow-hidden rounded-lg border bg-card">
         <ReactFlow<Node, Edge>
           nodes={focused.nodes}
           edges={focused.edges}
@@ -131,7 +57,7 @@ export function GraphCanvas({
           fitView
           minZoom={0.03}
           maxZoom={2}
-          fitViewOptions={{ padding: 0.12, minZoom: 0.75, maxZoom: 1 }}
+          fitViewOptions={{ padding: 0.15, minZoom: 0.03, maxZoom: 0.8 }}
           colorMode="dark"
           nodesDraggable={false}
           nodesConnectable={false}
@@ -142,15 +68,105 @@ export function GraphCanvas({
           onNodeDoubleClick={(_, node) => onOpen?.(node.id)}
           onPaneClick={onClear}
         >
+          <Panel position="top-right">
+            <div
+              className="graph-reading-controls"
+              aria-label="Graph reading controls"
+            >
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Readable zoom"
+                aria-label="Readable zoom"
+                onClick={() => {
+                  void flow.current?.zoomTo(0.8, { duration: 200 });
+                }}
+              >
+                <ZoomIn aria-hidden />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Fit all"
+                aria-label="Fit all"
+                onClick={() => {
+                  void flow.current?.fitView({
+                    minZoom: 0.03,
+                    maxZoom: 0.8,
+                    padding: 0.15,
+                    duration: 200,
+                  });
+                }}
+              >
+                <Scan aria-hidden />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Focus selection"
+                aria-label="Focus selection"
+                disabled={!selected}
+                onClick={() => {
+                  void flow.current?.fitView({
+                    nodes: [...connections.ids].map((id) => ({ id })),
+                    minZoom: 0.03,
+                    maxZoom: 0.8,
+                    padding: 0.2,
+                    duration: 200,
+                  });
+                }}
+              >
+                <Focus aria-hidden />
+              </Button>
+              <Button
+                variant={onlyConnections ? "secondary" : "outline"}
+                size="icon-sm"
+                title="Only connections"
+                aria-label="Only connections"
+                disabled={!selected}
+                aria-pressed={Boolean(selected && onlyConnections)}
+                onClick={() => setOnlyConnections((value) => !value)}
+              >
+                <Filter aria-hidden />
+              </Button>
+            </div>
+          </Panel>
+          <Panel position="top-left">
+            <div aria-label="Graph legend" className="graph-legend">
+              <span className="graph-legend-heading">Legend</span>
+              <span>
+                <i className="graph-legend-arrow" aria-hidden />
+                {symbols ? "Arrow: imports or calls" : "A → B: A imports B"}
+              </span>
+              {symbols && (
+                <span>
+                  <i
+                    className="graph-legend-arrow graph-legend-dashed"
+                    aria-hidden
+                  />
+                  Dashed: contains
+                </span>
+              )}
+              <span>
+                <i
+                  className="graph-legend-swatch graph-swatch-incoming"
+                  aria-hidden
+                />
+                Into selection
+              </span>
+              <span>
+                <i
+                  className="graph-legend-swatch graph-swatch-outgoing"
+                  aria-hidden
+                />
+                Out of selection
+              </span>
+            </div>
+          </Panel>
           <Background gap={24} size={0.7} />
           <Controls showInteractive={false} showFitView={false} />
         </ReactFlow>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Click a node to trace its direct connections. Pan to explore; Fit all
-        shows the full map at a smaller scale.
-        {onOpen ? " Double-click a node to open it." : ""}
-      </p>
       {selected && (
         <section
           aria-label="Selected connections"

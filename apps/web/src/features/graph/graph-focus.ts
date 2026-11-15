@@ -95,7 +95,7 @@ export function focusGraph(
           },
           labelStyle: {
             fill: active ? "var(--foreground)" : "var(--muted-foreground)",
-            fontSize: 14,
+            fontSize: 12,
             fontWeight: 500,
           },
           labelBgStyle: { fill: "var(--background)", fillOpacity: 1 },

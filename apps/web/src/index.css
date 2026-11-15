@@ -243,7 +243,7 @@
     border-color 150ms;
 }
 .graph-node-content {
-  padding: 12px 16px;
+  padding: 10px 12px;
   height: 100%;
   overflow: hidden;
 }
@@ -256,7 +256,7 @@
   margin-bottom: 6px;
 }
 .graph-node-title {
-  font-size: 20px;
+  font-size: 16px;
   line-height: 1.25;
   font-weight: 650;
   overflow: hidden;
@@ -265,7 +265,7 @@
 }
 .graph-node-context {
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1.4;
   margin-top: 6px;
   overflow-wrap: anywhere;
@@ -320,14 +320,37 @@
   opacity: 1;
 }
 .graph-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  padding: 12px 16px;
+  display: grid;
+  gap: 6px;
+  width: 200px;
+  max-width: calc(100vw - 130px);
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 12px;
+  background: color-mix(in oklch, var(--background) 96%, transparent);
+  box-shadow: var(--shadow-sm);
+  font-size: 11px;
   color: var(--muted-foreground);
+}
+.graph-legend-heading {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.graph-reading-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.graph-reading-controls button {
+  box-shadow: var(--shadow-sm);
+}
+@media (min-width: 640px) {
+  .graph-reading-controls {
+    flex-direction: row;
+  }
+}
+.graph-canvas .react-flow__panel {
+  margin: 10px;
 }
 .graph-legend > span {
   display: inline-flex;

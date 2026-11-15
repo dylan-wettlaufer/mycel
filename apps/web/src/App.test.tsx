@@ -27,7 +27,11 @@ test("the dashboard shows backend health and the repository selected by the CLI"
   expect(screen.getByRole("status").textContent).toBe("Connected");
   expect(fetchMock).toHaveBeenCalledWith("/api/health", expect.any(Object));
   await screen.findByRole("heading", { name: "selected-repository" });
-  expect(screen.getByText("/projects/selected-repository")).toBeTruthy();
+  expect(
+    screen
+      .getByRole("heading", { name: "selected-repository" })
+      .getAttribute("title"),
+  ).toBe("/projects/selected-repository");
   expect(fetchMock).toHaveBeenCalledWith("/api/project", expect.any(Object));
 });
 

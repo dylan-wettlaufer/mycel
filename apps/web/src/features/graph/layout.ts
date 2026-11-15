@@ -12,7 +12,7 @@ export function layoutNeighborhood(
   }).setDefaultEdgeLabel(() => ({}));
   layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
   for (const node of graph.nodes)
-    layout.setNode(node.id, { width: 260, height: 120 });
+    layout.setNode(node.id, { width: 240, height: 100 });
   for (const edge of graph.edges)
     layout.setEdge(edge.sourceId, edge.targetId, {}, edge.id);
   dagre.layout(layout);
@@ -33,12 +33,12 @@ export function layoutNeighborhood(
           change: recent.get(node.id),
           label: `${node.kind} · ${node.name}${recent.has(node.id) ? ` · ${recent.get(node.id)}` : ""}`,
         },
-        position: { x: position.x - 130, y: position.y - 60 },
+        position: { x: position.x - 120, y: position.y - 50 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         selected: node.id === selectedId,
         className: `graph-node graph-node-${node.kind}${recent.has(node.id) ? ` recent-${recent.get(node.id)}` : ""}`,
-        style: { width: 260, height: 120 },
+        style: { width: 240, height: 100 },
       };
     }),
     edges: graph.edges.map((edge) => ({
