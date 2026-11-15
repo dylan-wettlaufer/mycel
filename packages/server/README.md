@@ -133,3 +133,13 @@ and project/health behavior.
   file.
 - `GET /api/events` streams ordered changes with SSE IDs and replays after the
   native browser's `Last-Event-ID` on reconnection.
+
+
+### Feature discovery queries
+
+`GET /api/graph/semantic/features?status=candidate&limit=100` lists heuristic feature
+candidates. `status=declared` lists explicit declarations; omit status for both.
+`GET /api/graph/semantic/features/:id?limit=100` returns direct associated entities
+and their IMPLEMENTS evidence. Both limits are 1–500; the detail limit includes the
+feature. Results are scoped to the indexed project and include revision and
+truncation. See [discovery rules](../../docs/FEATURE_DISCOVERY.md) for semantics.

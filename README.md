@@ -192,7 +192,10 @@ Semantic application graphs are indexed alongside the structural graph. Query
 `/api/graph/semantic?limit=100` and
 `/api/graph/semantic/<id>/neighborhood?depth=4&limit=100` for supported React/TSX
 and Next.js applications. See [semantic extraction rules and source annotations](docs/SEMANTIC_GRAPH.md)
-for the first milestone's scope and fixture path.
+for the supported scope and fixture path. Automatic candidates and their memberships
+are available at `/api/graph/semantic/features?status=candidate` and
+`/api/graph/semantic/features/<id>`. See [feature discovery rules](docs/FEATURE_DISCOVERY.md)
+for confidence, explicit overrides, and limitations.
 
 Add shadcn/ui components from `apps/web`, for example
 `pnpm dlx shadcn@latest add dialog`. Generated components land in

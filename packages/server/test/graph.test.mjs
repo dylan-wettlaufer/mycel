@@ -487,3 +487,102 @@ test("semantic routes validate bounds, preserve project scope, and report missin
     assert.equal((await app.request(`/api/graph/${path}`)).status, 400);
   assert.equal((await createApp().request("/api/graph/semantic")).status, 503);
 });
+
+test("feature routes retrieve candidate memberships and validate status and size bounds", async (t) => {
+  const { app, database } = fixture(t);
+  const provenance = {
+    kind: "heuristic",
+    extractor: "fixture-discovery",
+    version: "1",
+    rule: "route-area",
+    confidence: 0.8,
+  };
+  const sources = [{ nodeId: "node:save", path: "src/save.ts", range }];
+  const feature = {
+    id: "feature:orders",
+    projectId: project.id,
+    kind: "feature",
+    name: "orders",
+    attributes: { status: "candidate" },
+    provenance,
+    sources,
+  };
+  const member = {
+    ...feature,
+    id: "operation:save",
+    kind: "service_operation",
+    name: "save",
+    attributes: {},
+  };
+  replaceProjectGraph(database, {
+    project,
+    nodes,
+    edges,
+    diagnostics: [],
+    semantic: {
+      entities: [feature, member],
+      relationships: [
+        {
+          id: "membership",
+          projectId: project.id,
+          sourceId: member.id,
+          targetId: feature.id,
+          kind: "IMPLEMENTS",
+          provenance,
+          sources,
+        },
+      ],
+    },
+  });
+  const response = await app.request(
+    "/api/graph/semantic/features?status=candidate&projectId=project:other",
+  );
+  assert.equal(response.status, 200);
+  const list = await response.json();
+  assert.equal(list.projectId, project.id);
+  assert.equal(list.features[0].id, feature.id);
+  assert.equal(list.features[0].provenance.kind, "heuristic");
+  assert.equal(
+    (
+      await (
+        await app.request("/api/graph/semantic/features?status=declared")
+      ).json()
+    ).features.length,
+    0,
+  );
+  const detail = await app.request(
+    "/api/graph/semantic/features/feature%3Aorders",
+  );
+  assert.equal(detail.status, 200);
+  const result = await detail.json();
+  assert.equal(result.entities.length, 2);
+  assert.equal(result.relationships[0].sources[0].nodeId, "node:save");
+  assert.equal(
+    (await app.request("/api/graph/semantic/features/missing")).status,
+    404,
+  );
+  assert.equal(
+    (await app.request("/api/graph/semantic/features/operation%3Asave")).status,
+    404,
+  );
+  for (const path of [
+    "features?status=verified",
+    "features?status=",
+    "features?status=candidate&status=declared",
+    "features?limit=501",
+    "features/feature%3Aorders?limit=0",
+    "features?limit=1&limit=2",
+  ])
+    assert.equal(
+      (await app.request(`/api/graph/semantic/${path}`)).status,
+      400,
+    );
+  assert.equal(
+    (await createApp().request("/api/graph/semantic/features")).status,
+    503,
+  );
+  assert.equal(
+    (await createApp().request("/api/graph/semantic/features/any")).status,
+    503,
+  );
+});

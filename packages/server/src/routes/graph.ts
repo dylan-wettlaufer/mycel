@@ -46,6 +46,51 @@ export function createGraphRoutes(graph?: GraphQueries) {
     );
   });
 
+  routes.get("/semantic/features", (context) => {
+    const values = context.req.queries("status");
+    const status = values?.[0];
+    if (
+      values &&
+      (values.length !== 1 || (status !== "candidate" && status !== "declared"))
+    )
+      throw new HTTPException(400, {
+        message: "status must be candidate or declared",
+      });
+    const limit = integerParameter(
+      context.req.queries("limit"),
+      "limit",
+      100,
+      1,
+      500,
+    );
+    return graph?.getFeatures
+      ? context.json(
+          graph.getFeatures({
+            ...(status === "candidate" || status === "declared"
+              ? { status }
+              : {}),
+            limit,
+          }),
+        )
+      : context.json({ error: "Feature queries unavailable" }, 503);
+  });
+
+  routes.get("/semantic/features/:id", (context) => {
+    const limit = integerParameter(
+      context.req.queries("limit"),
+      "limit",
+      100,
+      1,
+      500,
+    );
+    if (!graph?.getFeature)
+      return context.json({ error: "Feature queries unavailable" }, 503);
+    const result = graph.getFeature(context.req.param("id"), limit);
+    return result
+      ? context.json(result)
+      : context.json({ error: "Feature not found" }, 404);
+  });
+
   routes.get("/semantic", (context) => {
     const limit = integerParameter(
       context.req.queries("limit"),

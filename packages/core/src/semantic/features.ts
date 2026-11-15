@@ -191,13 +191,14 @@ export function discoverFeatures(
         ...route.sources,
         ...page.sources,
         ...(pageEdge?.sources ?? []),
+        ...(tags.has(id) ? (entities.get(id)?.sources ?? []) : []),
       ];
       traverse(
         id,
         route,
         evidence,
         confidence,
-        tags.size ? "annotated-route" : "route-area",
+        tags.size ? "annotated-route" : segment ? "route-area" : "route-group",
       );
       for (const layout of layouts) {
         const mapping = layout.sources.find(

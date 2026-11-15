@@ -1,4 +1,7 @@
-# Semantic application graph (phase 6.1)
+# Semantic application graph
+
+The foundation below was introduced in phase 6.1. Phase 6.2A adds
+[automatic feature candidates and membership queries](FEATURE_DISCOVERY.md).
 
 ## Audit and integration
 
@@ -22,7 +25,7 @@ agent tracking or AI explanation generation.
 
 | Entity kind | Meaning |
 | --- | --- |
-| `feature` | Explicitly declared application capability |
+| `feature` | Explicitly declared capability or heuristic organizational candidate |
 | `route` | Frontend URL pattern |
 | `page` | Source implementation of a routable page |
 | `component` | UI function containing JSX in its own implementation |
@@ -42,7 +45,8 @@ Each entity and relationship carries one or more source mappings to an existing
 structural file or symbol node, a repository-relative path, and a source range.
 Identity is project-scoped and independent of line offsets. Provenance records
 `deterministic`, `heuristic`, or `ai`, extractor identifier, version, rule, and
-confidence in [0, 1]. Only deterministic rules are implemented in this milestone.
+confidence in [0, 1]. Deterministic source rules and heuristic feature discovery
+are implemented; AI extraction is not.
 Confidence describes evidence strength, not runtime reachability or execution.
 
 Migration 003 adds `semantic_entities`, `semantic_relationships`, and
@@ -119,9 +123,12 @@ Metadata changes re-evaluate this support using the existing module resolver.
   reexported handlers/pages, class components, higher-order wrappers, and custom
   `pageExtensions` or routing configuration are outside this subset. No endpoints
   are synthesized for implicit methods. This adapter does not infer fetch-to-API
-  links, layout composition, client/server boundaries, or database behavior.
+  links, runtime layout composition, client/server boundaries, or database behavior.
+  Layout defaults are recognized as components for heuristic feature association.
 
-Features, non-handler operations, and data models require explicit JSDoc tags:
+Explicit features and roles can be declared with JSDoc tags. Automatic feature
+candidates and called `services/` operations are also supported as described in
+[feature discovery](FEATURE_DISCOVERY.md). Data models still require tags:
 
 ```ts
 /**
@@ -146,7 +153,7 @@ component, page, operation, or model also establishes `IMPLEMENTS`. Multiple
 source declarations of the same feature aggregate their source evidence. Tags
 express author declarations; extraction does not evaluate whether they are true.
 `READS` and `WRITES` remain reserved: model imports and return types alone cannot
-establish data access. There are no AI or heuristic extractors in the default set.
+establish data access. Feature discovery adds heuristic records; there are no AI extractors.
 
 Direct semantic calls resolve only to recognized operations. The binding pass
 omits ambiguous star-export chains, type-only value references, overloaded or

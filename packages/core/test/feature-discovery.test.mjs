@@ -120,6 +120,17 @@ test("discovers route areas, group-root pages, named feature directories, layout
     "orders",
     "reports",
   ]);
+  const listed = queries.getFeatures({ status: "candidate" });
+  assert.equal(listed.features.length, 4);
+  assert.equal(queries.getFeatures({ status: "declared" }).features.length, 0);
+  const featureId = features.find((item) => item.name === "orders").id;
+  const details = queries.getFeature(featureId);
+  assert.ok(details.entities.some((item) => item.name === "loadOrders"));
+  assert.ok(
+    details.relationships.every(
+      (edge) => edge.kind === "IMPLEMENTS" && edge.targetId === featureId,
+    ),
+  );
   assert.ok(
     features.every(
       (item) =>
@@ -153,6 +164,14 @@ test("discovers route areas, group-root pages, named feature directories, layout
     new Set(["orders"]),
   );
   assert.equal(memberships(graph, entity(graph, "SharedPanel")).size, 0);
+  const groupRoute = entity(graph, "/", "route");
+  assert.ok(
+    graph.relationships.some(
+      (edge) =>
+        edge.sourceId === groupRoute.id &&
+        edge.provenance.rule === "route-group",
+    ),
+  );
   const associations = graph.relationships.filter(
     (edge) => edge.kind === "IMPLEMENTS",
   );
@@ -241,6 +260,20 @@ test("explicit feature tags override route seeds and candidate roles and remain 
     memberships(graph, entity(graph, "send")),
     new Set(["fulfilment", "billing"]),
   );
+  const route = entity(graph, "/orders", "route");
+  const membership = graph.relationships.find(
+    (edge) =>
+      edge.sourceId === route.id && edge.provenance.rule === "annotated-route",
+  );
+  const evidence = await Promise.all(
+    membership.sources.map(async (source) =>
+      (await readFile(join(input.root, source.path), "utf8")).slice(
+        source.range.start,
+        source.range.end,
+      ),
+    ),
+  );
+  assert.ok(evidence.some((text) => text.includes("@mycelFeature purchases")));
   const fulfilment = entity(graph, "fulfilment", "feature");
   assert.equal(fulfilment.attributes.status, "declared");
   assert.equal(fulfilment.provenance.kind, "deterministic");
@@ -309,6 +342,34 @@ test("live discovery removes stale memberships after reference edits, feature/gr
     !read().relationships.some(
       (edge) => edge.sourceId === report.id || edge.targetId === report.id,
     ),
+  );
+  const analytics = entity(read(), "analytics", "feature");
+  const movedReport = join(
+    input.root,
+    "src/features/analytics/ReportsPanel.tsx",
+  );
+  const reportSource = input.sources.get(
+    "src/features/reports/ReportsPanel.tsx",
+  );
+  await writeFile(
+    movedReport,
+    "/** @mycelFeature insights */\n" + reportSource,
+  );
+  await until(
+    () =>
+      read().entities.some(
+        (item) =>
+          item.kind === "feature" &&
+          item.name === "insights" &&
+          item.attributes.status === "declared",
+      ) && !read().entities.some((item) => item.id === analytics.id),
+  );
+  const insights = entity(read(), "insights", "feature");
+  await writeFile(movedReport, reportSource);
+  await until(
+    () =>
+      read().entities.some((item) => item.id === analytics.id) &&
+      !read().entities.some((item) => item.id === insights.id),
   );
   await rename(
     join(input.root, "src/app/(marketing)"),

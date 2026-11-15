@@ -16,7 +16,7 @@ attributes, so this milestone needs no schema migration.
 ## Inputs
 
 Next App Router `layout.tsx` defaults become components when not already recognized
-by the JSX extractor. Anonymous defaults and layouts returning `children` are
+by the JSX extractor. Anonymous default function declarations and layouts returning `children` are
 included. Layout applicability is a framework convention; it does not establish
 that a layout actually renders its children, so no implicit RENDERS edge is added.
 
@@ -61,3 +61,49 @@ source evidence for its seed and the source references supporting its path.
 Confidence values are policy weights for evidence strength, not calibrated
 probabilities or proof of runtime execution. Features have `attributes.status`
 `candidate` or `declared`; explicit feature declarations remain deterministic.
+
+
+## Queries
+
+- `GET /api/graph/semantic/features?status=candidate&limit=100` lists candidates.
+  Use `status=declared` for explicit features or omit status for both. Results
+  contain source mappings, attributes, provenance, the project revision, and a
+  truncation flag. Legacy deterministic feature records without a status attribute
+  are treated as declarations for filtering.
+- `GET /api/graph/semantic/features/:id?limit=100` returns the feature and its direct
+  associated entities with all returned IMPLEMENTS evidence. It omits unrelated
+  runtime edges. The limit includes the feature itself, so limit 1 returns only
+  that entity and reports truncation if it has members.
+
+Both limits are 1–500. Invalid or repeated parameters return 400; unavailable
+providers return 503; an unknown or non-feature detail ID returns 404. Reads are
+project-scoped and transactional. Shared entities can occur in several feature
+responses. `createGraphQueries` exposes `getFeatures` and `getFeature`;
+`@mycel/db` exposes `getSemanticFeatures` and `getSemanticFeature`. Existing semantic
+snapshot and neighborhood queries also include the new candidates and memberships.
+
+## Incremental behavior and limits
+
+Discovery runs on the captured semantic snapshot, after declaration extraction and
+lexical references. The existing structural/semantic transaction replaces stale
+records atomically. Candidate identities depend on project, owning package, and
+area name; line shifts keep identity, while a feature rename changes it. Promoting
+a candidate to an explicit declaration uses the existing explicit identity and
+removes the candidate. A source move updates every affected source mapping and
+relationship. Existing last-good-source retention applies on syntax errors.
+
+Route area names and feature directory names are hints, not product requirements.
+A broad area such as `settings` may contain several real features. Route groups can
+reflect teams or visual organization. Unused directory components can still form
+organizational candidates, with no claimed runtime path. The implementation does
+not identify arbitrary service classes, infer ownership from import edges, match
+fetch URLs to handlers, follow callbacks or dynamic dispatch, or infer READS/WRITES.
+Only the existing React/TSX subset and default Next App Router conventions are
+supported. No exclusivity, user-visible feature completeness, or runtime behavior
+is implied by membership.
+
+`packages/core/test/fixtures/feature-discovery` is unannotated. Its fixture tests
+cover route areas and nested routes, group-root pages, applicable/shared layouts,
+named feature directories, shared components/services, explicit override variants,
+source evidence, query integration, source moves, reference removal, feature/group
+renames, route deletion, and promotion/demotion through annotation edits.

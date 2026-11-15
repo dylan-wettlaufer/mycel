@@ -70,3 +70,13 @@ export interface SemanticExtraction {
   entities: Omit<SemanticEntity, "revision">[];
   relationships: Omit<SemanticRelationship, "revision">[];
 }
+
+export type FeatureStatus = "candidate" | "declared";
+export interface SemanticFeatureQuery {
+  status?: FeatureStatus;
+  limit?: number;
+}
+export interface SemanticFeatureList extends GraphQueryContext {
+  features: SemanticEntity[];
+  truncated: boolean;
+}

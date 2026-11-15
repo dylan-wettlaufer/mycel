@@ -6,6 +6,8 @@ import {
   replaceProjectGraph,
   applyProjectGraph,
   getSemanticGraph,
+  getSemanticFeatures,
+  getSemanticFeature,
   getSemanticNeighborhood,
   migrateDatabase,
 } from "../dist/index.js";
@@ -177,4 +179,80 @@ test("replacement removes stale relationships and evidence and cascades project 
   ])
     assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0);
   assert.deepEqual(db.pragma("foreign_key_check"), []);
+});
+
+test("feature queries filter candidates and declarations and return bounded direct memberships with evidence", (t) => {
+  const db = database(t);
+  const candidate = {
+    ...entity("feature:candidate"),
+    kind: "feature",
+    name: "orders",
+    attributes: { status: "candidate" },
+    provenance: { ...provenance, kind: "heuristic", confidence: 0.8 },
+  };
+  // Legacy declared features did not have a status attribute.
+  const declared = {
+    ...entity("feature:declared"),
+    kind: "feature",
+    name: "billing",
+  };
+  const membership = (member) => ({
+    ...relationship(member, candidate.id),
+    kind: "IMPLEMENTS",
+    provenance: { ...provenance, kind: "heuristic", confidence: 0.65 },
+  });
+  replaceProjectGraph(
+    db,
+    graph({
+      entities: [
+        candidate,
+        declared,
+        entity("a"),
+        entity("b"),
+        entity("unrelated"),
+      ],
+      relationships: [membership("a"), membership("b"), relationship("a", "b")],
+    }),
+  );
+  assert.deepEqual(
+    getSemanticFeatures(db, "p").features.map((feature) => feature.name),
+    ["billing", "orders"],
+  );
+  assert.deepEqual(
+    getSemanticFeatures(db, "p", { status: "candidate" }).features.map(
+      (feature) => feature.id,
+    ),
+    [candidate.id],
+  );
+  assert.deepEqual(
+    getSemanticFeatures(db, "p", { status: "declared" }).features.map(
+      (feature) => feature.id,
+    ),
+    [declared.id],
+  );
+  assert.equal(getSemanticFeatures(db, "p", { limit: 1 }).truncated, true);
+  assert.equal(getSemanticFeatures(db, "other").features.length, 0);
+  const details = getSemanticFeature(db, "p", candidate.id);
+  assert.equal(details.entities.length, 3);
+  assert.equal(details.relationships.length, 2);
+  assert.ok(
+    details.relationships.every(
+      (edge) =>
+        edge.kind === "IMPLEMENTS" && edge.provenance.kind === "heuristic",
+    ),
+  );
+  assert.deepEqual(details.relationships[0].sources, [source]);
+  assert.equal(getSemanticFeature(db, "p", candidate.id, 2).truncated, true);
+  const root = getSemanticFeature(db, "p", candidate.id, 1);
+  assert.equal(root.entities.length, 1);
+  assert.equal(root.relationships.length, 0);
+  assert.equal(root.truncated, true);
+  assert.equal(getSemanticFeature(db, "p", "a"), undefined);
+  assert.equal(getSemanticFeature(db, "other", candidate.id), undefined);
+  assert.throws(
+    () => getSemanticFeatures(db, "p", { status: "verified" }),
+    RangeError,
+  );
+  assert.throws(() => getSemanticFeatures(db, "p", { limit: 501 }), RangeError);
+  assert.throws(() => getSemanticFeature(db, "p", candidate.id, 0), RangeError);
 });

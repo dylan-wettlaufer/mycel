@@ -25,4 +25,9 @@ export { getDiff } from "./history.js";
 export { pruneHistory } from "./history.js";
 export { startMonitoringSession, endMonitoringSession } from "./sessions.js";
 
-export { getSemanticGraph, getSemanticNeighborhood } from "./semantic.js";
+export {
+  getSemanticGraph,
+  getSemanticNeighborhood,
+  getSemanticFeatures,
+  getSemanticFeature,
+} from "./semantic.js";

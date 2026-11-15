@@ -1,5 +1,7 @@
 import type {
   SemanticEntity,
+  SemanticFeatureQuery,
+  SemanticFeatureList,
   SemanticExtraction,
   SemanticGraph,
   SemanticRelationship,
@@ -250,5 +252,75 @@ export function getSemanticNeighborhood(
       if (truncated) break;
     }
     return readGraph(db, projectId, [...visited], truncated);
+  })();
+}
+
+/** Lists declarations separately from heuristic candidates, including legacy declarations. */
+export function getSemanticFeatures(
+  db: SqliteDatabase,
+  projectId: string,
+  { status, limit = 100 }: SemanticFeatureQuery = {},
+): SemanticFeatureList {
+  validateLimit(limit);
+  if (status !== undefined && status !== "candidate" && status !== "declared")
+    throw new RangeError("Feature status must be candidate or declared");
+  return db.transaction(() => {
+    const rows = db
+      .prepare<[string, string | null, string | null, number], { id: string }>(
+        `SELECT id FROM semantic_entities
+      WHERE project_id = ? AND kind = 'feature' AND (? IS NULL OR
+        COALESCE(json_extract(attributes, '$.status'), CASE WHEN json_extract(provenance, '$.kind') = 'deterministic' THEN 'declared' ELSE 'candidate' END) = ?)
+      ORDER BY name, id LIMIT ?`,
+      )
+      .all(projectId, status ?? null, status ?? null, limit + 1);
+    const graph = readGraph(
+      db,
+      projectId,
+      rows.slice(0, limit).map((row) => row.id),
+      rows.length > limit,
+    );
+    const byId = new Map(graph.entities.map((entity) => [entity.id, entity]));
+    return {
+      projectId,
+      revision: graph.revision,
+      features: rows.slice(0, limit).map((row) => byId.get(row.id)!),
+      truncated: graph.truncated,
+    };
+  })();
+}
+
+/** Direct feature memberships only; the limit includes the feature itself. */
+export function getSemanticFeature(
+  db: SqliteDatabase,
+  projectId: string,
+  id: string,
+  limit = 100,
+): SemanticGraph | undefined {
+  validateLimit(limit);
+  return db.transaction(() => {
+    if (
+      !db
+        .prepare(
+          "SELECT 1 FROM semantic_entities WHERE project_id = ? AND id = ? AND kind = 'feature'",
+        )
+        .get(projectId, id)
+    )
+      return;
+    const rows = db
+      .prepare<[string, string, number], { id: string }>(
+        `SELECT DISTINCT source_id AS id FROM semantic_relationships
+      WHERE project_id = ? AND target_id = ? AND kind = 'IMPLEMENTS' ORDER BY source_id LIMIT ?`,
+      )
+      .all(projectId, id, limit);
+    const graph = readGraph(
+      db,
+      projectId,
+      [id, ...rows.slice(0, limit - 1).map((row) => row.id)],
+      rows.length > limit - 1,
+    );
+    graph.relationships = graph.relationships.filter(
+      (edge) => edge.kind === "IMPLEMENTS" && edge.targetId === id,
+    );
+    return graph;
   })();
 }
