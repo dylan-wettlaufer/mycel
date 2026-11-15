@@ -110,6 +110,13 @@ async function until(check) {
 
 test("discovers route areas, group-root pages, named feature directories, layouts, and nonexclusive shared dependencies", async (t) => {
   const input = await fixture(t);
+  // The same area can have a low-confidence group seed and a stronger URL seed.
+  const extraPath = "src/app/marketing/page.tsx";
+  const extraSource =
+    "export default function MarketingAreaPage() { return <h1>Marketing</h1>; }";
+  await mkdir(join(input.root, extraPath, ".."), { recursive: true });
+  await writeFile(join(input.root, extraPath), extraSource);
+  input.sources.set(extraPath, extraSource);
   const indexed = await indexRepository(input);
   const queries = createGraphQueries(input.database, indexed.projectId);
   const graph = queries.getSemanticGraph(500);
@@ -120,6 +127,9 @@ test("discovers route areas, group-root pages, named feature directories, layout
     "orders",
     "reports",
   ]);
+  const marketing = features.find((item) => item.name === "marketing");
+  assert.equal(marketing.provenance.confidence, 0.8);
+  assert.equal(marketing.provenance.rule, "route-area");
   const listed = queries.getFeatures({ status: "candidate" });
   assert.equal(listed.features.length, 4);
   assert.equal(queries.getFeatures({ status: "declared" }).features.length, 0);

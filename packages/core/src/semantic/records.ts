@@ -49,10 +49,8 @@ export function semanticRecords(
     const existing = entities.find((item) => item.id === id);
     if (existing) {
       addSource(existing.sources, source);
-      existing.provenance.confidence = Math.max(
-        existing.provenance.confidence,
-        evidence.confidence,
-      );
+      if (evidence.confidence > existing.provenance.confidence)
+        existing.provenance = provenance(rule, evidence);
     } else
       entities.push({
         id,

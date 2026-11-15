@@ -87,7 +87,9 @@ snapshot and neighborhood queries also include the new candidates and membership
 Discovery runs on the captured semantic snapshot, after declaration extraction and
 lexical references. The existing structural/semantic transaction replaces stale
 records atomically. Candidate identities depend on project, owning package, and
-area name; line shifts keep identity, while a feature rename changes it. Promoting
+area name; line shifts keep identity, while a feature rename changes it. When
+several seeds corroborate a candidate, its primary provenance retains the strongest
+rule and confidence while its sources retain the supporting evidence. Promoting
 a candidate to an explicit declaration uses the existing explicit identity and
 removes the candidate. A source move updates every affected source mapping and
 relationship. Existing last-good-source retention applies on syntax errors.
