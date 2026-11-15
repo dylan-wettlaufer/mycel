@@ -47,7 +47,12 @@ export function AppShell({
   onNavigate,
 }: AppShellProps) {
   return (
-    <div className="flex min-h-svh flex-col md:flex-row bg-background text-foreground">
+    <div
+      className={cn(
+        "flex flex-col bg-background text-foreground md:flex-row",
+        view === "Graph" ? "h-dvh overflow-hidden" : "min-h-svh",
+      )}
+    >
       <aside className="w-full md:w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex">
         <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
           <Waypoints className="size-5 text-sidebar-primary" aria-hidden />
@@ -79,8 +84,8 @@ export function AppShell({
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b px-4 md:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4 md:px-6">
           <h1 className="truncate text-sm font-medium" title={projectRoot}>
             {projectName}
           </h1>
@@ -115,7 +120,14 @@ export function AppShell({
             </Badge>
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main
+          className={cn(
+            "min-w-0 flex-1 p-4 md:p-6",
+            view === "Graph" && "flex min-h-0 flex-col overflow-hidden",
+          )}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

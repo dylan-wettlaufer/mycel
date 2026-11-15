@@ -110,7 +110,7 @@ export function App() {
           />
         </>
       ) : !nodeId ? (
-        <div className="space-y-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           {error && (
             <p role="alert" className="text-sm text-muted-foreground">
               Repository details unavailable
@@ -155,61 +155,59 @@ export function App() {
       ) : !node || !rootNode ? (
         <p>Loading node…</p>
       ) : (
-        <div className="space-y-5">
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <Suspense fallback={<p>Loading graph…</p>}>
-              <GraphPanel
-                key={rootNode.id}
-                onOverview={() => navigate({ view: "Graph" })}
-                root={rootNode}
-                selected={node}
-                onSelect={(next) =>
-                  navigate({ ...navigation, nodeId: next.id })
-                }
-                revision={activity.revision}
-                events={activity.events}
-              />
-            </Suspense>
-            <div className="space-y-3">
-              {node.kind === "file" && (
-                <FileSymbols
-                  file={node}
+        <Suspense fallback={<p>Loading graph…</p>}>
+          <GraphPanel
+            key={rootNode.id}
+            onOverview={() => navigate({ view: "Graph" })}
+            root={rootNode}
+            selected={node}
+            onSelect={(next) => navigate({ ...navigation, nodeId: next.id })}
+            revision={activity.revision}
+            events={activity.events}
+            details={
+              <div className="space-y-3">
+                {source && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate({ ...navigation, source: false })}
+                    >
+                      Close source
+                    </Button>
+                    <SourcePanel node={node} revision={activity.revision} />
+                  </>
+                )}
+                <NodeDetailsPanel
+                  node={node}
+                  onSelect={(next) =>
+                    navigate({ ...navigation, nodeId: next.id })
+                  }
+                  onScope={(next) =>
+                    navigate({ ...navigation, rootId: next.id })
+                  }
+                  onSource={() => navigate({ ...navigation, source: true })}
                   revision={activity.revision}
-                  onSelect={openNode}
                 />
-              )}
-              <NodeDetailsPanel
-                node={node}
-                onSelect={(next) =>
-                  navigate({ ...navigation, nodeId: next.id })
-                }
-                onScope={(next) => navigate({ ...navigation, rootId: next.id })}
-                onSource={() => navigate({ ...navigation, source: true })}
-                revision={activity.revision}
-              />
-              <Button
-                variant="outline"
-                onClick={() => navigate({ view: "Activity", nodeId: node.id })}
-              >
-                Show node activity
-              </Button>
-            </div>
-          </div>
-          {source && (
-            <>
-              <div className="flex justify-end">
+                {node.kind === "file" && (
+                  <FileSymbols
+                    file={node}
+                    revision={activity.revision}
+                    onSelect={openNode}
+                  />
+                )}
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate({ ...navigation, source: false })}
+                  variant="outline"
+                  onClick={() =>
+                    navigate({ view: "Activity", nodeId: node.id })
+                  }
                 >
-                  Close source
+                  Show node activity
                 </Button>
               </div>
-              <SourcePanel node={node} revision={activity.revision} />
-            </>
-          )}
-        </div>
+            }
+          />
+        </Suspense>
       )}
     </AppShell>
   );

@@ -3,6 +3,7 @@ import type { GraphNode, RepositoryGraph } from "@mycel/shared";
 import {
   fileScope,
   groupRepository,
+  layoutFileDependencies,
   layoutRepositoryGroups,
 } from "./repository-layout";
 function file(id: string, path: string) {
@@ -62,4 +63,23 @@ test("folder file views retain incoming and outgoing cross-folder edges without 
     "d",
   ]);
   expect(fileScope(graph, "missing").files).toEqual([]);
+});
+
+test("folder and file layouts leave room between connected nodes and siblings", () => {
+  for (const layout of [
+    layoutRepositoryGroups(graph, 2, null),
+    layoutFileDependencies(graph),
+  ]) {
+    for (const [index, node] of layout.nodes.entries()) {
+      for (const other of layout.nodes.slice(index + 1)) {
+        const horizontalGap =
+          Math.abs(node.position.x - other.position.x) -
+          Number(node.style?.width);
+        const verticalGap =
+          Math.abs(node.position.y - other.position.y) -
+          Number(node.style?.height);
+        expect(horizontalGap >= 160 || verticalGap >= 100).toBe(true);
+      }
+    }
+  }
 });

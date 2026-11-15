@@ -1,6 +1,6 @@
 import { GraphCanvas } from "./graph-canvas";
 import { recentChanges } from "@/features/activity/event-node";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
@@ -14,7 +14,9 @@ export function GraphPanel({
   revision = 0,
   events = [],
   onOverview,
+  details,
 }: {
+  details?: ReactNode;
   root: GraphNode;
   selected: GraphNode;
   onSelect: (node: GraphNode) => void;
@@ -42,8 +44,11 @@ export function GraphPanel({
     [data, selected.id, events, now],
   );
   return (
-    <section className="space-y-2" aria-label="Scoped graph">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
+      aria-label="Scoped graph"
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold" title={root.path}>
             {root.name}
@@ -95,6 +100,7 @@ export function GraphPanel({
             edges={layout.edges}
             selectedId={clearedFor === selected.id ? null : selected.id}
             symbols
+            details={details}
             onClear={() => setClearedFor(selected.id)}
             onSelect={(id) => {
               setClearedFor(null);

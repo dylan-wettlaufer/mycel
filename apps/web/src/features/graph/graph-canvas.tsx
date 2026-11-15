@@ -1,22 +1,42 @@
 import { Focus, Filter, Scan, ZoomIn } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Background,
   Controls,
   Panel,
   ReactFlow,
+  applyNodeChanges,
   type Edge,
   type Node,
   type ReactFlowInstance,
+  type OnNodesChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { graphNodeTypes } from "./graph-node";
 import { focusGraph, graphConnections } from "./graph-focus";
 
 function name(node: Node): string {
   return String(node.data.name ?? node.data.label);
 }
+
+// Keep React Flow's measured dimensions alongside positions so a controlled
+// update doesn't hide nodes and reset their handles while they are remeasured.
+function withNodeState(nodes: Node[], state: Map<string, Node>): Node[] {
+  return nodes.map((node) => {
+    const current = state.get(node.id);
+    return current
+      ? {
+          ...node,
+          position: current.position,
+          ...(current.measured ? { measured: current.measured } : {}),
+          dragging: current.dragging ?? false,
+        }
+      : node;
+  });
+}
+
 export function GraphCanvas({
   nodes,
   edges,
@@ -26,6 +46,7 @@ export function GraphCanvas({
   onOpen,
   openLabel,
   symbols = false,
+  details,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -35,12 +56,31 @@ export function GraphCanvas({
   onOpen?: ((id: string) => void) | undefined;
   openLabel?: string;
   symbols?: boolean;
+  details?: ReactNode;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
+  const [nodeState, setNodeState] = useState(() => new Map<string, Node>());
   const flow = useRef<ReactFlowInstance | null>(null);
   const focused = useMemo(
     () => focusGraph(nodes, edges, selectedId, onlyConnections),
     [nodes, edges, selectedId, onlyConnections],
+  );
+  const visibleNodes = useMemo(
+    () => withNodeState(focused.nodes, nodeState),
+    [focused.nodes, nodeState],
+  );
+  const onNodesChange = useCallback<OnNodesChange>(
+    (changes) => {
+      setNodeState(
+        (previous) =>
+          new Map(
+            applyNodeChanges(changes, withNodeState(nodes, previous)).map(
+              (node) => [node.id, node],
+            ),
+          ),
+      );
+    },
+    [nodes],
   );
   const connections = useMemo(
     () => graphConnections(nodes, edges, selectedId),
@@ -48,10 +88,10 @@ export function GraphCanvas({
   );
   const selected = nodes.find((node) => node.id === selectedId);
   return (
-    <div className="space-y-3">
-      <div className="graph-canvas h-[70svh] min-h-[400px] max-h-[900px] overflow-hidden rounded-lg border bg-card">
+    <div className="relative flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden">
+      <div className="graph-canvas min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card">
         <ReactFlow<Node, Edge>
-          nodes={focused.nodes}
+          nodes={visibleNodes}
           edges={focused.edges}
           nodeTypes={graphNodeTypes}
           fitView
@@ -59,8 +99,9 @@ export function GraphCanvas({
           maxZoom={2}
           fitViewOptions={{ padding: 0.15, minZoom: 0.03, maxZoom: 0.8 }}
           colorMode="dark"
-          nodesDraggable={false}
+          nodesDraggable
           nodesConnectable={false}
+          onNodesChange={onNodesChange}
           onInit={(instance) => {
             flow.current = instance;
           }}
@@ -168,11 +209,11 @@ export function GraphCanvas({
         </ReactFlow>
       </div>
       {selected && (
-        <section
-          aria-label="Selected connections"
-          className="rounded-lg border bg-card p-4"
+        <aside
+          aria-label="Selection details"
+          className="absolute inset-y-0 right-0 z-10 flex w-[340px] max-w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border bg-card shadow-lg lg:static lg:shadow-none"
         >
-          <div className="mb-4 flex flex-wrap items-start gap-2">
+          <div className="flex shrink-0 flex-wrap items-start gap-2 border-b p-4">
             <div className="mr-auto min-w-0">
               <h3 className="break-all text-base font-semibold">
                 {name(selected)}
@@ -190,21 +231,26 @@ export function GraphCanvas({
               Clear selection
             </Button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Connections
-              title={symbols ? "Points to selection" : "Used by"}
-              nodes={connections.incoming}
-              onSelect={onSelect}
-              direction="incoming"
-            />
-            <Connections
-              title={symbols ? "Selection points to" : "Depends on"}
-              nodes={connections.outgoing}
-              onSelect={onSelect}
-              direction="outgoing"
-            />
-          </div>
-        </section>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="space-y-5 p-4">
+              {details}
+              <section aria-label="Selected connections" className="space-y-5">
+                <Connections
+                  title={symbols ? "Points to selection" : "Used by"}
+                  nodes={connections.incoming}
+                  onSelect={onSelect}
+                  direction="incoming"
+                />
+                <Connections
+                  title={symbols ? "Selection points to" : "Depends on"}
+                  nodes={connections.outgoing}
+                  onSelect={onSelect}
+                  direction="outgoing"
+                />
+              </section>
+            </div>
+          </ScrollArea>
+        </aside>
       )}
     </div>
   );
@@ -232,7 +278,7 @@ function Connections({
       {nodes.length === 0 ? (
         <p className="text-sm text-muted-foreground">None in this view</p>
       ) : (
-        <ul className="max-h-52 space-y-1 overflow-y-auto">
+        <ul className="space-y-1">
           {nodes.map((node) => (
             <li key={node.id}>
               <Button

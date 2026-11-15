@@ -10,7 +10,7 @@ export function layoutNeighborhood(
   const layout = new dagre.graphlib.Graph({
     multigraph: true,
   }).setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
+  layout.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 180 });
   for (const node of graph.nodes)
     layout.setNode(node.id, { width: 240, height: 100 });
   for (const edge of graph.edges)

@@ -102,6 +102,130 @@ async function sourceContains(text, label = "Source code") {
       .locator(".view-lines"),
   ).toContainText(text);
 }
+async function graphFitsScreen() {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const canvas = globalThis.document.querySelector(".graph-canvas");
+        const main = globalThis.document.querySelector("main");
+        if (!canvas || !main) return false;
+        const bounds = canvas.getBoundingClientRect();
+        const bottom =
+          main.getBoundingClientRect().bottom -
+          Number.parseFloat(globalThis.getComputedStyle(main).paddingBottom);
+        return (
+          globalThis.document.documentElement.scrollHeight <=
+            globalThis.window.innerHeight &&
+          globalThis.document.documentElement.scrollWidth <=
+            globalThis.window.innerWidth &&
+          bounds.height > 0 &&
+          Math.abs(bounds.bottom - bottom) <= 1
+        );
+      }),
+    )
+    .toBe(true);
+}
+async function selectionFitsScreen() {
+  await graphFitsScreen();
+  const sidebar = await page
+    .getByRole("complementary", { name: "Selection details" })
+    .boundingBox();
+  const canvas = await page.locator(".graph-canvas").boundingBox();
+  assert.ok(sidebar && canvas);
+  assert.ok(
+    Math.abs(sidebar.y - canvas.y) <= 1,
+    "details align with the canvas top",
+  );
+  assert.ok(
+    Math.abs(sidebar.y + sidebar.height - canvas.y - canvas.height) <= 1,
+    "details stay within the canvas height",
+  );
+  if (page.viewportSize().width >= 1024)
+    assert.ok(
+      sidebar.x >= canvas.x + canvas.width,
+      "details sit to the right of the graph",
+    );
+}
+async function dragWithoutFlicker(node) {
+  await expect
+    .poll(() =>
+      page
+        .locator(".react-flow__node")
+        .evaluateAll((nodes) =>
+          nodes.every(
+            (node) =>
+              globalThis.getComputedStyle(node).visibility === "visible",
+          ),
+        ),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    const canvas = globalThis.document.querySelector(".react-flow");
+    const selector = ".react-flow__node, .react-flow__edge";
+    const count = canvas.querySelectorAll(selector).length;
+    const monitor = { failures: [], frames: 0, frame: 0, observer: null };
+    const check = () => {
+      const elements = [...canvas.querySelectorAll(selector)];
+      if (elements.length !== count)
+        monitor.failures.push("graph elements disappeared");
+      for (const element of elements) {
+        const style = globalThis.getComputedStyle(element);
+        if (style.visibility === "hidden" || style.display === "none")
+          monitor.failures.push(`${element.classList[0]} became hidden`);
+      }
+    };
+    monitor.observer = new globalThis.MutationObserver((records) => {
+      for (const record of records) {
+        if (
+          record.target.matches?.(selector) &&
+          /visibility:\s*hidden/.test(record.oldValue ?? "")
+        )
+          monitor.failures.push("a node was temporarily hidden");
+      }
+      check();
+    });
+    monitor.observer.observe(canvas, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+      attributeOldValue: true,
+      childList: true,
+    });
+    const frame = () => {
+      monitor.frames++;
+      check();
+      monitor.frame = globalThis.requestAnimationFrame(frame);
+    };
+    monitor.frame = globalThis.requestAnimationFrame(frame);
+    globalThis.mycelDragMonitor = monitor;
+  });
+  const bounds = await node.boundingBox();
+  assert.ok(bounds);
+  await page.mouse.move(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    bounds.x + bounds.width / 2 - 80,
+    bounds.y + bounds.height / 2 + 60,
+    { steps: 30 },
+  );
+  await page.mouse.up();
+  const result = await page.evaluate(() => {
+    const monitor = globalThis.mycelDragMonitor;
+    monitor.observer.disconnect();
+    globalThis.cancelAnimationFrame(monitor.frame);
+    delete globalThis.mycelDragMonitor;
+    return { failures: [...new Set(monitor.failures)], frames: monitor.frames };
+  });
+  assert.ok(result.frames > 0, "dragging is sampled across animation frames");
+  assert.deepEqual(
+    result.failures,
+    [],
+    "nodes and edges must stay visible throughout dragging",
+  );
+}
 try {
   console.log(`Dashboard: ${base} | fixture: ${directory}`);
   await page.goto(base);
@@ -111,6 +235,8 @@ try {
     page.getByRole("heading", { name: "Repository overview", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Graph legend")).toContainText("A imports B");
+  await graphFitsScreen();
+  await expect(page.getByLabel("Selection details")).toHaveCount(0);
   const canvasBounds = await page.locator(".react-flow").boundingBox();
   const legendBounds = await page.getByLabel("Graph legend").boundingBox();
   const toolbarBounds = await page
@@ -131,7 +257,32 @@ try {
       toolbarBounds.x >= legendBounds.x + legendBounds.width,
     "canvas controls sit in the top-right without overlapping the legend",
   );
-  await page.locator(".react-flow__node").filter({ hasText: "(root)" }).click();
+  const folderNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: "(root)" });
+  const nodePosition = () =>
+    folderNode.evaluate((node) => node.style.transform);
+  const originalPosition = await nodePosition();
+  await dragWithoutFlicker(folderNode);
+  await expect.poll(nodePosition).not.toBe(originalPosition);
+  const draggedPosition = await nodePosition();
+  await folderNode.click();
+  await selectionFitsScreen();
+  assert.equal(
+    await nodePosition(),
+    draggedPosition,
+    "selection preserves dragged positions",
+  );
+  await page
+    .getByRole("button", { name: "Clear selection", exact: true })
+    .click();
+  await expect(page.getByLabel("Selection details")).toHaveCount(0);
+  assert.equal(
+    await nodePosition(),
+    draggedPosition,
+    "clearing preserves dragged positions",
+  );
+  await folderNode.click();
   await page.getByRole("button", { name: "Open files", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "File dependencies", exact: true }),
@@ -158,12 +309,21 @@ try {
   await expect(page.getByLabel("Selected connections")).toContainText(
     "Used by",
   );
+  await selectionFitsScreen();
   await page.getByRole("button", { name: "Open file", exact: true }).click();
   await page
     .getByLabel("File symbols")
     .getByRole("button", { name: /double.*function/ })
     .click();
   await expect(page.getByLabel("Node details")).toContainText("double");
+  await selectionFitsScreen();
+  await dragWithoutFlicker(
+    page.locator(".react-flow__node").filter({ hasText: "double" }),
+  );
+  await page.screenshot({
+    path: join(directory, "graph-sidebar.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Search files and symbols" })
@@ -180,6 +340,7 @@ try {
     .getByRole("button", { name: "Open source", exact: true })
     .click();
   await sourceContains("double(3)");
+  await selectionFitsScreen();
   await expect(
     page.getByRole("region", { name: "Source code" }).getByRole("heading"),
   ).toHaveText("main.ts:3");
@@ -287,6 +448,21 @@ try {
     path: join(directory, "history.png"),
     fullPage: true,
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Graph", exact: true }).click();
+  await graphFitsScreen();
+  await page.locator(".react-flow__node").first().click();
+  await selectionFitsScreen();
+  await page.screenshot({
+    path: join(directory, "graph-mobile.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Clear selection", exact: true })
+    .click();
+  await expect(page.getByLabel("Selection details")).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await graphFitsScreen();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await expect(

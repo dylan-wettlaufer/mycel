@@ -62,4 +62,8 @@ test("cyclic neighborhoods preserve nodes, parallel edges and selection", () => 
   ).toBe(true);
   expect(result.nodes[1]?.selected).toBe(true);
   expect(result.edges.map((edge) => edge.id)).toEqual(["ab", "ba", "ab2"]);
+  const [a, b] = result.nodes;
+  expect(Math.abs(a!.position.x - b!.position.x) - 240).toBeGreaterThanOrEqual(
+    180,
+  );
 });

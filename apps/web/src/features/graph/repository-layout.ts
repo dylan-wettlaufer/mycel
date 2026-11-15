@@ -38,7 +38,7 @@ export function layoutRepositoryGroups(
 ): { nodes: Node[]; edges: Edge[] } {
   const { groups, connections } = groupRepository(graph, depth);
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 45, ranksep: 60 });
+  layout.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 160 });
   for (const folder of groups.keys())
     layout.setNode(folder, { width: 190, height: 100 });
   for (const edge of connections) layout.setEdge(edge.source, edge.target);
@@ -109,7 +109,7 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
   edges: Edge[];
 } {
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
+  layout.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 180 });
   for (const file of graph.files)
     layout.setNode(file.id, { width: 240, height: 100 });
   for (const edge of graph.dependencies)
