@@ -52,7 +52,9 @@ test("primary navigation switches workspace views", async () => {
   );
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "Graph" }));
-  expect(await screen.findByRole("heading", { name: "Graph" })).toBeTruthy();
+  expect(
+    await screen.findByRole("heading", { name: "Repository overview" }),
+  ).toBeTruthy();
   expect(
     screen.getByRole("button", { name: "Graph" }).getAttribute("aria-current"),
   ).toBe("page");

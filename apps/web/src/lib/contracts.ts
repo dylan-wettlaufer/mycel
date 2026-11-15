@@ -168,3 +168,26 @@ export function isGraphStats(
     )
   );
 }
+
+export function isRepositoryGraph(
+  value: unknown,
+): value is import("@mycel/shared").RepositoryGraph {
+  if (
+    !isRecord(value) ||
+    typeof value.projectId !== "string" ||
+    typeof value.revision !== "number" ||
+    !Array.isArray(value.files) ||
+    !value.files.every((node) => isNode(node) && node.kind === "file") ||
+    !Array.isArray(value.dependencies)
+  )
+    return false;
+  const ids = new Set(value.files.map((node) => node.id));
+  return value.dependencies.every(
+    (edge) =>
+      isRecord(edge) &&
+      typeof edge.id === "string" &&
+      edge.kind === "IMPORTS" &&
+      ids.has(edge.sourceId) &&
+      ids.has(edge.targetId),
+  );
+}

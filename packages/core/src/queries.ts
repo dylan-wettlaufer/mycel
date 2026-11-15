@@ -1,4 +1,5 @@
 import {
+  getRepositoryGraph,
   getGraphStats,
   getFileContent,
   getNeighborhood,
@@ -19,6 +20,7 @@ import type {
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getRepositoryGraph?(): import("@mycel/shared").RepositoryGraph;
   getStats?(): import("@mycel/shared").GraphStats;
   getFileContent?(
     path: string,
@@ -37,6 +39,7 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getRepositoryGraph: () => getRepositoryGraph(database, projectId),
     getStats: () => getGraphStats(database, projectId),
     getFileContent: (path) => getFileContent(database, projectId, path),
     searchSymbols: ({ q, limit }) =>

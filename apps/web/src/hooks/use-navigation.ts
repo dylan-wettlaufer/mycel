@@ -12,9 +12,12 @@ export function parseNavigation(hash: string): Navigation {
   const view = query.get("view");
   return {
     view:
-      view === "Graph" || view === "Activity" || view === "Explorer"
+      view === "Dashboard" ||
+      view === "Graph" ||
+      view === "Activity" ||
+      view === "Explorer"
         ? view
-        : "Dashboard",
+        : "Graph",
     ...(query.get("node") ? { nodeId: query.get("node")! } : {}),
     ...(query.get("root") ? { rootId: query.get("root")! } : {}),
     ...(query.get("change") && /^\d+$/.test(query.get("change")!)

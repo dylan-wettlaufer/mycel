@@ -23,6 +23,6 @@ test("navigation roundtrips opaque ids and supports browser history", async () =
   act(() => window.history.back());
   await waitFor(() => expect(result.current.navigation.source).toBe(true));
   expect(parseNavigation("#view=unknown&change=bad")).toEqual({
-    view: "Dashboard",
+    view: "Graph",
   });
 });

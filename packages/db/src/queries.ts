@@ -355,3 +355,29 @@ export function getGraphStats(
     };
   })();
 }
+
+/** A single committed snapshot; the overview must not omit disconnected files. */
+export function getRepositoryGraph(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+): import("@mycel/shared").RepositoryGraph {
+  return database.transaction(() => {
+    const files = database
+      .prepare<[string], NodeRow>(
+        `SELECT ${nodeColumns} FROM nodes n WHERE n.project_id = ? AND n.kind = 'file' ORDER BY n.path, n.id`,
+      )
+      .all(projectId)
+      .map(toNode);
+    const dependencies = database
+      .prepare<[string], GraphEdge>(
+        `SELECT e.id, e.project_id AS projectId, e.source_id AS sourceId, e.target_id AS targetId, e.kind, e.revision FROM edges e JOIN nodes source ON source.project_id = e.project_id AND source.id = e.source_id JOIN nodes target ON target.project_id = e.project_id AND target.id = e.target_id WHERE e.project_id = ? AND e.kind = 'IMPORTS' AND source.kind = 'file' AND target.kind = 'file' ORDER BY e.id`,
+      )
+      .all(projectId);
+    return {
+      projectId,
+      revision: getRevision(database, projectId),
+      files,
+      dependencies,
+    };
+  })();
+}

@@ -54,7 +54,8 @@ together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
 `apps/web` is a Vite + React + TypeScript dashboard styled with Tailwind CSS v4
 and shadcn/ui. It provides a searchable file and symbol explorer, scoped React Flow
 graphs, relationship details, and locally bundled Monaco source and diff viewers.
-The overview shows real index counts. Activity arrives through SSE, with recent
+The default Graph view shows every indexed file grouped into folders, with directed
+import counts between groups. The dashboard shows real index counts. Activity arrives through SSE, with recent
 node highlights and saved metadata and source for deleted nodes. Hash-based links
 preserve graph selections, individual changes, and source views across reloads and
 browser Back/Forward navigation.

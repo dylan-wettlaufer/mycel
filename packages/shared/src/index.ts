@@ -27,6 +27,7 @@ export type {
   FileContentQuery,
   GraphQueryContext,
   GraphStats,
+  RepositoryGraph,
   Neighborhood,
   NeighborhoodQuery,
   NodeDetails,

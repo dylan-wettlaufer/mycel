@@ -19,6 +19,12 @@ const GraphPanel = lazy(() =>
   })),
 );
 
+const RepositoryOverview = lazy(() =>
+  import("@/features/graph/repository-overview").then((module) => ({
+    default: module.RepositoryOverview,
+  })),
+);
+
 export function App() {
   const { navigation, navigate } = useNavigation();
   const { view, nodeId, rootId, changeId, source } = navigation;
@@ -102,15 +108,20 @@ export function App() {
           />
         </>
       ) : !nodeId ? (
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Graph</h2>
-          <p className="text-muted-foreground">
-            Select a file or symbol to explore its connections.
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {project?.root ??
+              (error
+                ? "Repository details unavailable"
+                : "Connecting to repository…")}
           </p>
-          <Button onClick={() => navigate({ view: "Explorer" })}>
-            Browse files and symbols
-          </Button>
-        </section>
+          <Suspense fallback={<p>Loading repository overview…</p>}>
+            <RepositoryOverview
+              revision={activity.revision}
+              onSelect={openNode}
+            />
+          </Suspense>
+        </div>
       ) : selected.error || root.error ? (
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">Graph</h2>
@@ -134,6 +145,9 @@ export function App() {
         <p>Loading node…</p>
       ) : (
         <div className="space-y-5">
+          <Button variant="outline" onClick={() => navigate({ view: "Graph" })}>
+            Repository overview
+          </Button>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
             <Suspense fallback={<p>Loading graph…</p>}>
               <GraphPanel

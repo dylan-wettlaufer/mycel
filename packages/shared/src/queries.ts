@@ -80,3 +80,9 @@ export interface GraphStats extends GraphQueryContext {
 export interface ErrorResponse {
   error: string;
 }
+
+/** Complete file/import graph for a repository-wide overview, including isolated files. */
+export interface RepositoryGraph extends GraphQueryContext {
+  files: GraphNode[];
+  dependencies: GraphEdge[];
+}

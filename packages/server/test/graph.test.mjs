@@ -369,3 +369,36 @@ test("statistics count only the selected project's committed graph", async (t) =
     diagnosticCount: 1,
   });
 });
+
+test("repository overview includes all files beyond neighborhood limits with project-scoped import edges", async (t) => {
+  const { app, database } = fixture(t);
+  const files = Array.from({ length: 130 }, (_, i) =>
+    node(`file:${i}`, `${i}.ts`, "file", `area/${i}.ts`),
+  );
+  replaceProjectGraph(database, {
+    project,
+    nodes: [...files, node("symbol", "symbol")],
+    edges: [
+      edge(files[0].id, files[1].id, "IMPORTS"),
+      edge(files[0].id, "symbol", "CONTAINS"),
+    ],
+    diagnostics: [],
+  });
+  const response = await app.request("/api/graph/repository");
+  assert.equal(response.status, 200);
+  const graph = await response.json();
+  assert.equal(graph.projectId, project.id);
+  assert.equal(graph.revision, 2);
+  assert.equal(graph.files.length, 130);
+  assert.ok(
+    graph.files.every(
+      (file) => file.kind === "file" && file.projectId === project.id,
+    ),
+  );
+  assert.equal(graph.dependencies.length, 1);
+  assert.equal(graph.dependencies[0].kind, "IMPORTS");
+  assert.equal(
+    (await createApp().request("/api/graph/repository")).status,
+    503,
+  );
+});
