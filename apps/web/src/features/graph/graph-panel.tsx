@@ -1,7 +1,6 @@
+import { GraphCanvas } from "./graph-canvas";
 import { recentChanges } from "@/features/activity/event-node";
 import { useEffect, useMemo, useState } from "react";
-import { Background, Controls, ReactFlow } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
@@ -26,6 +25,7 @@ export function GraphPanel({
     const timer = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
+  const [clearedFor, setClearedFor] = useState<string | null>(null);
   const [depth, setDepth] = useState(1);
   const { data, error } = useResource(
     `/api/graph/nodes/${encodeURIComponent(root.id)}/neighborhood?depth=${depth}&limit=100`,
@@ -77,28 +77,19 @@ export function GraphPanel({
               different scope.
             </p>
           )}
-          <div className="h-[540px] min-h-80 overflow-hidden rounded-lg border bg-card">
-            <ReactFlow
-              key={`${root.id}:${depth}`}
-              nodes={layout.nodes}
-              edges={layout.edges}
-              fitView
-              colorMode="dark"
-              nodesDraggable={false}
-              nodesConnectable={false}
-              onNodeClick={(_, node) => {
-                const selected = data.nodes.find((item) => item.id === node.id);
-                if (selected) onSelect(selected);
-              }}
-            >
-              <Background />
-              <Controls showInteractive={false} />
-            </ReactFlow>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Select a node for details. Dashed edges contain symbols; arrows
-            follow calls and imports.
-          </p>
+          <GraphCanvas
+            key={`${root.id}:${depth}`}
+            nodes={layout.nodes}
+            edges={layout.edges}
+            selectedId={clearedFor === selected.id ? null : selected.id}
+            symbols
+            onClear={() => setClearedFor(selected.id)}
+            onSelect={(id) => {
+              setClearedFor(null);
+              const node = data.nodes.find((node) => node.id === id);
+              if (node) onSelect(node);
+            }}
+          />
         </>
       )}
     </section>

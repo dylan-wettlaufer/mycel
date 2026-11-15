@@ -38,9 +38,9 @@ export function layoutRepositoryGroups(
 ): { nodes: Node[]; edges: Edge[] } {
   const { groups, connections } = groupRepository(graph, depth);
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 45, ranksep: 110 });
+  layout.setGraph({ rankdir: "LR", nodesep: 45, ranksep: 60 });
   for (const folder of groups.keys())
-    layout.setNode(folder, { width: 250, height: 80 });
+    layout.setNode(folder, { width: 200, height: 120 });
   for (const edge of connections) layout.setEdge(edge.source, edge.target);
   dagre.layout(layout);
   return {
@@ -48,15 +48,21 @@ export function layoutRepositoryGroups(
       const position = layout.node(folder);
       return {
         id: folder,
-        position: { x: position.x - 125, y: position.y - 40 },
+        position: { x: position.x - 100, y: position.y - 60 },
+        type: "code",
+        ariaLabel: `Folder ${folder}, ${files.length} files`,
         data: {
+          kind: "folder",
+          name: folder.split("/").at(-1),
+          context: folder,
+          detail: `${files.length} ${files.length === 1 ? "file" : "files"}`,
           label: `${folder} · ${files.length} ${files.length === 1 ? "file" : "files"}`,
         },
         selected: folder === selected,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         className: "graph-node graph-node-file",
-        style: { width: 250, minHeight: 80 },
+        style: { width: 200, height: 120 },
       };
     }),
     edges: connections.map((edge) => ({
@@ -103,9 +109,9 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
   edges: Edge[];
 } {
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 35, ranksep: 100 });
+  layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
   for (const file of graph.files)
-    layout.setNode(file.id, { width: 270, height: 70 });
+    layout.setNode(file.id, { width: 260, height: 120 });
   for (const edge of graph.dependencies)
     layout.setEdge(edge.sourceId, edge.targetId);
   dagre.layout(layout);
@@ -114,12 +120,19 @@ export function layoutFileDependencies(graph: RepositoryGraph): {
       const position = layout.node(file.id);
       return {
         id: file.id,
-        position: { x: position.x - 135, y: position.y - 35 },
-        data: { label: file.path },
+        position: { x: position.x - 130, y: position.y - 60 },
+        type: "code",
+        ariaLabel: `File ${file.path}`,
+        data: {
+          label: file.path,
+          name: file.name ?? file.path.split("/").at(-1),
+          context: file.path.split("/").slice(0, -1).join("/") || "(root)",
+          kind: "file",
+        },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         className: "graph-node graph-node-file",
-        style: { width: 270, minHeight: 70 },
+        style: { width: 260, height: 120 },
       };
     }),
     edges: graph.dependencies.map((edge) => ({

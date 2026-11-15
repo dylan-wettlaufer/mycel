@@ -1,6 +1,5 @@
+import { GraphCanvas } from "./graph-canvas";
 import { useMemo, useState } from "react";
-import { Background, Controls, ReactFlow } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import type { GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
@@ -32,6 +31,12 @@ export function RepositoryOverview({
     revision,
   );
   const [depth, setDepth] = useState(2);
+  const [selection, setSelection] = useState<{
+    scope: string;
+    id: string;
+  } | null>(null);
+  const scope = `${files}:${folder ?? ""}:${depth}`;
+  const selectedId = selection?.scope === scope ? selection.id : null;
   const scoped = useMemo(
     () => (data ? fileScope(data, folder) : undefined),
     [data, folder],
@@ -98,38 +103,28 @@ export function RepositoryOverview({
           <>
             <p className="text-xs text-muted-foreground">
               {files
-                ? `${folder ? `${folder} and its direct connections. ` : ""}Arrows point from an importing file to its dependency. Select a file for symbols and source.`
-                : "Every indexed file is included, even without connections. Select a folder to inspect its files. Arrows point to dependencies; counts show file imports between folders."}
+                ? `${folder ? `${folder} and its direct connections. ` : ""}Arrows point from an importing file to its dependency. Select a file to trace its connections, then Open file for symbols and source.`
+                : "Every indexed file is included, even without connections. Select a folder to trace its connections, then Open files to inspect it. Arrows point to dependencies; counts show file imports between folders."}
             </p>
             {files && scoped?.files.length === 0 ? (
               <p>No files in this folder.</p>
             ) : (
-              <div className="h-[620px] overflow-hidden rounded-lg border bg-card">
-                <ReactFlow
-                  key={`${files}:${folder ?? ""}:${depth}`}
-                  nodes={layout.nodes}
-                  edges={layout.edges}
-                  fitView
-                  minZoom={0.05}
-                  fitViewOptions={{ padding: 0.15, minZoom: 0.05, maxZoom: 1 }}
-                  colorMode="dark"
-                  nodesDraggable={false}
-                  nodesConnectable={false}
-                  onlyRenderVisibleElements
-                  onNodeClick={(_, node) => {
-                    if (!files) onFiles(node.id);
-                    else {
-                      const file = data.files.find(
-                        (file) => file.id === node.id,
-                      );
-                      if (file) onSelect(file);
-                    }
-                  }}
-                >
-                  <Background />
-                  <Controls showInteractive={false} />
-                </ReactFlow>
-              </div>
+              <GraphCanvas
+                key={scope}
+                nodes={layout.nodes}
+                edges={layout.edges}
+                selectedId={selectedId}
+                onSelect={(id) => setSelection({ scope, id })}
+                onClear={() => setSelection(null)}
+                onOpen={(id) => {
+                  if (!files) onFiles(id);
+                  else {
+                    const file = data.files.find((file) => file.id === id);
+                    if (file) onSelect(file);
+                  }
+                }}
+                openLabel={files ? "Open file" : "Open files"}
+              />
             )}
           </>
         ))

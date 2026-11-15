@@ -10,9 +10,9 @@ export function layoutNeighborhood(
   const layout = new dagre.graphlib.Graph({
     multigraph: true,
   }).setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 35, ranksep: 100 });
+  layout.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 85 });
   for (const node of graph.nodes)
-    layout.setNode(node.id, { width: 220, height: 70 });
+    layout.setNode(node.id, { width: 260, height: 120 });
   for (const edge of graph.edges)
     layout.setEdge(edge.sourceId, edge.targetId, {}, edge.id);
   dagre.layout(layout);
@@ -21,15 +21,24 @@ export function layoutNeighborhood(
       const position = layout.node(node.id);
       return {
         id: node.id,
+        type: "code",
+        ariaLabel: `${node.kind} ${node.qualifiedName}, ${node.path}:${node.range.startLine}`,
         data: {
+          name: node.name,
+          context:
+            node.kind === "file"
+              ? node.path.split("/").slice(0, -1).join("/") || "(root)"
+              : `${node.path}:${node.range.startLine}`,
+          kind: node.kind,
+          change: recent.get(node.id),
           label: `${node.kind} · ${node.name}${recent.has(node.id) ? ` · ${recent.get(node.id)}` : ""}`,
         },
-        position: { x: position.x - 110, y: position.y - 35 },
+        position: { x: position.x - 130, y: position.y - 60 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         selected: node.id === selectedId,
         className: `graph-node graph-node-${node.kind}${recent.has(node.id) ? ` recent-${recent.get(node.id)}` : ""}`,
-        style: { width: 220, minHeight: 70 },
+        style: { width: 260, height: 120 },
       };
     }),
     edges: graph.edges.map((edge) => ({

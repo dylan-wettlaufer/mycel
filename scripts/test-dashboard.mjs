@@ -110,7 +110,9 @@ try {
   await expect(
     page.getByRole("heading", { name: "Repository overview", exact: true }),
   ).toBeVisible();
+  await expect(page.getByLabel("Graph legend")).toContainText("A imports B");
   await page.locator(".react-flow__node").filter({ hasText: "(root)" }).click();
+  await page.getByRole("button", { name: "Open files", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "File dependencies", exact: true }),
   ).toBeVisible();
@@ -119,6 +121,24 @@ try {
     .locator(".react-flow__node")
     .filter({ hasText: "math.ts" })
     .click();
+  await expect(page.locator(".graph-unrelated")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Only connections", exact: true })
+    .click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(2);
+  await page
+    .getByRole("button", { name: "Clear selection", exact: true })
+    .click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+
+  await page
+    .locator(".react-flow__node")
+    .filter({ hasText: "math.ts" })
+    .click();
+  await expect(page.getByLabel("Selected connections")).toContainText(
+    "Used by",
+  );
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
   await page
     .getByLabel("File symbols")
     .getByRole("button", { name: /double.*function/ })
@@ -143,10 +163,7 @@ try {
   await expect(
     page.getByRole("region", { name: "Source code" }).getByRole("heading"),
   ).toHaveText("main.ts:3");
-  await page
-    .locator(".react-flow__node")
-    .filter({ hasText: "function · double" })
-    .click();
+  await page.locator(".react-flow__node").filter({ hasText: "double" }).click();
   await sourceContains("value * 2");
   await phase("create", () =>
     writeFile(
