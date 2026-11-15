@@ -69,3 +69,66 @@ export function layoutRepositoryGroups(
     })),
   };
 }
+
+/** Keep direct external dependencies/dependents so a folder never looks isolated. */
+export function fileScope(
+  graph: RepositoryGraph,
+  folder?: string,
+): RepositoryGraph {
+  if (!folder) return graph;
+  const scoped = new Set(
+    graph.files
+      .filter((file) =>
+        folder === "(root)"
+          ? !file.path.includes("/")
+          : file.path.startsWith(`${folder}/`),
+      )
+      .map((file) => file.id),
+  );
+  const dependencies = graph.dependencies.filter(
+    (edge) => scoped.has(edge.sourceId) || scoped.has(edge.targetId),
+  );
+  const included = new Set([
+    ...scoped,
+    ...dependencies.flatMap((edge) => [edge.sourceId, edge.targetId]),
+  ]);
+  return {
+    ...graph,
+    files: graph.files.filter((file) => included.has(file.id)),
+    dependencies,
+  };
+}
+export function layoutFileDependencies(graph: RepositoryGraph): {
+  nodes: Node[];
+  edges: Edge[];
+} {
+  const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+  layout.setGraph({ rankdir: "LR", nodesep: 35, ranksep: 100 });
+  for (const file of graph.files)
+    layout.setNode(file.id, { width: 270, height: 70 });
+  for (const edge of graph.dependencies)
+    layout.setEdge(edge.sourceId, edge.targetId);
+  dagre.layout(layout);
+  return {
+    nodes: graph.files.map((file) => {
+      const position = layout.node(file.id);
+      return {
+        id: file.id,
+        position: { x: position.x - 135, y: position.y - 35 },
+        data: { label: file.path },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        className: "graph-node graph-node-file",
+        style: { width: 270, minHeight: 70 },
+      };
+    }),
+    edges: graph.dependencies.map((edge) => ({
+      id: edge.id,
+      source: edge.sourceId,
+      target: edge.targetId,
+      label: "imports",
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { stroke: "var(--primary)" },
+    })),
+  };
+}

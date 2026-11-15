@@ -83,6 +83,15 @@ export function createGraphRoutes(graph?: GraphQueries) {
     return context.json(graph.searchSymbols(query));
   });
 
+  routes.get("/nodes/:id/symbols", (context) => {
+    if (!graph?.getFileSymbols)
+      return context.json({ error: "Graph queries unavailable" }, 503);
+    const result = graph.getFileSymbols(context.req.param("id"));
+    return result
+      ? context.json(result)
+      : context.json({ error: "File not found" }, 404);
+  });
+
   routes.get("/nodes/:id", (context) => {
     const query: NodeDetailsQuery = {
       limit: integerParameter(

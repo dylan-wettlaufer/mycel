@@ -1,3 +1,4 @@
+import { FileSymbols } from "@/features/details/file-symbols";
 import { lazy, Suspense } from "react";
 import type { GraphNode } from "@mycel/shared";
 import { AppShell } from "@/components/layout/app-shell";
@@ -117,6 +118,16 @@ export function App() {
           </p>
           <Suspense fallback={<p>Loading repository overview…</p>}>
             <RepositoryOverview
+              files={navigation.files}
+              folder={navigation.folder}
+              onFiles={(folder) =>
+                navigate({
+                  view: "Graph",
+                  files: true,
+                  ...(folder ? { folder } : {}),
+                })
+              }
+              onOverview={() => navigate({ view: "Graph" })}
               revision={activity.revision}
               onSelect={openNode}
             />
@@ -162,6 +173,13 @@ export function App() {
               />
             </Suspense>
             <div className="space-y-3">
+              {node.kind === "file" && (
+                <FileSymbols
+                  file={node}
+                  revision={activity.revision}
+                  onSelect={openNode}
+                />
+              )}
               <NodeDetailsPanel
                 node={node}
                 onSelect={(next) =>

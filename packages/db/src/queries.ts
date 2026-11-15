@@ -381,3 +381,27 @@ export function getRepositoryGraph(
     };
   })();
 }
+
+/** All declarations in a file, including nested classes/methods, in source order. */
+export function getFileSymbols(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+  id: NodeId,
+): SearchResult | undefined {
+  return database.transaction(() => {
+    const file = getNode(database, projectId, id);
+    if (!file || file.kind !== "file") return undefined;
+    const nodes = database
+      .prepare<[string, string], NodeRow>(
+        `SELECT ${nodeColumns} FROM nodes n WHERE n.project_id = ? AND n.path = ? AND n.kind != 'file' ORDER BY n.start_offset, n.end_offset, n.id`,
+      )
+      .all(projectId, file.path)
+      .map(toNode);
+    return {
+      projectId,
+      revision: getRevision(database, projectId),
+      nodes,
+      truncated: false,
+    };
+  })();
+}

@@ -6,6 +6,8 @@ export interface Navigation {
   rootId?: string;
   changeId?: string;
   source?: boolean;
+  files?: boolean;
+  folder?: string;
 }
 export function parseNavigation(hash: string): Navigation {
   const query = new URLSearchParams(hash.replace(/^#/, ""));
@@ -23,6 +25,8 @@ export function parseNavigation(hash: string): Navigation {
     ...(query.get("change") && /^\d+$/.test(query.get("change")!)
       ? { changeId: query.get("change")! }
       : {}),
+    ...(query.get("files") === "1" ? { files: true } : {}),
+    ...(query.get("folder") ? { folder: query.get("folder")! } : {}),
     ...(query.get("source") === "1" ? { source: true } : {}),
   };
 }
@@ -37,6 +41,8 @@ export function useNavigation() {
     if (next.nodeId) query.set("node", next.nodeId);
     if (next.rootId) query.set("root", next.rootId);
     if (next.changeId) query.set("change", next.changeId);
+    if (next.files) query.set("files", "1");
+    if (next.folder) query.set("folder", next.folder);
     if (next.source) query.set("source", "1");
     window.location.hash = query.toString();
   };

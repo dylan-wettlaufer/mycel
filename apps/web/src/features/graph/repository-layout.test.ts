@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import type { GraphNode, RepositoryGraph } from "@mycel/shared";
-import { groupRepository, layoutRepositoryGroups } from "./repository-layout";
+import {
+  fileScope,
+  groupRepository,
+  layoutRepositoryGroups,
+} from "./repository-layout";
 function file(id: string, path: string) {
   return { id, path, kind: "file" } as GraphNode;
 }
@@ -41,4 +45,21 @@ test("repository groups preserve isolated files and aggregate directed cross-fol
     true,
   );
   expect(groupRepository(graph, 1).groups.has("apps")).toBe(true);
+});
+
+test("folder file views retain incoming and outgoing cross-folder edges without unrelated files", () => {
+  const scoped = fileScope(graph, "apps/web");
+  expect(scoped.files.map((file) => file.id)).toEqual(["a", "b", "c"]);
+  expect(scoped.dependencies.map((edge) => edge.id)).toEqual([
+    "ab",
+    "cb",
+    "ac",
+  ]);
+  expect(
+    fileScope(graph, "packages/core").files.map((file) => file.id),
+  ).toEqual(["a", "b", "c"]);
+  expect(fileScope(graph, "(root)").files.map((file) => file.id)).toEqual([
+    "d",
+  ]);
+  expect(fileScope(graph, "missing").files).toEqual([]);
 });

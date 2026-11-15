@@ -402,3 +402,31 @@ test("repository overview includes all files beyond neighborhood limits with pro
     503,
   );
 });
+
+test("file drill-down returns every declaration in the file including nested methods", async (t) => {
+  const { app, database } = fixture(t);
+  replaceProjectGraph(database, {
+    project,
+    nodes: [
+      node("file", "nested.ts", "file", "nested.ts"),
+      node("class", "Store", "class", "nested.ts"),
+      node("method", "save", "method", "nested.ts"),
+      node("other", "elsewhere", "function", "other.ts"),
+    ],
+    edges: [],
+    diagnostics: [],
+  });
+  const response = await app.request("/api/graph/nodes/file/symbols");
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(
+    result.nodes.map((node) => node.id),
+    ["class", "method"],
+  );
+  assert.equal(result.truncated, false);
+  for (const id of ["class", "missing", "node:secret"])
+    assert.equal(
+      (await app.request(`/api/graph/nodes/${id}/symbols`)).status,
+      404,
+    );
+});

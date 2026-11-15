@@ -49,7 +49,10 @@ const context = await browser.newContext({
 const page = await context.newPage();
 const errors = [];
 const offOrigin = [];
-page.on("pageerror", (error) => errors.push(error.message));
+page.on("pageerror", (error) => {
+  console.error("Browser runtime error:", error.stack ?? error.message);
+  errors.push(error.message);
+});
 page.on("request", (request) => {
   if (
     !request.url().startsWith(base) &&
@@ -104,6 +107,23 @@ try {
   await page.goto(base);
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.getByLabel("Live connection")).toHaveText("Live updates");
+  await expect(
+    page.getByRole("heading", { name: "Repository overview", exact: true }),
+  ).toBeVisible();
+  await page.locator(".react-flow__node").filter({ hasText: "(root)" }).click();
+  await expect(
+    page.getByRole("heading", { name: "File dependencies", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(1);
+  await page
+    .locator(".react-flow__node")
+    .filter({ hasText: "math.ts" })
+    .click();
+  await page
+    .getByLabel("File symbols")
+    .getByRole("button", { name: /double.*function/ })
+    .click();
+  await expect(page.getByLabel("Node details")).toContainText("double");
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Search files and symbols" })

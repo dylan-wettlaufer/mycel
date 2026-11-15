@@ -1,4 +1,5 @@
 import {
+  getFileSymbols,
   getRepositoryGraph,
   getGraphStats,
   getFileContent,
@@ -20,6 +21,7 @@ import type {
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getFileSymbols?(id: NodeId): SearchResult | undefined;
   getRepositoryGraph?(): import("@mycel/shared").RepositoryGraph;
   getStats?(): import("@mycel/shared").GraphStats;
   getFileContent?(
@@ -39,6 +41,7 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getFileSymbols: (id) => getFileSymbols(database, projectId, id),
     getRepositoryGraph: () => getRepositoryGraph(database, projectId),
     getStats: () => getGraphStats(database, projectId),
     getFileContent: (path) => getFileContent(database, projectId, path),
