@@ -18,3 +18,10 @@ export type {
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";
+
+export { extractSemanticGraph } from "./semantic/index.js";
+export type {
+  SemanticExtractor,
+  SemanticContext,
+  SemanticInput,
+} from "./semantic/index.js";

@@ -68,3 +68,32 @@ providers return 503. The project is bound by the server, not chosen by request
 parameters. Truncation describes omitted entities; only induced relationships are
 returned. The same methods are available on `createGraphQueries`, and the database
 package exports `getSemanticGraph` and `getSemanticNeighborhood`.
+
+## Extraction pipeline
+
+`extractSemanticGraph` runs composable semantic extractors over captured text and
+structural nodes. Extractors receive a read-only-by-convention context, including
+source ASTs, lexical bindings, module resolution, and structural source anchors.
+They return entities and relationships; duplicate identities fail explicitly. A
+reference pass binds declarations after extraction. Custom extractors can be
+supplied through the public core API. The standard indexer runs the default set.
+
+The existing TypeScript dependency provides a second, semantic binding pass over
+captured sources only. Its compiler host cannot read disk, load dependencies, or
+execute project configuration. Tree-sitter continues to own the structural parse
+and graph. Partial parses are excluded from new semantic extraction; live indexing
+continues to retain the previous good captured source on parse failure.
+
+React extraction supports named function declarations and directly bound arrow or
+function expressions in TSX with an uppercase name and a direct JSX return
+(including parenthesized and conditional JSX). JSX aliases and reexports resolve
+to captured functions. Shadowed imports remain separate bindings. Returned nested
+closures, runtime object dispatch, higher-order component wrappers, and JSX that
+is not part of a returned expression stay unknown. `RENDERS` records a source-level
+JSX reference, not a guarantee about runtime rendering or reachability.
+
+External dependency entities represent exact runtime import specifiers, including
+package subpaths. They do not claim an installed package/version. A `DEPENDS_ON`
+edge requires a direct imported call or JSX use within a recognized implementation.
+Type-only imports, unresolved local aliases, and unused imported bindings do not
+produce runtime relationships. Nested callback execution is not assumed.

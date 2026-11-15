@@ -1,0 +1,14 @@
+import { Card as Panel } from './barrel';
+import { format } from 'display-sdk';
+
+export function App() {
+  format('hello');
+  return <Panel />;
+}
+
+export function Shadowed(Panel: unknown) {
+  return <Panel />;
+}
+
+export const Deferred = () => () => <Panel />;
+export function Unused() { const view = <Panel />; return null; }

@@ -11,7 +11,7 @@ import { hashIdentity } from "./hash.js";
 import type { CapturedFile } from "./graph.js";
 
 /** Resolve repository-relative TS/TSX modules, including emitted .js specifiers. */
-function resolveRelativeModule(
+export function resolveRelativeModule(
   from: string,
   specifier: string,
   paths: ReadonlySet<string>,

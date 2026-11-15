@@ -1,6 +1,7 @@
 import type { ModuleResolver } from "./module-resolution.js";
 import { hashContent, hashIdentity } from "./hash.js";
 export { hashContent, hashIdentity } from "./hash.js";
+import { extractSemanticGraph } from "./semantic/index.js";
 import { resolveRelationships } from "./resolver.js";
 import { posix } from "node:path";
 import type { ParseResult } from "@mycel/parser";
@@ -87,5 +88,11 @@ export function buildProjectGraph(
   const relationships = resolveRelationships(project, files, resolution);
   edges.push(...relationships.edges);
   diagnostics.push(...relationships.diagnostics);
-  return { project, nodes, edges, diagnostics };
+  const semantic = extractSemanticGraph({
+    project,
+    files,
+    nodes,
+    ...(resolution ? { resolution } : {}),
+  });
+  return { project, nodes, edges, diagnostics, semantic };
 }
