@@ -5,8 +5,10 @@ import type {
   Project,
   Revision,
   SourceRange,
+  SemanticExtraction,
 } from "@mycel/shared";
 import type { SqliteDatabase } from "./database.js";
+import { writeSemanticGraph } from "./semantic.js";
 import { resolveExternalDatabasePath } from "./paths.js";
 
 export interface ProjectGraph {
@@ -14,6 +16,7 @@ export interface ProjectGraph {
   nodes: readonly Omit<GraphNode, "revision">[];
   edges: readonly Omit<GraphEdge, "revision">[];
   diagnostics: readonly Diagnostic[];
+  semantic?: SemanticExtraction;
 }
 
 function rangeParameters(range: SourceRange) {
@@ -231,6 +234,7 @@ function writeProjectGraph(
           revision,
         });
       }
+      writeSemanticGraph(database, project.id, revision, graph.semantic);
       return revision;
     })
     .immediate();

@@ -1,3 +1,4 @@
+import { semanticSchema } from "./003-semantic.js";
 import { historySchema } from "./002-history.js";
 import { initialSchema } from "./001-initial.js";
 
@@ -14,4 +15,5 @@ export const migrations: readonly Migration[] = [
     name: "change history and monitoring sessions",
     sql: historySchema,
   },
+  { version: 3, name: "semantic application graph", sql: semanticSchema },
 ];
