@@ -5,6 +5,11 @@ import { parseFile } from "@mycel/parser";
 import { buildProjectGraph } from "../dist/graph.js";
 import { extractSemanticGraph } from "../dist/index.js";
 
+// Foundation assertions exclude the additive behaviour operation layer.
+const foundationRecord = (record) =>
+  !["behaviour-bindings", "native-fetch", "prisma"].includes(
+    record.provenance.extractor,
+  );
 const project = {
   id: "project:semantic",
   name: "fixture",
@@ -30,7 +35,8 @@ async function captureFixture() {
 test("React fixture resolves JSX aliases and reexports, direct dependencies, source mappings, and shadowing", async () => {
   const files = await captureFixture();
   const graph = buildProjectGraph(project, files);
-  const { entities, relationships } = graph.semantic;
+  const entities = graph.semantic.entities.filter(foundationRecord);
+  const relationships = graph.semantic.relationships.filter(foundationRecord);
   const find = (name) => entities.find((entity) => entity.name === name);
   assert.deepEqual(
     entities
@@ -87,11 +93,15 @@ test("React fixture resolves JSX aliases and reexports, direct dependencies, sou
     })),
   );
   assert.deepEqual(
-    shifted.semantic.entities.map((entity) => entity.id),
+    shifted.semantic.entities
+      .filter(foundationRecord)
+      .map((entity) => entity.id),
     entities.map((entity) => entity.id),
   );
   assert.deepEqual(
-    shifted.semantic.relationships.map((edge) => edge.id),
+    shifted.semantic.relationships
+      .filter(foundationRecord)
+      .map((edge) => edge.id),
     relationships.map((edge) => edge.id),
   );
 });
@@ -112,9 +122,11 @@ test("semantic extractors compose over structural captures without changing stru
   ]);
   assert.equal(called, true);
   assert.ok(
-    result.entities.every((entity) => entity.kind === "external_dependency"),
+    result.entities
+      .filter(foundationRecord)
+      .every((entity) => entity.kind === "external_dependency"),
   );
-  assert.equal(result.relationships.length, 0);
+  assert.equal(result.relationships.filter(foundationRecord).length, 0);
   assert.ok(graph.edges.some((edge) => edge.kind === "CALLS") === false);
 });
 
@@ -132,7 +144,10 @@ export interface PretendModel { id: string }
   const files = [{ source, parsed: parseFile("services/models.ts", source) }];
   const graph = buildProjectGraph(project, files);
   assert.deepEqual(
-    graph.semantic.entities.map((entity) => [entity.kind, entity.name]).sort(),
+    graph.semantic.entities
+      .filter(foundationRecord)
+      .map((entity) => [entity.kind, entity.name])
+      .sort(),
     [
       ["data_model", "Order"],
       ["data_model", "Receipt"],
@@ -153,7 +168,7 @@ export interface PretendModel { id: string }
     graph.nodes.find((node) => node.id === receipt.sources[0].nodeId).kind,
     "file",
   );
-  assert.equal(graph.semantic.relationships.length, 0);
+  assert.equal(graph.semantic.relationships.filter(foundationRecord).length, 0);
 });
 
 test("ambiguous star exports and type-only bindings never create runtime semantic edges", () => {
@@ -179,7 +194,7 @@ test("ambiguous star exports and type-only bindings never create runtime semanti
     parsed: parseFile(path, source),
   }));
   const graph = buildProjectGraph(project, files);
-  assert.equal(graph.semantic.relationships.length, 0);
+  assert.equal(graph.semantic.relationships.filter(foundationRecord).length, 0);
   assert.ok(
     !graph.semantic.entities.some((entity) => entity.name === "types-only-sdk"),
   );

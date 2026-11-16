@@ -1,0 +1,3 @@
+export async function submitOrder() {
+  return fetch('/api/orders', { method: 'POST' });
+}

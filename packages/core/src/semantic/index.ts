@@ -1,6 +1,7 @@
 import type { SemanticExtraction } from "@mycel/shared";
 import { createSemanticContext } from "./context.js";
 import type { SemanticContext, SemanticInput } from "./context.js";
+import { extractBehaviour } from "../behaviour/extract.js";
 import { discoverFeatures } from "./features.js";
 import { extractServiceCandidates } from "./services.js";
 import { extractNext } from "./next.js";
@@ -41,6 +42,9 @@ export function extractSemanticGraph(
   const features = discoverFeatures(context, output);
   output.entities.push(...features.entities);
   output.relationships.push(...features.relationships);
+  const behaviour = extractBehaviour(context, output);
+  output.entities.push(...behaviour.entities);
+  output.relationships.push(...behaviour.relationships);
   for (const records of [output.entities, output.relationships]) {
     if (new Set(records.map((record) => record.id)).size !== records.length)
       throw new Error("Semantic extractors produced duplicate identities");

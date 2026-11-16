@@ -43,7 +43,9 @@ test("unannotated fixture recognizes Next layouts and only called exported servi
   const queries = createGraphQueries(input.database, indexed.projectId);
   const graph = queries.getSemanticGraph(500);
   const operations = graph.entities.filter(
-    (entity) => entity.kind === "service_operation",
+    (entity) =>
+      entity.kind === "service_operation" &&
+      entity.provenance.extractor !== "behaviour-bindings",
   );
   assert.deepEqual(operations.map((entity) => entity.name).sort(), [
     "loadBilling",
@@ -83,7 +85,11 @@ test("unannotated fixture recognizes Next layouts and only called exported servi
 
 const entity = (graph, name, kind) => {
   const found = graph.entities.find(
-    (item) => item.name === name && (!kind || item.kind === kind),
+    (item) =>
+      item.name === name &&
+      (kind
+        ? item.kind === kind
+        : item.provenance.extractor !== "behaviour-bindings"),
   );
   assert.ok(found, `Missing ${kind ?? "entity"} ${name}`);
   return found;

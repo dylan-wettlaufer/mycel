@@ -1,0 +1,11 @@
+import { submitOrder } from './client';
+export function OrderForm() {
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await submitOrder();
+  };
+  function handleClick() { return submitOrder(); }
+  return <form onSubmit={event => handleSubmit(event)}>
+    <button onClick={handleClick}>Submit</button>
+  </form>;
+}

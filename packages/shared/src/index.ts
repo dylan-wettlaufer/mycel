@@ -46,3 +46,4 @@ export type {
 export type { ChangesQuery, ChangesPage, ChangeDiff } from "./history.js";
 export type { SseMessage } from "./history.js";
 export * from "./semantic.js";
+export * from "./behaviour.js";
