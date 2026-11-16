@@ -1,0 +1,15 @@
+import { useState } from 'react';
+import { submitOrder } from './submit';
+export function OrderForm() {
+  const [title, setTitle] = useState('');
+  const [preview, setPreview] = useState(false);
+  async function handleSubmit(event) {
+    event.preventDefault();
+    await submitOrder({ title, preview });
+  }
+  return <form onSubmit={handleSubmit}>
+    <input name="title" value={title} onChange={event => setTitle(event.target.value)} />
+    <input type="checkbox" checked={preview} onChange={event => setPreview(event.target.checked)} />
+    <button type="submit">Create order</button>
+  </form>;
+}

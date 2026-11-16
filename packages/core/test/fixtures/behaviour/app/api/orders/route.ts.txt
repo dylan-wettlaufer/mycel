@@ -1,0 +1,6 @@
+import { createOrder, listOrders } from '../../../services/orders';
+export async function POST(request: Request) {
+  const input = await request.json();
+  return Response.json(await createOrder(input));
+}
+export async function GET() { return Response.json(await listOrders()); }

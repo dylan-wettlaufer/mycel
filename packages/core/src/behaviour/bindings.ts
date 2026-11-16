@@ -51,9 +51,31 @@ export function behaviourBindings(context: SemanticContext) {
       )
     )
       left = node.operand;
-    if (left && ts.isIdentifier(left)) {
-      const symbol = context.checker.getSymbolAtLocation(left);
-      if (symbol) writes.add(symbol);
+    function mark(target: ts.Node) {
+      if (ts.isIdentifier(target)) {
+        const symbol = context.checker.getSymbolAtLocation(target);
+        if (symbol) writes.add(symbol);
+      } else if (
+        ts.isPropertyAccessExpression(target) ||
+        ts.isElementAccessExpression(target)
+      )
+        mark(target.expression);
+      else if (ts.isParenthesizedExpression(target)) mark(target.expression);
+      else if (ts.isArrayLiteralExpression(target))
+        target.elements.forEach(mark);
+      else if (ts.isObjectLiteralExpression(target))
+        for (const property of target.properties) {
+          if (ts.isShorthandPropertyAssignment(property)) mark(property.name);
+          else if (ts.isPropertyAssignment(property))
+            mark(property.initializer);
+          else if (ts.isSpreadAssignment(property)) mark(property.expression);
+        }
+      else if (ts.isSpreadElement(target)) mark(target.expression);
+    }
+    if (left) mark(left);
+    if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+      if (!ts.isVariableDeclarationList(node.initializer))
+        mark(node.initializer);
     }
     ts.forEachChild(node, visit);
   }

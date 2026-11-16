@@ -37,3 +37,35 @@ intrinsics do not represent onward application calls.
 A boundary is a source-mapped operation with `traceRole=unresolved`, a machine
 readable code, and a message. CALLS to it represent the observed unsupported call
 site, not a fabricated target. Trace results will retain these boundaries.
+
+## Native HTTP and Prisma adapter
+
+A native unshadowed `fetch` creates a request step. Literal root-relative URLs,
+including a query/fragment suffix, match exactly one same-package Next App Router
+handler by pathname and literal method (default GET). The options must be a direct
+object without spreads, shorthand or computed properties. Dynamic values,
+external/relative URLs, encoded/dot paths, absent handlers, and non-exact/dynamic
+route patterns produce explicit boundaries. No argument propagation through HTTP
+wrappers, rewriting, middleware, cross-package deployment inference, or URL
+interpolation is attempted.
+
+Persistence support is the requested `prisma.<model>.<method>` client API with a
+single-file schema and `prisma-client-js` generation into `@prisma/client`.
+The receiver must resolve through imports/const aliases to a direct const
+`new PrismaClient()` using that package's real imported constructor, not a local
+module alias or reassigned binding. A captured model declaration must prove the
+static delegate name. `findUnique`/`findMany` emit READS; `create`/`update`/`delete`
+emit WRITES. The operation call, client construction/import, and delegate access
+are source-mapped. Model attributes preserve the captured Prisma declaration and
+its schema path/range; Prisma metadata does not add structural nodes or require a
+SQL schema change. The schema is read as data and never generated or executed.
+
+Only one conventional `prisma/schema.prisma` or root `schema.prisma` is accepted.
+Schemas/configuration are watched as metadata, so schema edits invalidate access
+links in the same transaction as the semantic snapshot. Custom locations,
+`prisma.config.*`, custom generated-client output, `prisma-client` generation,
+singleton factories/extensions, dynamic delegates, unsupported CRUD, relation
+includes/nested writes, transactions, and raw queries are unresolved. This is an
+explicit initial adapter boundary, not a claim to support all Prisma generations.
+Next Request body-decoding and Response/JSON intrinsics do not introduce application
+call targets. Dynamic dispatch inside other libraries remains unresolved.

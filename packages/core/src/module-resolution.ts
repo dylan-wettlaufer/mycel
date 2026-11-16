@@ -1,3 +1,5 @@
+import { parsePrismaSchema, unknownSchema } from "./prisma-schema.js";
+import type { PrismaSchema } from "./prisma-schema.js";
 import { posix } from "node:path";
 import ts from "typescript";
 import { parse as parseYaml } from "yaml";
@@ -9,8 +11,9 @@ export interface ModuleResolver {
   resolve(from: string, specifier: string): string | undefined;
   isLocal(from: string, specifier: string): boolean;
   diagnostics: Diagnostic[];
-  /** Nearest owning package directory, only when it declares this dependency. */
+  prismaSchema?(from: string): PrismaSchema;
   packageRoot?(from: string): string | undefined;
+  /** Nearest owning package directory, only when it declares this dependency. */
   dependencyRoot?(from: string, dependency: string): string | undefined;
 }
 function record(value: unknown): value is Record<string, unknown> {
@@ -64,7 +67,7 @@ export async function loadModuleResolver(
     });
   }
   const pending = metadataPaths.filter((path) =>
-    /(^|\/)(package\.json|tsconfig[^/]*\.json|pnpm-workspace\.ya?ml)$/.test(
+    /(^|\/)(package\.json|tsconfig[^/]*\.json|pnpm-workspace\.ya?ml|prisma\.config\.[cm]?[jt]s|[^/]+\.prisma)$/.test(
       path,
     ),
   );
@@ -342,6 +345,46 @@ export async function loadModuleResolver(
   const cache = new Map<string, string | undefined>();
   return {
     diagnostics,
+    prismaSchema(from) {
+      let directory = posix.dirname(absolute(from));
+      while (
+        inside(directory, base) &&
+        !metadata.has(posix.join(directory, "package.json"))
+      )
+        directory = posix.dirname(directory);
+      if (!inside(directory, base)) directory = base;
+      if (
+        [
+          "prisma.config.ts",
+          "prisma.config.js",
+          "prisma.config.mts",
+          "prisma.config.cts",
+          "prisma.config.mjs",
+          "prisma.config.cjs",
+        ].some((name) => metadata.has(posix.join(directory, name)))
+      )
+        return unknownSchema(
+          "unsupported-prisma-config",
+          "Runtime Prisma configuration is not evaluated by this adapter.",
+        );
+      const manifest = manifests.get(directory);
+      if (record(manifest?.prisma) && manifest.prisma.schema !== undefined)
+        return unknownSchema(
+          "unsupported-prisma-config",
+          "Custom schema locations are not supported by this adapter.",
+        );
+      const paths = [
+        posix.join(directory, "prisma/schema.prisma"),
+        posix.join(directory, "schema.prisma"),
+      ].filter((path) => metadata.has(path));
+      if (paths.length !== 1)
+        return unknownSchema(
+          "unresolved-prisma-schema",
+          "Exactly one conventional single-file Prisma schema must be captured.",
+        );
+      const path = paths[0]!;
+      return parsePrismaSchema(posix.relative(base, path), metadata.get(path)!);
+    },
     packageRoot(from) {
       for (
         let directory = posix.dirname(absolute(from));

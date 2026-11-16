@@ -68,7 +68,10 @@ test("unannotated fixture recognizes Next layouts and only called exported servi
   const shared = operations.find((entity) => entity.name === "send");
   assert.equal(
     graph.relationships.filter(
-      (edge) => edge.kind === "CALLS" && edge.targetId === shared.id,
+      (edge) =>
+        edge.kind === "CALLS" &&
+        edge.targetId === shared.id &&
+        edge.provenance.extractor === "typescript-references",
     ).length,
     2,
   );

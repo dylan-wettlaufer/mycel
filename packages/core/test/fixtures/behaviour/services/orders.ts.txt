@@ -1,0 +1,8 @@
+import { prisma as database } from '../db/client';
+export async function createOrder(input: { title: string }) {
+  return database.order.create({ data: { title: input.title } });
+}
+export async function listOrders() { return database.order.findMany(); }
+export async function findOrder(id: string) { return database.order.findUnique({ where: { id } }); }
+export async function updateOrder(id: string, title: string) { return database.order.update({ where: { id }, data: { title } }); }
+export async function deleteOrder(id: string) { return database.order.delete({ where: { id } }); }

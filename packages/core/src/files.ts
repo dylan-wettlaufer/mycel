@@ -33,5 +33,9 @@ export function isMissing(error: unknown): boolean {
 
 /** JSON may be a referenced tsconfig with an arbitrary filename. */
 export function isResolutionMetadata(path: string): boolean {
-  return path.endsWith(".json") || /(^|\/)pnpm-workspace\.ya?ml$/.test(path);
+  return (
+    path.endsWith(".json") ||
+    path.endsWith(".prisma") ||
+    /(^|\/)(pnpm-workspace\.ya?ml|prisma\.config\.[cm]?[jt]s)$/.test(path)
+  );
 }

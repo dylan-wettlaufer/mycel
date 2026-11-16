@@ -5,6 +5,8 @@ import { walkImplementation } from "../semantic/context.js";
 import { jsxReturnExpressions } from "../semantic/react.js";
 import { semanticRecords } from "../semantic/records.js";
 import { behaviourBindings } from "./bindings.js";
+import { extractFetch } from "./http.js";
+import { extractPrisma } from "./prisma.js";
 import type { BehaviourCallable } from "./bindings.js";
 
 /** All function steps are operations; traceRole avoids claiming a business-service role. */
@@ -52,16 +54,7 @@ export function extractBehaviour(
     evidence: SemanticSource,
     rule: string,
   ) {
-    if (
-      !current.relationships.some(
-        (edge) =>
-          edge.kind === "CALLS" &&
-          edge.sourceId === from &&
-          edge.targetId === to &&
-          edge.provenance.kind === "deterministic",
-      )
-    )
-      records.relationship("CALLS", from, to, evidence, rule);
+    records.relationship("CALLS", from, to, evidence, rule);
   }
   const counts = new Map<string, number>();
   function step(
@@ -185,6 +178,19 @@ export function extractBehaviour(
     )
       return true;
     const first = fn.declaration.parameters[0]?.name;
+    const isHandler = current.relationships.some(
+      (edge) => edge.kind === "HANDLES" && edge.sourceId === op(fn),
+    );
+    if (
+      isHandler &&
+      first &&
+      ts.isIdentifier(first) &&
+      first.text === base.text &&
+      ["json", "text", "formData", "arrayBuffer", "blob", "bytes"].includes(
+        expression.name.text,
+      )
+    )
+      return true;
     return (
       eventHandlers.has(fn.declaration) &&
       first &&
@@ -196,6 +202,38 @@ export function extractBehaviour(
   for (const fn of bindings.functions) {
     walkImplementation(fn.declaration, (node) => {
       if (!ts.isCallExpression(node) || intrinsic(fn, node.expression)) return;
+      const adapterContext = {
+        context,
+        bindings,
+        graph: current,
+        records,
+        owner: fn,
+        ownerId: op(fn),
+        step: (
+          category: string,
+          name: string,
+          callNode: ts.Node,
+          attributes: Record<string, string>,
+        ) =>
+          step(
+            fn,
+            category,
+            name,
+            context.evidence(callNode, fn.anchor),
+            attributes,
+          ),
+        boundary: (
+          from: string,
+          callNode: ts.Node,
+          code: string,
+          message: string,
+        ) => boundary(fn, from, callNode, code, message),
+      };
+      if (
+        extractFetch(node, adapterContext) ||
+        extractPrisma(node, adapterContext)
+      )
+        return;
       const target = !node.questionDotToken && bindings.target(node.expression);
       if (target)
         call(
