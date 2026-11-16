@@ -46,6 +46,55 @@ export function createGraphRoutes(graph?: GraphQueries) {
     );
   });
 
+  routes.get("/behaviour/entries", (context) => {
+    const limit = integerParameter(
+      context.req.queries("limit"),
+      "limit",
+      100,
+      1,
+      500,
+    );
+    return graph?.getBehaviourEntries
+      ? context.json(graph.getBehaviourEntries(limit))
+      : context.json({ error: "Behaviour queries unavailable" }, 503);
+  });
+
+  routes.get("/behaviour/:id", (context) => {
+    const values = context.req.queries("direction");
+    const direction = values?.[0] ?? "forward";
+    if (
+      (values && values.length !== 1) ||
+      (direction !== "forward" && direction !== "reverse")
+    )
+      throw new HTTPException(400, {
+        message: "direction must be forward or reverse",
+      });
+    const maxDepth = integerParameter(
+      context.req.queries("maxDepth"),
+      "maxDepth",
+      12,
+      0,
+      32,
+    );
+    const maxPaths = integerParameter(
+      context.req.queries("maxPaths"),
+      "maxPaths",
+      20,
+      1,
+      100,
+    );
+    if (!graph?.traceBehaviour)
+      return context.json({ error: "Behaviour queries unavailable" }, 503);
+    const result = graph.traceBehaviour(context.req.param("id"), {
+      direction,
+      maxDepth,
+      maxPaths,
+    });
+    return result
+      ? context.json(result)
+      : context.json({ error: "Trace root not found or unsupported" }, 404);
+  });
+
   routes.get("/semantic/features", (context) => {
     const values = context.req.queries("status");
     const status = values?.[0];

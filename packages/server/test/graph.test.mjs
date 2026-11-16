@@ -586,3 +586,97 @@ test("feature routes retrieve candidate memberships and validate status and size
     503,
   );
 });
+
+test("behaviour routes expose entries, evidence paths, reverse function selection, and bounded parameters", async (t) => {
+  const { app, database } = fixture(t);
+  const provenance = {
+    kind: "deterministic",
+    extractor: "behaviour-bindings",
+    version: "1",
+    rule: "event-handler-binding",
+    confidence: 1,
+  };
+  const source = { nodeId: "node:save", path: "src/save.ts", range };
+  const operation = {
+    id: "operation:save",
+    projectId: project.id,
+    kind: "service_operation",
+    name: "save",
+    attributes: { traceRole: "callable" },
+    provenance,
+    sources: [source],
+  };
+  const entry = {
+    ...operation,
+    id: "event:submit",
+    name: "form.onSubmit",
+    attributes: { traceRole: "ui_event", event: "onSubmit" },
+    sources: [{ ...source, nodeId: "file:save" }],
+  };
+  replaceProjectGraph(database, {
+    project,
+    nodes,
+    edges,
+    diagnostics: [],
+    semantic: {
+      entities: [operation, entry],
+      relationships: [
+        {
+          id: "event:call",
+          projectId: project.id,
+          sourceId: entry.id,
+          targetId: operation.id,
+          kind: "CALLS",
+          provenance,
+          sources: [source],
+        },
+      ],
+    },
+  });
+  const entries = await app.request(
+    "/api/graph/behaviour/entries?projectId=project:other",
+  );
+  assert.equal(entries.status, 200);
+  const list = await entries.json();
+  assert.equal(list.projectId, project.id);
+  assert.equal(list.entries[0].id, entry.id);
+  const response = await app.request("/api/graph/behaviour/event%3Asubmit");
+  assert.equal(response.status, 200);
+  assert.equal(
+    (await response.json()).paths[0].hops[0].relationship.sources[0].nodeId,
+    "node:save",
+  );
+  const reverse = await app.request(
+    "/api/graph/behaviour/node%3Asave?direction=reverse",
+  );
+  assert.equal(reverse.status, 200);
+  assert.equal((await reverse.json()).paths[0].entityIds.at(-1), entry.id);
+  for (const query of [
+    "direction=both",
+    "direction=",
+    "direction=reverse&direction=forward",
+    "maxDepth=33",
+    "maxDepth=-1",
+    "maxPaths=0",
+    "maxPaths=101",
+    "maxPaths=1&maxPaths=2",
+  ])
+    assert.equal(
+      (await app.request(`/api/graph/behaviour/event%3Asubmit?${query}`))
+        .status,
+      400,
+    );
+  assert.equal(
+    (await app.request("/api/graph/behaviour/entries?limit=501")).status,
+    400,
+  );
+  assert.equal((await app.request("/api/graph/behaviour/missing")).status, 404);
+  assert.equal(
+    (await createApp().request("/api/graph/behaviour/entries")).status,
+    503,
+  );
+  assert.equal(
+    (await createApp().request("/api/graph/behaviour/any")).status,
+    503,
+  );
+});

@@ -1,4 +1,6 @@
 import {
+  getBehaviourEntries,
+  traceBehaviour,
   getSemanticFeatures,
   getSemanticFeature,
   getSemanticGraph,
@@ -24,10 +26,18 @@ import type {
   SemanticGraph,
   SemanticFeatureQuery,
   SemanticFeatureList,
+  BehaviourEntryList,
+  BehaviourTrace,
+  BehaviourTraceQuery,
 } from "@mycel/shared";
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
 export interface GraphQueries {
+  getBehaviourEntries?(limit?: number): BehaviourEntryList;
+  traceBehaviour?(
+    id: string,
+    query?: BehaviourTraceQuery,
+  ): BehaviourTrace | undefined;
   getFeatures?(query?: SemanticFeatureQuery): SemanticFeatureList;
   getFeature?(id: string, limit?: number): SemanticGraph | undefined;
   getSemanticGraph?(limit?: number): SemanticGraph;
@@ -55,6 +65,10 @@ export function createGraphQueries(
   projectId: ProjectId,
 ): GraphQueries {
   return {
+    getBehaviourEntries: (limit) =>
+      getBehaviourEntries(database, projectId, limit),
+    traceBehaviour: (id, query) =>
+      traceBehaviour(database, projectId, id, query),
     getFeatures: (query) => getSemanticFeatures(database, projectId, query),
     getFeature: (id, limit) =>
       getSemanticFeature(database, projectId, id, limit),

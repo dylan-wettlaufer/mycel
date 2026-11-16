@@ -69,3 +69,36 @@ includes/nested writes, transactions, and raw queries are unresolved. This is an
 explicit initial adapter boundary, not a claim to support all Prisma generations.
 Next Request body-decoding and Response/JSON intrinsics do not introduce application
 call targets. Dynamic dispatch inside other libraries remains unresolved.
+
+## Trace queries
+
+- `GET /api/graph/behaviour/entries?limit=100` lists observed UI event bindings,
+  including ones whose handler resolution stops at an explicit boundary. Limit
+  is 1–500. Every entry includes its event, element, and source mapping.
+- `GET /api/graph/behaviour/:id?direction=forward&maxDepth=12&maxPaths=20`
+  traverses supported call/event/request/access links. `direction=reverse` follows
+  supported callers. A root can be an event, request, endpoint, callable operation,
+  Prisma model, or an existing structural function ID returned by symbol search.
+  A structural ID resolves to its callable operation in `rootId`.
+
+Depth is 0–32 and counts relationship hops; paths are limited to 1–100. A query also
+has a fixed 1,000-edge expansion budget. Reads are transactional and project-scoped.
+Invalid/repeated parameters return 400; absent providers return 503; absent or
+unsupported roots return 404. Core exposes `getBehaviourEntries` and
+`traceBehaviour` on `createGraphQueries`, with matching database exports.
+
+Responses contain the committed project/revision, root, direction, returned
+entities, and terminal paths. Each path orders its entity IDs and hops, retaining
+the original relationship with source/provenance. HANDLES is traversed endpoint →
+handler forwards and handler → endpoint backwards; `fromId`/`toId` describe traversal
+without rewriting the original stored relationship. No render, feature, directory,
+or import-only relationship supplies a behavioural hop. CALLS uses the stricter
+behaviour extractor's evidence, not older semantic hints.
+
+Terminal reasons distinguish data access, unresolved boundaries (with code/message),
+no supported calls/callers, cycles, depth limits, and work limits. `truncated` is
+true if limits/cycles omit continuation or result paths. Multiple source call sites
+to the same function can share an evidence-aggregating edge. Branches return
+multiple reference paths, not a statement-by-statement execution order, argument
+propagation, data-flow proof, exhaustive control-flow analysis, or a runtime log.
+A query with no supported callers does not prove that a function is unused.

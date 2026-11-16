@@ -36,3 +36,7 @@ export interface BehaviourTrace extends GraphQueryContext {
   paths: BehaviourPath[];
   truncated: boolean;
 }
+export interface BehaviourEntryList extends GraphQueryContext {
+  entries: SemanticEntity[];
+  truncated: boolean;
+}

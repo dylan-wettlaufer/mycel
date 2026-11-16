@@ -144,3 +144,44 @@ test("dynamic requests, unsupported clients, invalid models, and Prisma wrappers
   ])
     assert.ok(codes.has(code), code);
 });
+
+test("form-to-persistence queries return both request branches and supported reverse callers with evidence", async (t) => {
+  const input = await fixture(t);
+  const indexed = await indexRepository(input);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  const entry = queries
+    .getBehaviourEntries()
+    .entries.find((item) => item.attributes.event === "onSubmit");
+  assert.ok(entry);
+  const trace = queries.traceBehaviour(entry.id);
+  assert.equal(trace.truncated, false);
+  assert.equal(trace.paths.length, 2);
+  assert.ok(trace.paths.every((path) => path.end === "data-access"));
+  const entities = new Map(trace.entities.map((entity) => [entity.id, entity]));
+  const effects = new Set(
+    trace.paths.map((path) => path.hops.at(-1).relationship.kind),
+  );
+  assert.deepEqual(effects, new Set(["READS", "WRITES"]));
+  for (const path of trace.paths) {
+    assert.ok(
+      path.entityIds.some((id) => entities.get(id).kind === "endpoint"),
+    );
+    assert.equal(entities.get(path.entityIds.at(-1)).name, "Order");
+    for (const hop of path.hops) {
+      assert.equal(hop.relationship.provenance.kind, "deterministic");
+      assert.ok(hop.relationship.sources.length > 0);
+      for (const source of hop.relationship.sources)
+        assert.ok(
+          input.sources
+            .get(source.path)
+            .slice(source.range.start, source.range.end).length > 0,
+        );
+    }
+  }
+  const selected = queries
+    .searchSymbols({ q: "createOrder" })
+    .nodes.find((node) => node.kind === "function");
+  const reverse = queries.traceBehaviour(selected.id, { direction: "reverse" });
+  assert.ok(reverse.paths.some((path) => path.entityIds.includes(entry.id)));
+  assert.ok(reverse.paths.every((path) => path.end === "no-supported-callers"));
+});

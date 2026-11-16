@@ -133,7 +133,7 @@ function readSources(
     .map(({ nodeId, path, ...range }) => ({ nodeId, path, range }));
 }
 
-function readGraph(
+export function readSemanticSelection(
   db: SqliteDatabase,
   projectId: string,
   ids: string[],
@@ -191,7 +191,7 @@ export function getSemanticGraph(
         "SELECT id FROM semantic_entities WHERE project_id = ? ORDER BY id LIMIT ?",
       )
       .all(projectId, limit + 1);
-    return readGraph(
+    return readSemanticSelection(
       db,
       projectId,
       rows.slice(0, limit).map((row) => row.id),
@@ -251,7 +251,7 @@ export function getSemanticNeighborhood(
       for (const neighbor of frontier) visited.add(neighbor);
       if (truncated) break;
     }
-    return readGraph(db, projectId, [...visited], truncated);
+    return readSemanticSelection(db, projectId, [...visited], truncated);
   })();
 }
 
@@ -273,7 +273,7 @@ export function getSemanticFeatures(
       ORDER BY name, id LIMIT ?`,
       )
       .all(projectId, status ?? null, status ?? null, limit + 1);
-    const graph = readGraph(
+    const graph = readSemanticSelection(
       db,
       projectId,
       rows.slice(0, limit).map((row) => row.id),
@@ -312,7 +312,7 @@ export function getSemanticFeature(
       WHERE project_id = ? AND target_id = ? AND kind = 'IMPLEMENTS' ORDER BY source_id LIMIT ?`,
       )
       .all(projectId, id, limit);
-    const graph = readGraph(
+    const graph = readSemanticSelection(
       db,
       projectId,
       [id, ...rows.slice(0, limit - 1).map((row) => row.id)],
