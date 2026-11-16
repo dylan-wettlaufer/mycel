@@ -138,6 +138,7 @@ export function readSemanticSelection(
   projectId: string,
   ids: string[],
   truncated: boolean,
+  relationshipIds?: readonly string[],
 ): SemanticGraph {
   const selected = JSON.stringify(ids);
   const entities = db
@@ -152,13 +153,20 @@ export function readSemanticSelection(
       provenance: JSON.parse(row.provenance),
       sources: readSources(db, projectId, "entity_id", row.id),
     }));
+  const relationshipFilter =
+    relationshipIds === undefined
+      ? ""
+      : "AND id IN (SELECT value FROM json_each(?))";
+  const parameters = [projectId, selected, selected];
+  if (relationshipIds !== undefined)
+    parameters.push(JSON.stringify(relationshipIds));
   const relationships = db
-    .prepare<[string, string, string], RelationshipRow>(
+    .prepare<string[], RelationshipRow>(
       `SELECT ${relationshipColumns} FROM semantic_relationships
     WHERE project_id = ? AND source_id IN (SELECT value FROM json_each(?))
-    AND target_id IN (SELECT value FROM json_each(?)) ORDER BY id`,
+    AND target_id IN (SELECT value FROM json_each(?)) ${relationshipFilter} ORDER BY id`,
     )
-    .all(projectId, selected, selected)
+    .all(...parameters)
     .map((row): SemanticRelationship => ({
       ...row,
       provenance: JSON.parse(row.provenance),

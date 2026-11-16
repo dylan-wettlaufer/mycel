@@ -21,31 +21,59 @@ export function extractBehaviour(
   );
   const bindings = behaviourBindings(context);
   const operations = new Map<ts.Node, string>();
+  const serverActions = new Set<ts.Node>();
+  function directive(statements: readonly ts.Statement[]) {
+    for (const statement of statements) {
+      if (
+        !ts.isExpressionStatement(statement) ||
+        !ts.isStringLiteral(statement.expression)
+      )
+        break;
+      if (statement.expression.text === "use server") return statement;
+    }
+  }
   for (const fn of bindings.functions) {
+    const unsupported =
+      directive(fn.source.statements) ??
+      (fn.declaration.body && ts.isBlock(fn.declaration.body)
+        ? directive(fn.declaration.body.statements)
+        : undefined);
+    const attributes: Record<string, string> = {
+      traceRole: unsupported ? "unresolved" : "callable",
+      callableNodeId: fn.anchor.id,
+    };
+    if (unsupported) {
+      serverActions.add(fn.declaration);
+      attributes.code = "unsupported-server-action";
+      attributes.message =
+        "Server Actions and use server modules are outside the supported React/fetch/App Router path.";
+    }
+    const sources = [
+      { nodeId: fn.anchor.id, path: fn.anchor.path, range: fn.anchor.range },
+      ...(unsupported ? [context.evidence(unsupported)] : []),
+    ];
     const existing = current.entities.find(
       (entity) =>
         entity.kind === "service_operation" &&
         entity.sources.some((source) => source.nodeId === fn.anchor.id),
     );
     if (existing) {
-      existing.attributes.traceRole = "callable";
+      Object.assign(existing.attributes, attributes);
+      if (unsupported) existing.sources.push(context.evidence(unsupported));
       operations.set(fn.declaration, existing.id);
-    } else
-      operations.set(
-        fn.declaration,
-        records.entity(
+    } else {
+      let id = "";
+      for (const source of sources)
+        id = records.entity(
           "service_operation",
           fn.anchor.id,
           fn.anchor.name,
-          {
-            nodeId: fn.anchor.id,
-            path: fn.anchor.path,
-            range: fn.anchor.range,
-          },
+          source,
           "source-callable",
-          { traceRole: "callable" },
-        ),
-      );
+          attributes,
+        );
+      operations.set(fn.declaration, id);
+    }
   }
   const op = (fn: BehaviourCallable) => operations.get(fn.declaration)!;
   function call(
@@ -95,6 +123,7 @@ export function extractBehaviour(
   }
   const eventHandlers = new Set<ts.Node>();
   for (const fn of bindings.functions) {
+    if (serverActions.has(fn.declaration)) continue;
     const roots = jsxReturnExpressions(fn.declaration);
     walkImplementation(fn.declaration, (node) => {
       if (
@@ -111,14 +140,39 @@ export function extractBehaviour(
         return;
       const tag = opening.tagName.getText();
       const evidence = context.evidence(node, fn.anchor);
+      const attributes = {
+        traceRole: "ui_event",
+        event: node.name.getText(),
+        element: tag,
+        binding: "unresolved",
+      };
       const event = step(
         fn,
         "jsx-event",
         `${tag}.${node.name.getText()}`,
         evidence,
-        { traceRole: "ui_event", event: node.name.getText(), element: tag },
+        attributes,
       );
       call(op(fn), event, evidence, "jsx-event-binding");
+      if (
+        node.parent.properties.some((property) =>
+          ts.isJsxSpreadAttribute(property),
+        ) ||
+        node.parent.properties.filter(
+          (property) =>
+            ts.isJsxAttribute(property) &&
+            property.name.getText() === node.name.getText(),
+        ).length !== 1
+      ) {
+        boundary(
+          fn,
+          event,
+          node,
+          "ambiguous-event-props",
+          "JSX spreads or duplicate event attributes can replace the handler; their values are not inferred.",
+        );
+        return;
+      }
       const expression =
         node.initializer && ts.isJsxExpression(node.initializer)
           ? node.initializer.expression
@@ -147,6 +201,9 @@ export function extractBehaviour(
         );
         return;
       }
+      attributes.binding = serverActions.has(handler.declaration)
+        ? "unresolved"
+        : "resolved";
       eventHandlers.add(handler.declaration);
       call(event, op(handler), evidence, "event-handler-binding");
     });
@@ -200,6 +257,7 @@ export function extractBehaviour(
     );
   }
   for (const fn of bindings.functions) {
+    if (serverActions.has(fn.declaration)) continue;
     walkImplementation(fn.declaration, (node) => {
       if (!ts.isCallExpression(node) || intrinsic(fn, node.expression)) return;
       const adapterContext = {

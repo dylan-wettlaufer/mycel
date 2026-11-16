@@ -85,6 +85,19 @@ export function behaviourBindings(context: SemanticContext) {
     seen = new Set<ts.Symbol>(),
   ): ts.Declaration | undefined {
     if (!context.runtimeBindingIsKnown(node)) return;
+    if (
+      ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)
+    ) {
+      let base = node.expression;
+      while (
+        ts.isPropertyAccessExpression(base) ||
+        ts.isElementAccessExpression(base)
+      )
+        base = base.expression;
+      const receiver = context.checker.getSymbolAtLocation(base);
+      if (receiver && writes.has(receiver)) return;
+    }
     const raw = context.checker.getSymbolAtLocation(node);
     const symbol = context.symbolAt(node);
     if (
@@ -108,10 +121,24 @@ export function behaviourBindings(context: SemanticContext) {
     return item;
   }
   function target(expression: ts.Node): BehaviourCallable | undefined {
+    while (
+      ts.isParenthesizedExpression(expression) ||
+      ts.isAsExpression(expression) ||
+      ts.isSatisfiesExpression(expression) ||
+      ts.isNonNullExpression(expression) ||
+      ts.isTypeAssertionExpression(expression)
+    )
+      expression = expression.expression;
     if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression))
       return byDeclaration.get(expression);
     const reference = runtimeReference(context, expression);
     if (!reference) return;
+    if (ts.isPropertyAccessExpression(reference)) {
+      const receiver = context.checker.getSymbolAtLocation(
+        reference.expression,
+      );
+      if (receiver && writes.has(receiver)) return;
+    }
     const item = declaration(
       ts.isPropertyAccessExpression(reference) ? reference.name : reference,
     );

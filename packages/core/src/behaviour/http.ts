@@ -14,9 +14,12 @@ export const extractFetch: BehaviourCallAdapter = (call, adapter) => {
   )
     return false;
   const evidence = context.evidence(call, owner.anchor);
-  const request = adapter.step("fetch-request", "fetch", call, {
+  const attributes: Record<string, string> = {
     traceRole: "http_request",
-  });
+    client: "fetch",
+    binding: "unresolved",
+  };
+  const request = adapter.step("fetch-request", "fetch", call, attributes);
   records.relationship(
     "CALLS",
     ownerId,
@@ -53,6 +56,7 @@ export const extractFetch: BehaviourCallAdapter = (call, adapter) => {
     );
     return true;
   }
+  attributes.url = url.text;
   let method = "GET";
   if (options) {
     if (
@@ -99,6 +103,8 @@ export const extractFetch: BehaviourCallAdapter = (call, adapter) => {
   }
   // Reject normalization tricks rather than changing the source URL's meaning.
   const pathname = url.text.split(/[?#]/)[0]!;
+  attributes.method = method;
+  attributes.pathname = pathname;
   if (
     pathname.split("/").some((segment) => [".", ".."].includes(segment)) ||
     /%/.test(pathname)
@@ -132,6 +138,7 @@ export const extractFetch: BehaviourCallAdapter = (call, adapter) => {
     );
     return true;
   }
+  attributes.binding = "resolved";
   records.relationship(
     "CALLS",
     request,

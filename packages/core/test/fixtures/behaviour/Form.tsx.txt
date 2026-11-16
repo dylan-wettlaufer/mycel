@@ -6,6 +6,6 @@ export function OrderForm() {
   };
   function handleClick() { return submitOrder(); }
   return <form onSubmit={event => handleSubmit(event)}>
-    <button onClick={handleClick}>Submit</button>
+    <button onClick={(handleClick)}>Submit</button>
   </form>;
 }

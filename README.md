@@ -197,6 +197,12 @@ are available at `/api/graph/semantic/features?status=candidate` and
 `/api/graph/semantic/features/<id>`. See [feature discovery rules](docs/FEATURE_DISCOVERY.md)
 for confidence, explicit overrides, and limitations.
 
+Evidence-backed behaviour traces are available at `/api/graph/behaviour/entries`
+and `/api/graph/behaviour/<id>?direction=forward&maxDepth=12&maxPaths=20`.
+Use `direction=reverse` with a selected structural function ID for supported callers.
+See [behaviour tracing scope and boundaries](docs/BEHAVIOUR_TRACING.md) for the
+React → native fetch → Next App Router → Prisma path.
+
 Add shadcn/ui components from `apps/web`, for example
 `pnpm dlx shadcn@latest add dialog`. Generated components land in
 `apps/web/src/components/ui`.

@@ -99,7 +99,8 @@ A broad area such as `settings` may contain several real features. Route groups 
 reflect teams or visual organization. Unused directory components can still form
 organizational candidates, with no claimed runtime path. The implementation does
 not identify arbitrary service classes, infer ownership from import edges, match
-fetch URLs to handlers, follow callbacks or dynamic dispatch, or infer READS/WRITES.
+fetch URLs to handlers, follow callbacks or dynamic dispatch, or infer READS/WRITES. [Behaviour tracing](BEHAVIOUR_TRACING.md) adds separately
+verified Prisma access links; feature memberships are never used as behavioural hops.
 Only the existing React/TSX subset and default Next App Router conventions are
 supported. No exclusivity, user-visible feature completeness, or runtime behavior
 is implied by membership.

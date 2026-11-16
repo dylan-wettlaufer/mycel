@@ -10,8 +10,14 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { setTimeout } from "node:timers/promises";
 import { openDatabase } from "@mycel/db";
-import { createGraphQueries, indexRepository } from "../dist/index.js";
+import { parseFile } from "@mycel/parser";
+import {
+  createGraphQueries,
+  indexRepository,
+  watchRepository,
+} from "../dist/index.js";
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "mycel-behaviour-"));
@@ -45,6 +51,17 @@ test("literal native requests bind same-app Next handlers and verified Prisma CR
     (entity) => entity.attributes.traceRole === "http_request",
   );
   assert.equal(requests.length, 2);
+  assert.ok(
+    requests.every(
+      (request) =>
+        request.attributes.binding === "resolved" &&
+        request.attributes.url === "/api/orders",
+    ),
+  );
+  assert.deepEqual(
+    new Set(requests.map((request) => request.attributes.method)),
+    new Set(["GET", "POST"]),
+  );
   assert.equal(
     graph.relationships.filter(
       (edge) => edge.provenance.rule === "literal-http-endpoint",
@@ -106,6 +123,8 @@ test("dynamic requests, unsupported clients, invalid models, and Prisma wrappers
       prisma.missing.create({data:{}}); prisma[model].findMany();
       prisma.order.upsert({}); prisma.order.create({ data: { child: { create: {} } } });
       fake.order.create({});
+      prisma.$transaction([prisma.order.create({data:{title:'wrapped'}})]);
+      prisma.order.findMany();
     }`;
   await writeFile(join(input.root, "negative.ts"), source);
   const result = await indexRepository(input);
@@ -140,6 +159,7 @@ test("dynamic requests, unsupported clients, invalid models, and Prisma wrappers
     "external-or-relative-url",
     "unsupported-prisma-operation",
     "unsupported-prisma-options",
+    "unsupported-prisma-consumption",
     "unresolved-call",
   ])
     assert.ok(codes.has(code), code);
@@ -184,4 +204,248 @@ test("form-to-persistence queries return both request branches and supported rev
   const reverse = queries.traceBehaviour(selected.id, { direction: "reverse" });
   assert.ok(reverse.paths.some((path) => path.entityIds.includes(entry.id)));
   assert.ok(reverse.paths.every((path) => path.end === "no-supported-callers"));
+});
+
+async function until(check) {
+  const deadline = Date.now() + 8000;
+  while (!check()) {
+    if (Date.now() > deadline)
+      assert.fail("Timed out waiting for a trace update");
+    await setTimeout(25);
+  }
+}
+
+test("incremental edits replace accesses, HTTP links, handlers, and schema evidence atomically while retaining last good TS", async (t) => {
+  const input = await fixture(t);
+  const errors = [];
+  const parsed = [];
+  const live = await watchRepository({
+    ...input,
+    debounceMs: 20,
+    onError: (error) => errors.push(error),
+    parse: (path, source) => {
+      parsed.push(path);
+      return parseFile(path, source);
+    },
+  });
+  t.after(() => live.close());
+  const queries = createGraphQueries(input.database, live.project.id);
+  const entry = queries.getBehaviourEntries().entries[0];
+  const read = () => queries.traceBehaviour(entry.id);
+  const snapshot = () => queries.getSemanticGraph(500);
+  const complete = () =>
+    read()?.paths.length === 2 &&
+    read().paths.every((path) => path.end === "data-access");
+  assert.ok(complete());
+  const first = read();
+  const originalWrite = first.paths
+    .flatMap((path) => path.hops)
+    .find((hop) => hop.relationship.kind === "WRITES").relationship.id;
+  const postLink = first.paths
+    .flatMap((path) => path.hops)
+    .find(
+      (hop) =>
+        hop.relationship.provenance.rule === "literal-http-endpoint" &&
+        first.entities.find((entity) => entity.id === hop.toId)?.attributes
+          .method === "POST",
+    ).relationship.id;
+  const service = "services/orders.ts";
+  await writeFile(
+    join(input.root, service),
+    input.sources
+      .get(service)
+      .replace(
+        "database.order.create({ data: { title: input.title } })",
+        "database.order.findUnique({ where: { id: input.title } })",
+      ),
+  );
+  await until(
+    () =>
+      complete() &&
+      read().paths.every(
+        (path) => path.hops.at(-1).relationship.kind === "READS",
+      ),
+  );
+  assert.ok(
+    !snapshot().relationships.some((edge) => edge.id === originalWrite),
+  );
+  await writeFile(
+    join(input.root, "submit.ts"),
+    input.sources
+      .get("submit.ts")
+      .replace("fetch('/api/orders',", "fetch(`/api/${input.title}`,"),
+  );
+  await until(() =>
+    read().paths.some((path) => path.boundary?.code === "dynamic-url"),
+  );
+  assert.ok(!snapshot().relationships.some((edge) => edge.id === postLink));
+  await writeFile(
+    join(input.root, "submit.ts"),
+    input.sources.get("submit.ts"),
+  );
+  await writeFile(join(input.root, service), input.sources.get(service));
+  await until(
+    () =>
+      complete() &&
+      read().paths.some(
+        (path) => path.hops.at(-1).relationship.kind === "WRITES",
+      ),
+  );
+  // A metadata-only edit must invalidate every old Prisma delegate edge.
+  const model = snapshot().entities.find(
+    (entity) =>
+      entity.attributes.provider === "prisma" && entity.kind === "data_model",
+  );
+  parsed.length = 0;
+  await writeFile(
+    join(input.root, "prisma/schema.prisma"),
+    input.sources
+      .get("prisma/schema.prisma")
+      .replace("model Order", "model Purchase"),
+  );
+  await until(() =>
+    read().paths.every(
+      (path) => path.boundary?.code === "unsupported-prisma-operation",
+    ),
+  );
+  assert.equal(parsed.length, 0);
+  assert.ok(!snapshot().entities.some((entity) => entity.id === model.id));
+  assert.ok(
+    !snapshot().relationships.some((edge) =>
+      ["READS", "WRITES"].includes(edge.kind),
+    ),
+  );
+  await writeFile(
+    join(input.root, "prisma/schema.prisma"),
+    input.sources.get("prisma/schema.prisma"),
+  );
+  await until(complete);
+  // Configuration is explicitly unsupported, rather than guessing its schema.
+  await writeFile(
+    join(input.root, "prisma.config.ts"),
+    "export default { schema: 'elsewhere.prisma' };",
+  );
+  await until(() =>
+    read().paths.every(
+      (path) => path.boundary?.code === "unsupported-prisma-config",
+    ),
+  );
+  await rm(join(input.root, "prisma.config.ts"));
+  await until(complete);
+  await writeFile(
+    join(input.root, "OrderForm.tsx"),
+    input.sources.get("OrderForm.tsx") + "\nconst broken = ;",
+  );
+  await until(() => live.lastUpdate?.retainedPaths.includes("OrderForm.tsx"));
+  assert.ok(complete());
+  await writeFile(
+    join(input.root, "OrderForm.tsx"),
+    input.sources
+      .get("OrderForm.tsx")
+      .replace("onSubmit={handleSubmit}", "onSubmit={wrap(handleSubmit)}"),
+  );
+  await until(
+    () =>
+      read().paths.length === 1 &&
+      read().paths[0].boundary?.code === "unresolved-event-handler",
+  );
+  assert.equal(
+    queries.getBehaviourEntries().entries[0].attributes.binding,
+    "unresolved",
+  );
+  await writeFile(
+    join(input.root, "OrderForm.tsx"),
+    input.sources.get("OrderForm.tsx"),
+  );
+  await until(complete);
+  const endpoint = snapshot().entities.find(
+    (entity) =>
+      entity.kind === "endpoint" && entity.attributes.method === "POST",
+  );
+  await writeFile(
+    join(input.root, "app/api/orders/route.ts"),
+    input.sources
+      .get("app/api/orders/route.ts")
+      .replace("export async function POST", "async function POST"),
+  );
+  await until(() =>
+    read().paths.some((path) => path.boundary?.code === "unresolved-endpoint"),
+  );
+  assert.ok(!snapshot().entities.some((entity) => entity.id === endpoint.id));
+  assert.ok(
+    !snapshot().relationships.some(
+      (edge) => edge.sourceId === endpoint.id || edge.targetId === endpoint.id,
+    ),
+  );
+  await rm(join(input.root, "OrderForm.tsx"));
+  await until(() => queries.getBehaviourEntries().entries.length === 0);
+  assert.equal(read(), undefined);
+  assert.ok(
+    !snapshot()
+      .entities.flatMap((entity) => entity.sources)
+      .some((source) => source.path === "OrderForm.tsx"),
+  );
+  assert.deepEqual(errors, []);
+  assert.deepEqual(input.database.pragma("foreign_key_check"), []);
+});
+
+test("ambiguous call bindings and shadowed fetch never borrow older semantic hints to invent trace paths", async (t) => {
+  const input = await fixture(t);
+  await writeFile(
+    join(input.root, "ambiguous.ts"),
+    `
+    /** @mycelService */ export function save() {}
+    export function replacement() {}
+    save = replacement;
+    /** @mycelService */ export function ambiguous() { save(); }
+    const choice = condition ? save : replacement;
+    export function conditional() { choice(); }
+    export function shadowed(fetch) { return fetch('/api/orders', {method:'POST'}); }
+  `,
+  );
+  const indexed = await indexRepository(input);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  for (const name of ["ambiguous", "conditional", "shadowed"]) {
+    const root = queries
+      .searchSymbols({ q: name })
+      .nodes.find((node) => node.kind === "function" && node.name === name);
+    const trace = queries.traceBehaviour(root.id);
+    assert.equal(trace.paths.length, 1);
+    assert.equal(trace.paths[0].end, "unresolved");
+    assert.ok(
+      !trace.entities.some(
+        (entity) => entity.kind === "endpoint" || entity.name === "save",
+      ),
+    );
+  }
+});
+
+test("use server actions remain explicit boundaries rather than implicit RPC links", async (t) => {
+  const input = await fixture(t);
+  await writeFile(
+    join(input.root, "server-actions.ts"),
+    `"use server";
+    import { prisma } from './db/client';
+    export async function serverAction() { return prisma.order.create({data:{title:'Action'}}); }`,
+  );
+  await writeFile(
+    join(input.root, "actions-client.ts"),
+    `import { serverAction } from './server-actions';
+    export async function invokeAction() { return serverAction(); }`,
+  );
+  const indexed = await indexRepository(input);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  for (const name of ["invokeAction", "serverAction"]) {
+    const selected = queries
+      .searchSymbols({ q: name })
+      .nodes.find((node) => node.kind === "function" && node.name === name);
+    const trace = queries.traceBehaviour(selected.id);
+    assert.equal(trace.paths[0].end, "unresolved");
+    assert.equal(trace.paths[0].boundary.code, "unsupported-server-action");
+    assert.ok(
+      !trace.entities.some(
+        (entity) => entity.attributes.traceRole === "prisma_operation",
+      ),
+    );
+  }
 });

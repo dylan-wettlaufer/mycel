@@ -143,3 +143,14 @@ candidates. `status=declared` lists explicit declarations; omit status for both.
 and their IMPLEMENTS evidence. Both limits are 1–500; the detail limit includes the
 feature. Results are scoped to the indexed project and include revision and
 truncation. See [discovery rules](../../docs/FEATURE_DISCOVERY.md) for semantics.
+
+
+### Behaviour trace queries
+
+`GET /api/graph/behaviour/entries?limit=100` lists observed UI event bindings (limit
+1–500). `GET /api/graph/behaviour/:id?direction=forward&maxDepth=12&maxPaths=20`
+returns evidence paths; `direction=reverse` follows supported callers. IDs may be
+trace operation/event/endpoint/model IDs or existing structural function IDs.
+Depth is 0–32 and paths are 1–100, with a 1,000-edge work budget. Results include
+source/provenance for every hop, explicit unresolved/limit/cycle termination,
+revision, and truncation. See [trace semantics](../../docs/BEHAVIOUR_TRACING.md).

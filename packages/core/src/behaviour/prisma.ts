@@ -124,6 +124,26 @@ export const extractPrisma: BehaviourCallAdapter = (call, adapter) => {
     );
     return true;
   }
+  let consumed: ts.Node = call;
+  while (
+    ts.isParenthesizedExpression(consumed.parent) ||
+    ts.isAsExpression(consumed.parent) ||
+    ts.isSatisfiesExpression(consumed.parent) ||
+    ts.isNonNullExpression(consumed.parent)
+  )
+    consumed = consumed.parent;
+  if (
+    !ts.isAwaitExpression(consumed.parent) &&
+    !ts.isReturnStatement(consumed.parent)
+  ) {
+    adapter.boundary(
+      ownerId,
+      call,
+      "unsupported-prisma-consumption",
+      "Prisma promises must be directly awaited or returned; transactions, promise wrappers, and deferred query aliases are not followed.",
+    );
+    return true;
+  }
   const evidence = context.evidence(call, owner.anchor);
   const operation = adapter.step(
     "prisma-operation",

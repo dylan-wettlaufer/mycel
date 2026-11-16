@@ -97,6 +97,8 @@ test("mutable/conditional calls, callback wrappers, custom event props, and type
       const conditional = flag ? save : remove;
       function handler() { action(); conditional(); send(); }
       export function Form() { return <form onSubmit={wrap(handler)}><Widget onClick={handler}/><button onClick={handler}/></form>; }`,
+    "Spreads.tsx":
+      "export function Spreads(props) { function submit() {} return <form onSubmit={submit} {...props}/>; }",
     "client.ts": "export function send() {}",
   };
   const graph = buildProjectGraph(project, capture(sources)).semantic;
@@ -118,6 +120,11 @@ test("mutable/conditional calls, callback wrappers, custom event props, and type
   assert.ok(
     graph.entities.some(
       (entity) => entity.attributes.code === "unsupported-event-prop",
+    ),
+  );
+  assert.ok(
+    graph.entities.some(
+      (entity) => entity.attributes.code === "ambiguous-event-props",
     ),
   );
   assert.ok(

@@ -33,6 +33,7 @@ export function getBehaviourEntries(
       projectId,
       rows.slice(0, limit).map((row) => row.id),
       rows.length > limit,
+      [],
     );
     return {
       projectId,
@@ -84,8 +85,8 @@ export function traceBehaviour(
       WHERE e.project_id = ? AND (
         (e.id = ? AND ((e.kind = 'service_operation' AND json_extract(e.attributes, '$.traceRole') IN (${traceRoles}))
           OR e.kind = 'endpoint' OR (e.kind = 'data_model' AND json_extract(e.attributes, '$.provider') = 'prisma')))
-        OR (e.kind = 'service_operation' AND json_extract(e.attributes, '$.traceRole') = 'callable'
-          AND EXISTS (SELECT 1 FROM semantic_sources s WHERE s.project_id = e.project_id AND s.entity_id = e.id AND s.node_id = ?)))
+        OR (e.kind = 'service_operation' AND (json_extract(e.attributes, '$.traceRole') = 'callable' OR (json_extract(e.attributes, '$.traceRole') = 'unresolved' AND json_extract(e.attributes, '$.callableNodeId') IS NOT NULL))
+          AND EXISTS (SELECT 1 FROM semantic_sources s WHERE s.project_id = e.project_id AND s.entity_id = e.id AND s.node_id = ? AND (json_extract(e.attributes, '$.traceRole') = 'callable' OR json_extract(e.attributes, '$.callableNodeId') = s.node_id))))
       ORDER BY CASE WHEN e.id = ? THEN 0 ELSE 1 END, e.id LIMIT 1`,
       )
       .get(projectId, id, id, id);
@@ -110,7 +111,7 @@ export function traceBehaviour(
           AND (t.kind = 'endpoint' OR (t.kind = 'service_operation' AND json_extract(t.attributes, '$.traceRole') IN (${traceRoles}))))
         OR (e.kind = 'HANDLES' AND json_extract(e.provenance, '$.extractor') = 'next-app-router'
           AND json_extract(e.provenance, '$.rule') = 'http-method-export'
-          AND json_extract(s.attributes, '$.traceRole') = 'callable' AND t.kind = 'endpoint')
+          AND json_extract(s.attributes, '$.traceRole') IN ('callable','unresolved') AND t.kind = 'endpoint')
         OR (e.kind IN ('READS','WRITES') AND json_extract(e.provenance, '$.extractor') = 'behaviour-bindings'
           AND json_extract(s.attributes, '$.traceRole') = 'prisma_operation'
           AND t.kind = 'data_model' AND json_extract(t.attributes, '$.provider') = 'prisma')
@@ -119,7 +120,7 @@ export function traceBehaviour(
     function entity(entityId: string) {
       const cached = cachedEntities.get(entityId);
       if (cached) return cached;
-      const found = readSemanticSelection(db, projectId, [entityId], false)
+      const found = readSemanticSelection(db, projectId, [entityId], false, [])
         .entities[0]!;
       cachedEntities.set(entityId, found);
       return found;
@@ -136,7 +137,10 @@ export function traceBehaviour(
         truncated = true;
         continue;
       }
-      if (current.attributes.traceRole === "unresolved") {
+      if (
+        direction === "forward" &&
+        current.attributes.traceRole === "unresolved"
+      ) {
         paths.push({
           ...state,
           end: "unresolved",
@@ -190,7 +194,16 @@ export function traceBehaviour(
     }
     truncated ||= stack.length > 0;
     const ids = [...new Set(paths.flatMap((path) => path.ids))];
-    const graph = readSemanticSelection(db, projectId, ids, truncated);
+    const selectedEdges = [
+      ...new Set(paths.flatMap((path) => path.links.map((link) => link.id))),
+    ];
+    const graph = readSemanticSelection(
+      db,
+      projectId,
+      ids,
+      truncated,
+      selectedEdges,
+    );
     const byId = new Map(graph.relationships.map((edge) => [edge.id, edge]));
     return {
       projectId,

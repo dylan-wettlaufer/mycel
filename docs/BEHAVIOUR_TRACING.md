@@ -24,7 +24,8 @@ functions defined inside a component, directly bound arrows, const identifier
 aliases, and inline arrows/function expressions. Only attributes in the supported
 returned JSX are used. Event-binding CALLS edges mean potential invocation when
 the event occurs, not invocation while rendering. Custom component event props
-are unresolved because forwarding to a DOM event is not established.
+are unresolved because forwarding to a DOM event is not established. JSX spreads
+and repeated event props are also unresolved rather than assuming a final handler.
 
 Function bodies are inspected separately. Creating a callback does not execute
 it. Direct lexical calls and imported namespace members use the existing binding
@@ -55,7 +56,9 @@ The receiver must resolve through imports/const aliases to a direct const
 `new PrismaClient()` using that package's real imported constructor, not a local
 module alias or reassigned binding. A captured model declaration must prove the
 static delegate name. `findUnique`/`findMany` emit READS; `create`/`update`/`delete`
-emit WRITES. The operation call, client construction/import, and delegate access
+emit WRITES. Prisma promises must be directly awaited or returned; promises passed
+to transaction/aggregation wrappers or saved for later consumption remain unresolved.
+The operation call, client construction/import, and delegate access
 are source-mapped. Model attributes preserve the captured Prisma declaration and
 its schema path/range; Prisma metadata does not add structural nodes or require a
 SQL schema change. The schema is read as data and never generated or executed.
@@ -73,7 +76,8 @@ call targets. Dynamic dispatch inside other libraries remains unresolved.
 ## Trace queries
 
 - `GET /api/graph/behaviour/entries?limit=100` lists observed UI event bindings,
-  including ones whose handler resolution stops at an explicit boundary. Limit
+  including ones whose handler resolution stops at an explicit boundary. The
+  `binding` attribute distinguishes resolved/unresolved bindings. Limit
   is 1–500. Every entry includes its event, element, and source mapping.
 - `GET /api/graph/behaviour/:id?direction=forward&maxDepth=12&maxPaths=20`
   traverses supported call/event/request/access links. `direction=reverse` follows
@@ -102,3 +106,28 @@ to the same function can share an evidence-aggregating edge. Branches return
 multiple reference paths, not a statement-by-statement execution order, argument
 propagation, data-flow proof, exhaustive control-flow analysis, or a runtime log.
 A query with no supported callers does not prove that a function is unused.
+
+
+## Incremental coverage and unsupported protocols
+
+The source-only fixture in `packages/core/test/fixtures/behaviour` is an ordinary
+React form with state, a nested submission handler, a preview/submit HTTP client,
+GET/POST Next handlers, a service module, and a real Prisma schema/client import.
+Preview and submit produce separate read and write paths. It does not require a
+Prisma runtime, database connection, or framework installation for extraction.
+
+Watcher tests verify replacement of WRITES by READS after an operation edit,
+removal/recovery of HTTP links after a dynamic URL edit, model invalidation on a
+metadata-only schema rename without reparsing TS, configuration boundaries,
+last-good-source retention through TS syntax errors, event-wrapper changes,
+handler export removal, and entry deletion. Existing structural, semantic,
+feature, persistence, and query tests remain in the checks.
+
+Server Actions (`"use server"` directives on a function or module) are explicit
+unsupported boundaries. Their bodies are not followed as ordinary client/server
+calls or Prisma accesses. Axios/Hono adapters, Drizzle, better-sqlite3, class/object
+method dispatch, arbitrary callback execution, HTTP wrapper parameter propagation,
+Next route rewrites/base paths/dynamic pattern expansion, custom Prisma generation,
+Prisma configuration execution, transactions, raw SQL, and nested relation access
+remain outside this milestone. Trace requests report the supported prefix and the
+boundary rather than joining layers by names, directory proximity, or feature hints.

@@ -178,6 +178,12 @@ test("forward/reverse traces return alternative evidence paths, handle endpoint 
     "component",
   ]);
   assert.equal(reverse.paths[0].end, "no-supported-callers");
+  const boundaryCallers = traceBehaviour(db, "p", "unknown", {
+    direction: "reverse",
+  });
+  assert.ok(
+    boundaryCallers.paths.some((path) => path.entityIds.includes("event")),
+  );
   assert.equal(traceBehaviour(db, "other", "event"), undefined);
   assert.equal(getBehaviourEntries(db, "other").entries.length, 0);
 });

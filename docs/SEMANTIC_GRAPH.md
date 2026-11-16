@@ -1,6 +1,8 @@
 # Semantic application graph
 
-The foundation below was introduced in phase 6.1. Phase 6.2A adds
+The foundation below was introduced in phase 6.1.
+[Behaviour tracing](BEHAVIOUR_TRACING.md) adds source-backed event, HTTP, and Prisma
+paths using the same persistence model. Phase 6.2A adds
 [automatic feature candidates and membership queries](FEATURE_DISCOVERY.md).
 
 ## Audit and integration
@@ -31,7 +33,7 @@ agent tracking or AI explanation generation.
 | `component` | UI function containing JSX in its own implementation |
 | `endpoint` | HTTP method and URL pattern with a source handler |
 | `service_operation` | Explicitly designated application operation |
-| `data_model` | Explicitly designated data declaration |
+| `data_model` | Explicit declaration or verified Prisma schema model |
 | `external_dependency` | Imported external module specifier |
 
 Relationships are directed: `RENDERS` (route/page/component → rendered UI),
@@ -122,13 +124,15 @@ Metadata changes re-evaluate this support using the existing module resolver.
 - Private folders, parallel slots, intercepted routes, conflicting public paths,
   reexported handlers/pages, class components, higher-order wrappers, and custom
   `pageExtensions` or routing configuration are outside this subset. No endpoints
-  are synthesized for implicit methods. This adapter does not infer fetch-to-API
-  links, runtime layout composition, client/server boundaries, or database behavior.
+  are synthesized for implicit methods. The route adapter itself does not infer
+  fetch-to-API links; [behaviour tracing](BEHAVIOUR_TRACING.md) adds literal same-app matching. It
+  does not infer runtime layout composition, client/server boundaries, or database behavior.
   Layout defaults are recognized as components for heuristic feature association.
 
 Explicit features and roles can be declared with JSDoc tags. Automatic feature
 candidates and called `services/` operations are also supported as described in
-[feature discovery](FEATURE_DISCOVERY.md). Data models still require tags:
+[feature discovery](FEATURE_DISCOVERY.md). Other data models still require tags;
+the Prisma adapter also verifies model declarations from captured schemas:
 
 ```ts
 /**
@@ -152,8 +156,10 @@ digits, `_`, `.`, `/`, or `-`, starting with a letter or digit. A tag on a recog
 component, page, operation, or model also establishes `IMPLEMENTS`. Multiple
 source declarations of the same feature aggregate their source evidence. Tags
 express author declarations; extraction does not evaluate whether they are true.
-`READS` and `WRITES` remain reserved: model imports and return types alone cannot
-establish data access. Feature discovery adds heuristic records; there are no AI extractors.
+`READS` and `WRITES` are emitted only for verified supported Prisma operations by
+[behaviour tracing](BEHAVIOUR_TRACING.md); imports and return types alone do not
+establish data access. Feature discovery adds heuristic records; there are no AI
+extractors.
 
 Direct semantic calls resolve only to recognized operations. The binding pass
 omits ambiguous star-export chains, type-only value references, overloaded or
