@@ -66,7 +66,8 @@ try {
   const model = graph.getByLabel("Order Data, Order, Data Model", {
     exact: true,
   });
-  const nodes = graph.locator(".react-flow__node");
+  const nodes = graph.locator(".react-flow__node-code");
+  const layers = graph.locator(".react-flow__node-layer");
   const canvas = graph.locator(".graph-canvas");
   const fitAll = graph.getByRole("button", { name: "Fit all" });
   const legend = graph.getByRole("button", { name: "Legend" });
@@ -82,6 +83,12 @@ try {
   await expect(readEndpoint).toBeVisible();
   await expect(writeEndpoint).toBeVisible();
   await expect(model).toBeVisible();
+  await expect(layers).toHaveCount(3);
+  await expect(layers.locator(".layer-node-title")).toHaveText([
+    "UI (Frontend)",
+    "API (Backend)",
+    "Data (Persistence)",
+  ]);
   await expect(writeEndpoint.locator(".operation-node-title")).toHaveText(
     "Create Order",
   );
@@ -339,7 +346,7 @@ try {
   await expect(empty).toBeVisible();
   await fitAll.click();
   await expect.poll(nodesFit).toBe(true);
-  await expect.poll(readZoom).toBeGreaterThan(0.9);
+  await expect.poll(() => effectiveTitleSize(event)).toBeGreaterThanOrEqual(16);
 
   const zoomBeforeExpansion = await readZoom();
   await showWrite.click();
@@ -349,7 +356,15 @@ try {
   await expect(readService).toHaveCount(0);
   await expect(submitHandler).toHaveCount(0);
   await expect(writeHandler).toBeInViewport({ ratio: 0.9 });
-  await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
+  await expect(layers).toHaveCount(4);
+  await expect(writeEndpoint.locator(".react-flow__handle-bottom")).toHaveCount(
+    1,
+  );
+  const [endpointBox, handlerBox] = await Promise.all(
+    [writeEndpoint, writeHandler].map((node) => node.boundingBox()),
+  );
+  assert.equal(Math.round(handlerBox.x), Math.round(endpointBox.x));
+  assert.ok(handlerBox.y > endpointBox.y + endpointBox.height);
   for (const toggle of [showRead, hideWrite]) {
     await expect
       .poll(() =>
@@ -446,6 +461,7 @@ try {
   ).toBeVisible();
   await expect(writeEndpoint).toBeInViewport({ ratio: 0.9 });
   await selection.getByRole("button", { name: "Clear selection" }).click();
+  await fitAll.click();
   await expect.poll(nodesFit).toBe(true);
   await readEndpoint.press("Enter");
   await expect(

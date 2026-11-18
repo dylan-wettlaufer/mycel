@@ -6,7 +6,6 @@ import type {
   SemanticRelationshipKind,
 } from "@mycel/shared";
 import { expect, test } from "vitest";
-import { Position } from "@xyflow/react";
 import { getBehaviourDetails } from "./behaviour-details-data";
 import { layoutBehaviour } from "./behaviour-layout";
 
@@ -285,64 +284,221 @@ test("cycle steps remain visible and terminal evidence stays on the affected nod
   );
 });
 
-test("wide graphs lay out shallow branches horizontally and layer deep traces vertically", () => {
+function role(
+  id: string,
+  attributes: Record<string, string>,
+  rule = "trace",
+): SemanticEntity {
+  return { ...entity(id), attributes, provenance: { ...provenance, rule } };
+}
+
+function orders(readFirst = false) {
   const write = ["submit", "post", "handler", "service", "write", "order"];
   const read = ["submit", "get", "order"];
-  const result = trace(
+  const kinds: Partial<Record<string, SemanticRelationshipKind>> = {
+    handler: "HANDLES",
+    order: "WRITES",
+  };
+  return trace(
     [
-      entity("submit"),
+      role("submit", { traceRole: "ui_event", event: "onSubmit" }),
       entity("post", "endpoint"),
       entity("get", "endpoint"),
-      entity("handler"),
-      entity("service"),
-      entity("write"),
+      role("handler", { traceRole: "callable" }, "http-handler-operation"),
+      role(
+        "service",
+        { traceRole: "callable" },
+        "called-service-directory-function",
+      ),
+      role("write", { traceRole: "prisma_operation", operation: "create" }),
       entity("order", "data_model"),
     ],
-    [write, read].map((entityIds) => ({
+    (readFirst ? [read, write] : [write, read]).map((entityIds) => ({
       entityIds,
-      hops: entityIds.slice(1).map((id, index) => hop(entityIds[index]!, id)),
+      hops: entityIds
+        .slice(1)
+        .map((id, index) => hop(entityIds[index]!, id, kinds[id])),
       end: "data-access",
     })),
   );
+}
 
-  const collapsed = layoutBehaviour([result]);
-  expect(
-    collapsed.nodes.every((node) => node.sourcePosition === Position.Right),
-  ).toBe(true);
-  const branches = collapsed.nodes
-    .filter(({ id }) => id === "get" || id === "post")
-    .sort((a, b) => a.position.y - b.position.y);
-  const [upper, lower] = branches;
-  expect(
-    lower!.position.y - upper!.position.y - Number(upper!.style?.height),
-  ).toBeGreaterThanOrEqual(60);
-  expect(
-    collapsed.edges.find(
-      ({ source, target }) => source === "post" && target === "order",
-    )?.style,
-  ).toEqual({ strokeDasharray: "7 4" });
+type Box = { x: number; y: number; width: number; height: number };
 
-  const expanded = layoutBehaviour([result], new Set(["post"]));
-  const nodes = new Map(expanded.nodes.map((node) => [node.id, node]));
+function crossesCard(
+  graph: ReturnType<typeof layoutBehaviour>,
+  edge: (typeof graph.edges)[number],
+) {
+  const { source, target, bends } = edge.data.route;
+  const points = [source, ...bends, target];
+  const cards: Box[] = graph.nodes
+    .filter(({ id }) => id !== edge.source && id !== edge.target)
+    .map(({ position, style }) => ({
+      ...position,
+      width: Number(style?.width),
+      height: Number(style?.height),
+    }));
+  return points.slice(1).some((end, index) => {
+    const start = points[index]!;
+    return cards.some(
+      (card) =>
+        Math.max(start.x, end.x) > card.x &&
+        Math.min(start.x, end.x) < card.x + card.width &&
+        Math.max(start.y, end.y) > card.y &&
+        Math.min(start.y, end.y) < card.y + card.height,
+    );
+  });
+}
+
+function contains(layer: Box, card: Box) {
+  return (
+    card.x >= layer.x &&
+    card.y >= layer.y &&
+    card.x + card.width <= layer.x + layer.width &&
+    card.y + card.height <= layer.y + layer.height
+  );
+}
+
+function box(node: {
+  position: { x: number; y: number };
+  style?: { width?: unknown; height?: unknown } | undefined;
+}): Box {
+  return {
+    ...node.position,
+    width: Number(node.style?.width),
+    height: Number(node.style?.height),
+  };
+}
+
+test("operations are grouped into layers derived from their source roles", () => {
+  const collapsed = layoutBehaviour([orders()]);
+  expect(collapsed.layers.map(({ id }) => id)).toEqual([
+    "layer:interface",
+    "layer:api",
+    "layer:data",
+  ]);
+  const expanded = layoutBehaviour([orders()], new Set(["post"]));
+  expect(Object.fromEntries(expanded.layerOf)).toMatchObject({
+    submit: "interface",
+    post: "api",
+    get: "api",
+    handler: "api",
+    service: "service",
+    write: "data",
+    order: "data",
+  });
+  expect(expanded.layers.map(({ id, data }) => [id, data.count])).toEqual([
+    ["layer:interface", 1],
+    ["layer:api", 3],
+    ["layer:service", 1],
+    ["layer:data", 2],
+  ]);
+  for (const graph of [collapsed, expanded]) {
+    for (const layer of graph.layers) {
+      const members = graph.nodes.filter(
+        ({ id }) => `layer:${graph.layerOf.get(id)}` === layer.id,
+      );
+      expect(members.every((node) => contains(box(layer), box(node)))).toBe(
+        true,
+      );
+    }
+  }
+});
+
+test("functions and requests join the layer of the code that calls them", () => {
+  const entities = [
+    role("submit", { traceRole: "ui_event", event: "onSubmit" }),
+    entity("helper"),
+    role("request", { traceRole: "http_request", method: "POST" }),
+    entity("api", "endpoint"),
+  ];
+  const ids = ["submit", "helper", "request", "api"];
+  const input = trace(entities, [
+    {
+      entityIds: ids,
+      hops: ids.slice(1).map((id, index) => hop(ids[index]!, id)),
+      end: "no-supported-calls",
+    },
+  ]);
+  const orphan = {
+    ...trace(
+      [entity("orphan"), entity("api", "endpoint")],
+      [
+        {
+          entityIds: ["orphan", "api"],
+          hops: [hop("orphan", "api")],
+          end: "no-supported-calls",
+        },
+      ],
+    ),
+    rootId: "orphan",
+  };
+  const graph = layoutBehaviour([input, orphan], new Set(["submit"]));
+  expect(Object.fromEntries(graph.layerOf)).toEqual({
+    submit: "interface",
+    helper: "interface",
+    request: "interface",
+    api: "api",
+    orphan: "logic",
+  });
+  expect(graph.steps.get("submit")).toBe(2);
+});
+
+test("layers read left to right and revealed steps stack inside their layer", () => {
+  const collapsed = layoutBehaviour([orders()]);
+  const at = (graph: typeof collapsed, id: string) =>
+    graph.nodes.find((node) => node.id === id)!;
+  expect(at(collapsed, "post").position.x).toBe(
+    at(collapsed, "get").position.x,
+  );
+  expect(at(collapsed, "post").position.x).toBeGreaterThan(
+    at(collapsed, "submit").position.x,
+  );
+  expect(at(collapsed, "order").position.x).toBeGreaterThan(
+    at(collapsed, "post").position.x,
+  );
   expect(
-    expanded.nodes.every((node) => node.sourcePosition === Position.Bottom),
-  ).toBe(true);
-  expect(nodes.get("post")?.position.y).toBe(nodes.get("get")?.position.y);
-  const rows = write.map((id) => nodes.get(id)!.position.y);
+    collapsed.edges.map(({ sourceHandle, targetHandle }) => [
+      sourceHandle,
+      targetHandle,
+    ]),
+  ).toEqual(
+    Array(collapsed.edges.length).fill(["source-right", "target-left"]),
+  );
+
+  const expanded = layoutBehaviour([orders()], new Set(["post"]));
+  const post = at(expanded, "post");
+  const handler = at(expanded, "handler");
+  expect(handler.position.x).toBe(post.position.x);
+  expect(handler.position.y).toBeGreaterThan(post.position.y);
+  expect(
+    expanded.edges.find(({ target }) => target === "handler"),
+  ).toMatchObject({
+    sourceHandle: "source-bottom",
+    targetHandle: "target-top",
+  });
+  expect(at(expanded, "service").position.y).toBe(handler.position.y);
+
+  const vertical = layoutBehaviour([orders()], new Set(["post"]), "TB");
+  const rows = ["submit", "post", "service", "order"].map(
+    (id) => at(vertical, id).position.y,
+  );
   expect(rows).toEqual([...new Set(rows)].sort((a, b) => a - b));
-  const post = nodes.get("post")!;
-  const handler = nodes.get("handler")!;
   expect(
-    handler.position.y - post.position.y - Number(post.style?.height),
-  ).toBeGreaterThanOrEqual(72);
-  const shortcut = expanded.edges.find(
-    ({ source, target }) => source === "get" && target === "order",
-  );
-  expect(shortcut?.data.route.bends.length).toBeGreaterThan(1);
-  expect(shortcut?.data.route.source.y).toBeLessThan(
-    shortcut!.data.route.target.y,
-  );
-  expect(shortcut?.data.route.label.y).toBeGreaterThan(
-    shortcut!.data.route.source.y,
-  );
+    vertical.edges.find(({ target }) => target === "post")?.sourceHandle,
+  ).toBe("source-bottom");
+
+  const readFirst = layoutBehaviour([orders(true)], new Set(["post"]));
+  expect(
+    readFirst.edges.find(
+      ({ source, target }) => source === "write" && target === "order",
+    ),
+  ).toMatchObject({
+    sourceHandle: "source-bottom",
+    targetHandle: "target-top",
+  });
+
+  for (const graph of [collapsed, expanded, vertical, readFirst])
+    for (const edge of graph.edges)
+      expect(crossesCard(graph, edge)).toBe(false);
 });

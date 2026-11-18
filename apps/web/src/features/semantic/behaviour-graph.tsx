@@ -79,13 +79,18 @@ function BehaviourGraph({
                 ...node.data,
                 expansion: {
                   expanded: expanded.has(node.id),
+                  steps: graph.steps.get(node.id),
                   onToggle: toggle,
                 },
               },
             }
           : node,
       ),
-    [graph.nodes, graph.expandable, expanded, toggle],
+    [graph.nodes, graph.expandable, graph.steps, expanded, toggle],
+  );
+  const canvasNodes = useMemo(
+    () => [...graph.layers, ...nodes],
+    [graph.layers, nodes],
   );
   if (selectedId && !nodes.some((node) => node.id === selectedId)) {
     setSelectedId(anchorId && graph.expandable.has(anchorId) ? anchorId : null);
@@ -119,7 +124,7 @@ function BehaviourGraph({
               hasExpandedSteps: expanded.size > 0,
               reveal,
             }}
-            nodes={nodes}
+            nodes={canvasNodes}
             edges={graph.edges}
             selectedId={selectedId}
             onSelect={selectNode}

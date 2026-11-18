@@ -64,12 +64,17 @@ export function BehaviourEdgeView(props: EdgeProps<BehaviourEdge>) {
   });
   let geometry = { path, labelX, labelY };
   if (route) {
-    const dx = sourceX - route.source.x;
-    const dy = sourceY - route.source.y;
+    const shift = {
+      x: [sourceX - route.source.x, targetX - route.target.x],
+      y: [sourceY - route.source.y, targetY - route.target.y],
+    };
+    // Handles sit slightly outside the card, so compare the average translation.
+    const dx = (shift.x[0]! + shift.x[1]!) / 2;
+    const dy = (shift.y[0]! + shift.y[1]!) / 2;
     // Relayout can translate the whole graph. A manually dragged node needs a fresh route.
     if (
-      Math.abs(dx - (targetX - route.target.x)) <= 3 &&
-      Math.abs(dy - (targetY - route.target.y)) <= 3
+      Math.abs(shift.x[0]! - shift.x[1]!) <= 8 &&
+      Math.abs(shift.y[0]! - shift.y[1]!) <= 8
     ) {
       const source = { x: sourceX, y: sourceY };
       const target = { x: targetX, y: targetY };

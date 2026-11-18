@@ -1,9 +1,28 @@
-import { memo } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { memo, useEffect } from "react";
+import {
+  Box,
+  ChevronDown,
+  ChevronUp,
+  CircleHelp,
+  Database,
+  MousePointerClick,
+  Send,
+  Server,
+  SquareFunction,
+  Table2,
+  type LucideIcon,
+} from "lucide-react";
+import {
+  Handle,
+  Position,
+  useUpdateNodeInternals,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ChangeAction, NodeKind } from "@mycel/shared";
+import { LayerNodeView } from "./layer-node";
 
 const operationKinds = {
   event: "UI Event",
@@ -18,6 +37,23 @@ const operationKinds = {
 
 export type OperationKind = keyof typeof operationKinds;
 
+const operationIcons: Record<OperationKind, LucideIcon> = {
+  event: MousePointerClick,
+  endpoint: Server,
+  request: Send,
+  service: Box,
+  function: SquareFunction,
+  data: Database,
+  model: Table2,
+  unresolved: CircleHelp,
+};
+
+export type NodeHandle = {
+  id: string;
+  type: "source" | "target";
+  position: Position;
+};
+
 type StructuralNode = {
   kind: NodeKind | "folder";
   context: string;
@@ -28,8 +64,11 @@ type StructuralNode = {
 
 type OperationNode = {
   operationKind: OperationKind;
+  location?: string;
+  handles?: NodeHandle[];
   expansion?: {
     expanded: boolean;
+    steps?: number | undefined;
     onToggle: (id: string) => void;
   };
 };
@@ -46,22 +85,63 @@ export function operationKindLabel(kind: OperationKind) {
   return operationKinds[kind];
 }
 
+function stepsLabel({
+  expanded,
+  steps,
+}: NonNullable<OperationNode["expansion"]>) {
+  if (expanded) return "Hide steps";
+  return steps ? `${steps} ${steps === 1 ? "step" : "steps"}` : "Show steps";
+}
+
 const GraphNode = memo(function GraphNode({
   id,
   data,
   targetPosition = Position.Left,
   sourcePosition = Position.Right,
 }: NodeProps<CodeNode>) {
+  const handles = data.operationKind
+    ? data.handles
+    : [
+        { id: "target", type: "target", position: targetPosition } as const,
+        { id: "source", type: "source", position: sourcePosition } as const,
+      ];
+  const Icon = data.operationKind && operationIcons[data.operationKind];
+  const updateNodeInternals = useUpdateNodeInternals();
+  const handleKey = handles?.map((handle) => handle.id).join() ?? "";
+  // React Flow only measures handles on mount and resize.
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, handleKey, updateNodeInternals]);
   return (
     <>
-      <Handle type="target" position={targetPosition} isConnectable={false} />
+      {handles?.map((handle) => (
+        <Handle
+          key={handle.id}
+          id={data.operationKind ? handle.id : null}
+          type={handle.type}
+          position={handle.position}
+          isConnectable={false}
+        />
+      ))}
       {data.operationKind ? (
         <div
           className="operation-node-content"
-          title={`${data.label}\n${data.name}`}
+          title={`${data.label}\n${data.name}${data.location ? `\n${data.location}` : ""}`}
         >
-          <div className="operation-node-title">{data.label}</div>
-          <code className="operation-node-identifier">{data.name}</code>
+          <div className="flex min-w-0 items-start gap-2 self-stretch">
+            {Icon && (
+              <span className="operation-node-icon" aria-hidden>
+                <Icon />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="operation-node-title">{data.label}</div>
+              <code className="operation-node-identifier">{data.name}</code>
+              {data.location && (
+                <div className="operation-node-location">{data.location}</div>
+              )}
+            </div>
+          </div>
           <div className="mt-auto flex w-full items-center justify-between gap-1">
             <Badge variant="ghost" className="operation-node-type">
               {operationKindLabel(data.operationKind)}
@@ -84,7 +164,7 @@ const GraphNode = memo(function GraphNode({
                 ) : (
                   <ChevronDown aria-hidden />
                 )}
-                {data.expansion.expanded ? "Hide steps" : "Show steps"}
+                {stepsLabel(data.expansion)}
               </Button>
             )}
           </div>
@@ -112,8 +192,7 @@ const GraphNode = memo(function GraphNode({
           <div className="graph-node-context">{data.context}</div>
         </div>
       )}
-      <Handle type="source" position={sourcePosition} isConnectable={false} />
     </>
   );
 });
-export const graphNodeTypes = { code: GraphNode };
+export const graphNodeTypes = { code: GraphNode, layer: LayerNodeView };

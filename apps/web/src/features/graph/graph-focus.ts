@@ -39,24 +39,36 @@ export function focusGraph(
   const connections = graphConnections(nodes, edges, selected);
   const incoming = new Set(connections.incoming.map((node) => node.id));
   const outgoing = new Set(connections.outgoing.map((node) => node.id));
+  // Non-selectable nodes are backdrops such as architecture layers.
+  const backdrop = (node: Node) => node.selectable === false;
   return {
     nodes: nodes
       .filter(
-        (node) => !selected || !onlyConnections || connections.ids.has(node.id),
+        (node) =>
+          backdrop(node) ||
+          !selected ||
+          !onlyConnections ||
+          connections.ids.has(node.id),
       )
-      .map((node) => ({
-        ...node,
-        selected: node.id === selected,
-        className: [
-          node.className,
-          node.id === selected ? "graph-selected" : "",
-          selected && !connections.ids.has(node.id) ? "graph-unrelated" : "",
-          selected && incoming.has(node.id) ? "graph-incoming" : "",
-          selected && outgoing.has(node.id) ? "graph-outgoing" : "",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      })),
+      .map((node) =>
+        backdrop(node)
+          ? node
+          : {
+              ...node,
+              selected: node.id === selected,
+              className: [
+                node.className,
+                node.id === selected ? "graph-selected" : "",
+                selected && !connections.ids.has(node.id)
+                  ? "graph-unrelated"
+                  : "",
+                selected && incoming.has(node.id) ? "graph-incoming" : "",
+                selected && outgoing.has(node.id) ? "graph-outgoing" : "",
+              ]
+                .filter(Boolean)
+                .join(" "),
+            },
+      ),
     edges: edges
       .filter(
         (edge) =>
