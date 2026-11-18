@@ -178,6 +178,8 @@ export function layoutBehaviour(
       className: `graph-node graph-operation-node graph-operation-${kind}`,
       position: placement.positions.get(id)!,
       style: { ...operationSize },
+      // Positions encode the source-derived layer and keep routed links clear of cards.
+      draggable: false,
     };
   });
   const layers: LayerNode[] = placement.layers.map(
@@ -209,6 +211,7 @@ export function layoutBehaviour(
   const edges: BehaviourEdge[] = diagramLinks.map(
     ({ id, source, target, paths, label, uncertain }) => {
       const { sourceHandle, targetHandle, route } = placement.links.get(id)!;
+      const steps = label.startsWith("via ");
       return {
         id,
         source,
@@ -216,10 +219,14 @@ export function layoutBehaviour(
         sourceHandle,
         targetHandle,
         type: "behaviour",
-        label,
+        label: steps ? label.slice("via ".length) : label,
         ariaLabel: `${entities.get(source)?.name} to ${entities.get(target)?.name}: ${label}`,
         ...(uncertain && { className: "graph-edge-uncertain" }),
-        data: { paths, route },
+        data: {
+          paths,
+          route,
+          description: `${presentation.get(source)!.title} → ${presentation.get(target)!.title}: ${steps ? `connects ${label}` : label}`,
+        },
         style: uncertain
           ? { strokeDasharray: "2 5", strokeLinecap: "round" }
           : paths.some((path) => path.length > 1)

@@ -385,6 +385,17 @@ try {
   await page.mouse.wheel(0, 220);
   await expect.poll(readTransform).not.toBe(beforePan);
   await expect.poll(readZoom).toBeCloseTo(zoomAfterExpansion);
+  const cardPosition = () =>
+    writeService.evaluate((node) => node.style.transform);
+  const lockedPosition = await cardPosition();
+  const beforeDrag = await readTransform();
+  const serviceBox = await writeService.boundingBox();
+  await page.mouse.move(serviceBox.x + 40, serviceBox.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(serviceBox.x + 160, serviceBox.y + 80, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(readTransform).not.toBe(beforeDrag);
+  assert.equal(await cardPosition(), lockedPosition);
   await fitAll.click();
   await expect.poll(nodesFit).toBe(true);
 

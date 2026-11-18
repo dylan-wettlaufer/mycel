@@ -350,6 +350,22 @@ function crossesCard(
   });
 }
 
+/** Approximate rendered size of a short label such as "3 steps" or "writes". */
+function labelHidden(
+  graph: ReturnType<typeof layoutBehaviour>,
+  edge: (typeof graph.edges)[number],
+) {
+  const { x, y } = edge.data.route.label;
+  const [halfWidth, halfHeight] = [36, 11];
+  return graph.nodes.some(
+    ({ position, style }) =>
+      x + halfWidth > position.x &&
+      x - halfWidth < position.x + Number(style?.width) &&
+      y + halfHeight > position.y &&
+      y - halfHeight < position.y + Number(style?.height),
+  );
+}
+
 function contains(layer: Box, card: Box) {
   return (
     card.x >= layer.x &&
@@ -442,6 +458,14 @@ test("functions and requests join the layer of the code that calls them", () => 
     orphan: "logic",
   });
   expect(graph.steps.get("submit")).toBe(2);
+  expect(layoutBehaviour([input, orphan]).edges[0]).toMatchObject({
+    source: "submit",
+    target: "api",
+    label: "2 steps",
+    data: {
+      description: "Submit Form → Handle API Request: connects via 2 steps",
+    },
+  });
 });
 
 test("layers read left to right and revealed steps stack inside their layer", () => {
@@ -498,7 +522,13 @@ test("layers read left to right and revealed steps stack inside their layer", ()
     targetHandle: "target-top",
   });
 
-  for (const graph of [collapsed, expanded, vertical, readFirst])
-    for (const edge of graph.edges)
+  for (const graph of [collapsed, expanded, vertical, readFirst]) {
+    expect(graph.nodes.every(({ draggable }) => draggable === false)).toBe(
+      true,
+    );
+    for (const edge of graph.edges) {
       expect(crossesCard(graph, edge)).toBe(false);
+      expect(labelHidden(graph, edge)).toBe(false);
+    }
+  }
 });

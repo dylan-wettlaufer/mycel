@@ -15,7 +15,11 @@ type Route = {
   label: XYPosition;
 };
 
-type EdgeData = { paths: BehaviourHop[][]; route: Route };
+type EdgeData = {
+  paths: BehaviourHop[][];
+  route: Route;
+  description?: string;
+};
 
 export type BehaviourEdge = Edge<EdgeData, "behaviour"> & { data: EdgeData };
 
@@ -92,16 +96,19 @@ export function BehaviourEdgeView(props: EdgeProps<BehaviourEdge>) {
     }
   }
   return (
-    <BaseEdge
-      id={props.id}
-      style={props.style}
-      {...(props.markerEnd && { markerEnd: props.markerEnd })}
-      label={props.label}
-      labelStyle={props.labelStyle ?? {}}
-      labelBgStyle={props.labelBgStyle ?? {}}
-      labelBgPadding={props.labelBgPadding ?? [7, 4]}
-      labelBgBorderRadius={props.labelBgBorderRadius ?? 4}
-      {...geometry}
-    />
+    <g>
+      {data?.description && <title>{data.description}</title>}
+      <BaseEdge
+        id={props.id}
+        style={props.style}
+        {...(props.markerEnd && { markerEnd: props.markerEnd })}
+        label={props.label}
+        labelStyle={props.labelStyle ?? {}}
+        labelBgStyle={props.labelBgStyle ?? {}}
+        labelBgPadding={props.labelBgPadding ?? [7, 4]}
+        labelBgBorderRadius={props.labelBgBorderRadius ?? 4}
+        {...geometry}
+      />
+    </g>
   );
 }

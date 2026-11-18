@@ -15,6 +15,7 @@ const bandGap = 112;
 const laneOffset = 32;
 const laneSpacing = 12;
 const gapOffsets = [0, 12, -12, 24, -24];
+const straightLabelShift = 8;
 
 type Link = { id: string; source: string; target: string };
 
@@ -187,40 +188,22 @@ export function placeArchitecture(
     const into = chain ? chainIn : from === to ? forwardOut : forwardIn;
     const start = side(source, out);
     const end = side(target, into);
-    const fanIn = (incoming.get(target)?.length ?? 0) > 1;
-    const fanOut = (outgoing.get(source)?.length ?? 0) > 1;
-    const nearSource = (u: number) =>
-      point((across(start) + u) / 2, along(start));
-    const nearTarget = (u: number) => point((u + across(end)) / 2, along(end));
+    // Labels sit on the longest open run of a link, never on the short stubs
+    // beside a card where they would be hidden or crowd the arrowhead.
+    const midway = along(start) / 2 + along(end) / 2;
     let bends: XYPosition[] = [];
     let label: XYPosition;
     if (chain) {
-      label = point(across(start), (along(start) + along(end)) / 2);
-    } else if (from === to) {
-      const u = inGap(from);
-      bends = [point(u, along(start)), point(u, along(end))];
-      label = point(u, (along(start) + along(end)) / 2);
+      label = point(across(start), midway);
     } else if (from < to && fromSlot === toSlot && clear(from, to, fromSlot)) {
-      label =
-        to === from + 1
-          ? point(gap(from), along(start))
-          : fanIn && !fanOut
-            ? nearSource(gap(from))
-            : nearTarget(gap(to - 1));
-    } else if (from < to && clear(from, to, toSlot)) {
-      const u = inGap(from);
+      label = point(gap(from) - straightLabelShift, along(start));
+    } else if (
+      from === to ||
+      (from < to && (clear(from, to, toSlot) || clear(from, to, fromSlot)))
+    ) {
+      const u = inGap(from < to && !clear(from, to, toSlot) ? to - 1 : from);
       bends = [point(u, along(start)), point(u, along(end))];
-      label =
-        fanIn && !fanOut
-          ? nearSource(u)
-          : nearTarget(to === from + 1 ? u : gap(to - 1));
-    } else if (from < to && clear(from, to, fromSlot)) {
-      const u = inGap(to - 1);
-      bends = [point(u, along(start)), point(u, along(end))];
-      label =
-        fanIn && !fanOut
-          ? nearSource(to === from + 1 ? u : gap(from))
-          : nearTarget(u);
+      label = point(u, midway);
     } else {
       // Backward links and blocked rows travel along a lane past every layer.
       const lane = layerBreadth + laneOffset + laneSpacing * lanes++;
@@ -231,7 +214,7 @@ export function placeArchitecture(
         point(last, lane),
         point(last, along(end)),
       ];
-      label = nearTarget(last);
+      label = point((first + last) / 2, lane);
     }
     placedLinks.set(id, {
       sourceHandle: addHandle(source, "source", out),
