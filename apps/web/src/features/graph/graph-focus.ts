@@ -66,22 +66,32 @@ export function focusGraph(
           edge.target === selected,
       )
       .map((edge) => {
+        const behaviour = edge.type === "behaviour";
+        const uncertain =
+          behaviour && edge.className === "graph-edge-uncertain";
         const active =
           selected && (edge.source === selected || edge.target === selected);
-        const color = active
-          ? edge.source === selected
-            ? "var(--primary)"
-            : "var(--chart-1)"
-          : "var(--muted-foreground)";
+        const color = uncertain
+          ? "var(--warning)"
+          : active
+            ? edge.source === selected
+              ? "var(--primary)"
+              : "var(--chart-1)"
+            : "var(--muted-foreground)";
         return {
           ...edge,
-          className:
+          className: [
+            edge.className,
+            behaviour && "graph-behaviour-edge",
             selected && !active
               ? "graph-edge-unrelated"
               : active
                 ? "graph-edge-active"
                 : "",
-          label: selected && !active ? undefined : edge.label,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          label: selected && !active && !behaviour ? undefined : edge.label,
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color,
@@ -91,12 +101,16 @@ export function focusGraph(
           style: {
             ...edge.style,
             stroke: color,
-            strokeWidth: active ? 3 : 1.75,
+            strokeWidth: behaviour ? (active ? 2.6 : 2) : active ? 3 : 1.75,
           },
           labelStyle: {
-            fill: active ? "var(--foreground)" : "var(--muted-foreground)",
-            fontSize: 12,
-            fontWeight: 500,
+            fill: uncertain
+              ? "var(--warning)"
+              : active || behaviour
+                ? "var(--foreground)"
+                : "var(--muted-foreground)",
+            fontSize: behaviour ? 14 : 12,
+            fontWeight: behaviour ? 600 : 500,
           },
           labelBgStyle: { fill: "var(--background)", fillOpacity: 1 },
           labelBgPadding: [7, 4] as [number, number],

@@ -62,7 +62,7 @@ const GraphNode = memo(function GraphNode({
         >
           <div className="operation-node-title">{data.label}</div>
           <code className="operation-node-identifier">{data.name}</code>
-          <div className="mt-auto flex w-full items-center justify-between gap-2">
+          <div className="mt-auto flex w-full items-center justify-between gap-1">
             <Badge variant="ghost" className="operation-node-type">
               {operationKindLabel(data.operationKind)}
             </Badge>
@@ -70,7 +70,7 @@ const GraphNode = memo(function GraphNode({
               <Button
                 variant="outline"
                 size="xs"
-                className="nodrag nopan"
+                className="nodrag nopan gap-0.5 has-[>svg]:px-1"
                 aria-label={`${data.expansion.expanded ? "Hide" : "Show"} call steps for ${data.name}`}
                 aria-expanded={data.expansion.expanded}
                 onClick={(event) => {

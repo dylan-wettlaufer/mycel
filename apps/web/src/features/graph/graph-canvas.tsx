@@ -1,7 +1,7 @@
-import { Focus, Filter, Scan, ZoomIn } from "lucide-react";
+import { ChevronDown, Focus, Filter, Scan, ZoomIn } from "lucide-react";
+import { Collapsible } from "radix-ui";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -24,9 +24,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { graphNodeTypes } from "./graph-node";
 import { focusGraph, graphConnections } from "./graph-focus";
+import { BehaviourEdgeView } from "./behaviour-edge";
+import {
+  BehaviourViewport,
+  behaviourFitOptions,
+  type BehaviourView,
+} from "./behaviour-viewport";
 
 const fitViewOptions = { padding: 0.15, minZoom: 0.03, maxZoom: 0.8 };
-const behaviourFitViewOptions = { ...fitViewOptions, maxZoom: 1 };
+const edgeTypes = { behaviour: BehaviourEdgeView };
 
 function name(node: Node): string {
   return String(node.data.name ?? node.data.label);
@@ -97,7 +103,7 @@ export function GraphCanvas({
   openLabel,
   mode = "imports",
   layoutAnchorId,
-  fitRequest,
+  behaviourView,
   details,
   sidePanel,
 }: {
@@ -110,7 +116,7 @@ export function GraphCanvas({
   openLabel?: string;
   mode?: "imports" | "symbols" | "behaviour";
   layoutAnchorId?: string | undefined;
-  fitRequest?: number | undefined;
+  behaviourView?: BehaviourView;
   details?: ReactNode;
   sidePanel?: ReactNode;
 }) {
@@ -120,40 +126,15 @@ export function GraphCanvas({
     byId: new Map(),
   }));
   const flow = useRef<ReactFlowInstance | null>(null);
-  const fittedRequest = useRef(fitRequest);
-  const canvas = useRef<HTMLDivElement>(null);
+  const userMoved = useRef(false);
   const behaviour = mode === "behaviour";
-  const fitOptions = behaviour ? behaviourFitViewOptions : fitViewOptions;
+  const fitOptions = behaviour ? behaviourFitOptions : fitViewOptions;
+  const viewportDuration = behaviour ? 0 : 200;
   if (behaviour && nodeState.layout !== nodes) {
     // Apply the new positions before React Flow sees them, keeping the card
     // that triggered the layout at the same position in the current viewport.
     setNodeState(applyLayout(nodes, nodeState, layoutAnchorId));
   }
-  useEffect(() => {
-    const element = canvas.current;
-    // Once the user unfolds a region, opening details must not shrink the graph.
-    if (!behaviour || !element || layoutAnchorId) return;
-    let size: string | undefined;
-    let frame = 0;
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      const nextSize = `${width}:${height}`;
-      if (size !== undefined && size !== nextSize && width > 0 && height > 0) {
-        cancelAnimationFrame(frame);
-        // Wait for React Flow to observe the new canvas dimensions first.
-        frame = requestAnimationFrame(() => {
-          void flow.current?.fitView({ ...fitOptions, duration: 200 });
-        });
-      }
-      size = nextSize;
-    });
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [behaviour, fitOptions, layoutAnchorId]);
   const focused = useMemo(
     () => focusGraph(nodes, edges, selectedId, onlyConnections),
     [nodes, edges, selectedId, onlyConnections],
@@ -162,30 +143,6 @@ export function GraphCanvas({
     () => withNodeState(focused.nodes, nodeState.byId),
     [focused.nodes, nodeState.byId],
   );
-  const nodesMeasured =
-    visibleNodes.length > 0 &&
-    visibleNodes.every(({ measured }) => measured?.width && measured.height);
-  useEffect(() => {
-    if (
-      fitRequest === undefined ||
-      fittedRequest.current === fitRequest ||
-      !nodesMeasured
-    )
-      return;
-
-    const frame = requestAnimationFrame(() => {
-      if (!flow.current) return;
-      fittedRequest.current = fitRequest;
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      void flow.current.fitView({
-        ...fitOptions,
-        duration: reducedMotion ? 0 : 200,
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [fitOptions, fitRequest, nodesMeasured]);
   const onNodesChange = useCallback<OnNodesChange>(
     (changes) => {
       setNodeState((previous) => {
@@ -222,32 +179,38 @@ export function GraphCanvas({
   return (
     <div
       className={cn(
-        "relative flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden",
-        behaviour && "flex-col lg:flex-row",
+        "relative flex min-h-0 min-w-0 flex-1 gap-3",
+        behaviour
+          ? "flex-col lg:flex-row lg:overflow-hidden"
+          : "overflow-hidden",
       )}
     >
       <div
-        ref={canvas}
         className={cn(
           "graph-canvas min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card",
-          behaviour &&
-            "h-[min(30rem,58dvh)] min-h-72 flex-none lg:h-auto lg:flex-1",
+          behaviour && "h-full flex-none lg:flex-1",
         )}
       >
         <ReactFlow<Node, Edge>
           nodes={visibleNodes}
           edges={focused.edges}
           nodeTypes={graphNodeTypes}
-          fitView
-          minZoom={0.03}
+          edgeTypes={edgeTypes}
+          fitView={!behaviourView}
+          minZoom={fitOptions.minZoom}
           maxZoom={2}
           fitViewOptions={fitOptions}
           colorMode="dark"
+          panOnScroll={behaviour}
+          zoomOnScroll={!behaviour}
           nodesDraggable
           nodesConnectable={false}
           onNodesChange={onNodesChange}
           onInit={(instance) => {
             flow.current = instance;
+          }}
+          onMoveStart={(event) => {
+            if (event) userMoved.current = true;
           }}
           onNodeClick={(_, node) => onSelect(node.id)}
           onNodeDoubleClick={(_, node) => onOpen?.(node.id)}
@@ -255,7 +218,7 @@ export function GraphCanvas({
         >
           <Panel position="top-right">
             <div
-              className="graph-reading-controls"
+              className={cn("graph-reading-controls", behaviour && "flex-row!")}
               aria-label="Graph reading controls"
             >
               <Button
@@ -264,8 +227,9 @@ export function GraphCanvas({
                 title="Readable zoom"
                 aria-label="Readable zoom"
                 onClick={() => {
+                  userMoved.current = true;
                   void flow.current?.zoomTo(fitOptions.maxZoom, {
-                    duration: 200,
+                    duration: viewportDuration,
                   });
                 }}
               >
@@ -277,9 +241,10 @@ export function GraphCanvas({
                 title="Fit all"
                 aria-label="Fit all"
                 onClick={() => {
+                  userMoved.current = false;
                   void flow.current?.fitView({
                     ...fitOptions,
-                    duration: 200,
+                    duration: viewportDuration,
                   });
                 }}
               >
@@ -292,11 +257,12 @@ export function GraphCanvas({
                 aria-label="Focus selection"
                 disabled={!selected}
                 onClick={() => {
+                  userMoved.current = true;
                   void flow.current?.fitView({
                     ...fitOptions,
                     nodes: [...connections.ids].map((id) => ({ id })),
                     padding: 0.2,
-                    duration: 200,
+                    duration: viewportDuration,
                   });
                 }}
               >
@@ -315,46 +281,36 @@ export function GraphCanvas({
               </Button>
             </div>
           </Panel>
+          {behaviourView && (
+            <BehaviourViewport
+              {...behaviourView}
+              nodeCount={focused.nodes.length}
+              selectedId={selectedId}
+              userMoved={userMoved}
+            />
+          )}
           <Panel
             position="top-left"
-            className={
-              behaviour ? "max-w-[calc(100%-64px)] hidden sm:block" : undefined
-            }
+            className={behaviour ? "max-w-[calc(100%-64px)]" : undefined}
           >
-            <div aria-label="Graph legend" className="graph-legend">
-              <span className="graph-legend-heading">Legend</span>
-              <span>
-                <i className="graph-legend-arrow" aria-hidden />
-                {mode === "symbols"
-                  ? "Arrow: imports or calls"
-                  : behaviour
-                    ? "Arrow follows the flow"
-                    : "A → B: A imports B"}
-              </span>
-              {mode !== "imports" && (
-                <span>
-                  <i
-                    className="graph-legend-arrow graph-legend-dashed"
-                    aria-hidden
-                  />
-                  {behaviour ? "Dashed: combined steps" : "Dashed: contains"}
-                </span>
-              )}
-              <span>
-                <i
-                  className="graph-legend-swatch graph-swatch-incoming"
-                  aria-hidden
-                />
-                Into selection
-              </span>
-              <span>
-                <i
-                  className="graph-legend-swatch graph-swatch-outgoing"
-                  aria-hidden
-                />
-                Out of selection
-              </span>
-            </div>
+            {behaviour ? (
+              <Collapsible.Root className="group">
+                <Collapsible.Trigger asChild>
+                  <Button variant="outline" size="sm">
+                    Legend
+                    <ChevronDown
+                      aria-hidden
+                      className="group-data-[state=open]:rotate-180"
+                    />
+                  </Button>
+                </Collapsible.Trigger>
+                <Collapsible.Content className="mt-1">
+                  <GraphLegend mode={mode} />
+                </Collapsible.Content>
+              </Collapsible.Root>
+            ) : (
+              <GraphLegend mode={mode} />
+            )}
           </Panel>
           <Background gap={24} size={0.7} />
           <Controls showInteractive={false} showFitView={false} />
@@ -423,6 +379,49 @@ export function GraphCanvas({
     </div>
   );
 }
+
+function GraphLegend({ mode }: { mode: "imports" | "symbols" | "behaviour" }) {
+  return (
+    <div aria-label="Graph legend" className="graph-legend">
+      {mode !== "behaviour" && (
+        <span className="graph-legend-heading">Legend</span>
+      )}
+      <span>
+        <i className="graph-legend-arrow" aria-hidden />
+        {mode === "symbols"
+          ? "Arrow: imports or calls"
+          : mode === "behaviour"
+            ? "Source-verified flow"
+            : "A → B: A imports B"}
+      </span>
+      {mode !== "imports" && (
+        <span>
+          <i className="graph-legend-arrow graph-legend-dashed" aria-hidden />
+          {mode === "behaviour" ? "Combined steps" : "Dashed: contains"}
+        </span>
+      )}
+      {mode === "behaviour" && (
+        <span>
+          <i
+            className="graph-legend-arrow graph-legend-uncertain"
+            aria-hidden
+          />
+          Unresolved or inferred
+        </span>
+      )}
+      <span>
+        <i className="graph-legend-swatch graph-swatch-incoming" aria-hidden />
+        Into selection
+      </span>
+      <span>
+        <i className="graph-legend-swatch graph-swatch-outgoing" aria-hidden />
+        Out of selection
+      </span>
+      {mode === "behaviour" && <span>Drag or scroll to pan</span>}
+    </div>
+  );
+}
+
 function Connections({
   title,
   nodes,

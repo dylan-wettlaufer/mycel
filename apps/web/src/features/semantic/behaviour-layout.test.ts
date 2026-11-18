@@ -6,6 +6,7 @@ import type {
   SemanticRelationshipKind,
 } from "@mycel/shared";
 import { expect, test } from "vitest";
+import { Position } from "@xyflow/react";
 import { getBehaviourDetails } from "./behaviour-details-data";
 import { layoutBehaviour } from "./behaviour-layout";
 
@@ -275,4 +276,73 @@ test("cycle steps remain visible and terminal evidence stays on the affected nod
   expect([...result.notices.get("dynamic")!]).toEqual([
     "The target is dynamic.",
   ]);
+  expect(result.edges.find(({ target }) => target === "dynamic")).toMatchObject(
+    {
+      label: "unresolved",
+      className: "graph-edge-uncertain",
+      style: { strokeDasharray: "2 5" },
+    },
+  );
+});
+
+test("wide graphs lay out shallow branches horizontally and layer deep traces vertically", () => {
+  const write = ["submit", "post", "handler", "service", "write", "order"];
+  const read = ["submit", "get", "order"];
+  const result = trace(
+    [
+      entity("submit"),
+      entity("post", "endpoint"),
+      entity("get", "endpoint"),
+      entity("handler"),
+      entity("service"),
+      entity("write"),
+      entity("order", "data_model"),
+    ],
+    [write, read].map((entityIds) => ({
+      entityIds,
+      hops: entityIds.slice(1).map((id, index) => hop(entityIds[index]!, id)),
+      end: "data-access",
+    })),
+  );
+
+  const collapsed = layoutBehaviour([result]);
+  expect(
+    collapsed.nodes.every((node) => node.sourcePosition === Position.Right),
+  ).toBe(true);
+  const branches = collapsed.nodes
+    .filter(({ id }) => id === "get" || id === "post")
+    .sort((a, b) => a.position.y - b.position.y);
+  const [upper, lower] = branches;
+  expect(
+    lower!.position.y - upper!.position.y - Number(upper!.style?.height),
+  ).toBeGreaterThanOrEqual(60);
+  expect(
+    collapsed.edges.find(
+      ({ source, target }) => source === "post" && target === "order",
+    )?.style,
+  ).toEqual({ strokeDasharray: "7 4" });
+
+  const expanded = layoutBehaviour([result], new Set(["post"]));
+  const nodes = new Map(expanded.nodes.map((node) => [node.id, node]));
+  expect(
+    expanded.nodes.every((node) => node.sourcePosition === Position.Bottom),
+  ).toBe(true);
+  expect(nodes.get("post")?.position.y).toBe(nodes.get("get")?.position.y);
+  const rows = write.map((id) => nodes.get(id)!.position.y);
+  expect(rows).toEqual([...new Set(rows)].sort((a, b) => a - b));
+  const post = nodes.get("post")!;
+  const handler = nodes.get("handler")!;
+  expect(
+    handler.position.y - post.position.y - Number(post.style?.height),
+  ).toBeGreaterThanOrEqual(72);
+  const shortcut = expanded.edges.find(
+    ({ source, target }) => source === "get" && target === "order",
+  );
+  expect(shortcut?.data.route.bends.length).toBeGreaterThan(1);
+  expect(shortcut?.data.route.source.y).toBeLessThan(
+    shortcut!.data.route.target.y,
+  );
+  expect(shortcut?.data.route.label.y).toBeGreaterThan(
+    shortcut!.data.route.source.y,
+  );
 });

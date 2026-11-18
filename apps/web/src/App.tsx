@@ -65,6 +65,7 @@ export function App() {
   return (
     <AppShell
       view={view}
+      fillWorkspace={view === "Features" && Boolean(featureId)}
       onNavigate={(view) => navigate({ view })}
       projectName={project?.name ?? "Mycel"}
       projectRoot={project?.root}

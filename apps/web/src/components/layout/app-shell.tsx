@@ -32,6 +32,7 @@ export type WorkspaceView =
 
 interface AppShellProps {
   view: WorkspaceView;
+  fillWorkspace?: boolean;
   onNavigate: (view: WorkspaceView) => void;
   projectName: string;
   projectRoot?: string | undefined;
@@ -47,13 +48,16 @@ export function AppShell({
   liveConnection,
   children,
   view,
+  fillWorkspace = false,
   onNavigate,
 }: AppShellProps) {
   return (
     <div
       className={cn(
         "flex flex-col bg-background text-foreground md:flex-row",
-        view === "Graph" ? "h-dvh overflow-hidden" : "min-h-svh",
+        view === "Graph" || fillWorkspace
+          ? "h-dvh overflow-hidden"
+          : "min-h-svh",
       )}
     >
       <aside className="w-full md:w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex">
@@ -127,6 +131,7 @@ export function AppShell({
           className={cn(
             "min-w-0 flex-1 p-4 md:p-6",
             view === "Graph" && "flex min-h-0 flex-col overflow-hidden",
+            fillWorkspace && "flex min-h-0 flex-col overflow-y-auto",
           )}
         >
           {children}

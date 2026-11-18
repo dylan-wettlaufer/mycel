@@ -39,8 +39,13 @@ export function FeatureBrowser({
 
   if (featureId) {
     return (
-      <section className="mx-auto w-full max-w-[96rem] space-y-4">
-        <Button variant="outline" size="sm" onClick={onBack}>
+      <section className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-4">
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={onBack}
+        >
           All features
         </Button>
         {detail.error ? (
@@ -49,7 +54,7 @@ export function FeatureBrowser({
           <p>Loading feature…</p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <h2 className="break-all text-xl font-semibold">
                 {featureName(feature.name)}
               </h2>
@@ -58,7 +63,7 @@ export function FeatureBrowser({
               )}
             </div>
             {data.truncated && (
-              <p className="text-sm text-muted-foreground">
+              <p className="shrink-0 text-sm text-muted-foreground">
                 Query limits may omit some paths.
               </p>
             )}

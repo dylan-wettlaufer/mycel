@@ -11,16 +11,16 @@ import { BehaviourDetails, BehaviourEmptyState } from "./behaviour-details";
 import type { BehaviourConnection } from "./behaviour-details-data";
 import { layoutBehaviour } from "./behaviour-layout";
 
-const narrowScreen = "(width < 40rem)";
+const wideScreen = "(width >= 75rem)";
 
 function subscribeToWidth(onChange: () => void) {
-  const screen = window.matchMedia(narrowScreen);
+  const screen = window.matchMedia(wideScreen);
   screen.addEventListener("change", onChange);
   return () => screen.removeEventListener("change", onChange);
 }
 
-function isNarrowScreen() {
-  return window.matchMedia(narrowScreen).matches;
+function isWideScreen() {
+  return window.matchMedia(wideScreen).matches;
 }
 
 function BehaviourGraph({
@@ -32,33 +32,42 @@ function BehaviourGraph({
   members: SemanticEntity[];
   revision: number;
 }) {
-  const [{ expanded, anchorId, actionId }, setExpansion] = useState<{
+  const [{ expanded, anchorId, fitRequest }, setExpansion] = useState<{
     expanded: Set<string>;
     anchorId?: string;
-    actionId: number;
-  }>(() => ({ expanded: new Set(), actionId: 0 }));
+    fitRequest: number;
+  }>(() => ({ expanded: new Set(), fitRequest: 0 }));
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const narrow = useSyncExternalStore(subscribeToWidth, isNarrowScreen);
+  const [reveal, setReveal] = useState<{ id: string } | null>(null);
+  const wide = useSyncExternalStore(subscribeToWidth, isWideScreen);
   const graph = useMemo(
-    () => layoutBehaviour(traces, expanded, narrow ? "TB" : "LR", members),
-    [traces, expanded, narrow, members],
+    () => layoutBehaviour(traces, expanded, wide ? "LR" : "TB", members),
+    [traces, expanded, wide, members],
   );
   const toggle = useCallback((id: string) => {
     setExpansion((previous) => {
       const next = new Set(previous.expanded);
       if (!next.delete(id)) next.add(id);
-      return { expanded: next, anchorId: id, actionId: previous.actionId + 1 };
+      return {
+        expanded: next,
+        anchorId: id,
+        fitRequest: previous.fitRequest + 1,
+      };
     });
   }, []);
+  function selectNode(id: string) {
+    setSelectedId(id);
+    setReveal({ id });
+  }
   function selectConnection({ id, revealFrom }: BehaviourConnection) {
     if (revealFrom !== undefined) {
       setExpansion((previous) => ({
         expanded: new Set([...previous.expanded, revealFrom]),
         anchorId: revealFrom,
-        actionId: previous.actionId + 1,
+        fitRequest: previous.fitRequest + 1,
       }));
     }
-    setSelectedId(id);
+    selectNode(id);
   }
   const nodes = useMemo(
     () =>
@@ -81,10 +90,16 @@ function BehaviourGraph({
   if (selectedId && !nodes.some((node) => node.id === selectedId)) {
     setSelectedId(anchorId && graph.expandable.has(anchorId) ? anchorId : null);
   }
-  const clearSelection = () => setSelectedId(null);
+  const clearSelection = () => {
+    setSelectedId(null);
+    setReveal(null);
+  };
   return (
-    <section aria-label="Behaviour graph" className="min-w-0 space-y-3">
-      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+    <section
+      aria-label="Behaviour graph"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
+    >
+      <div className="flex min-h-6 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h3 className="text-base font-semibold">Behaviour graph</h3>
         {nodes.length > 0 && !selectedId && <BehaviourEmptyState />}
       </div>
@@ -93,18 +108,21 @@ function BehaviourGraph({
           No supported UI event paths found.
         </p>
       ) : (
-        <div className="flex lg:h-[min(68dvh,52rem)] lg:min-h-[28rem]">
+        <div className="flex min-h-56 flex-1">
           <GraphCanvas
-            key={String(narrow)}
             mode="behaviour"
-            layoutAnchorId={anchorId}
-            fitRequest={
-              anchorId && expanded.has(anchorId) ? actionId : undefined
-            }
+            layoutAnchorId={anchorId ?? nodes[0]?.id}
+            behaviourView={{
+              rootId: nodes[0]!.id,
+              wide,
+              fitRequest,
+              hasExpandedSteps: expanded.size > 0,
+              reveal,
+            }}
             nodes={nodes}
             edges={graph.edges}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectNode}
             onClear={clearSelection}
             sidePanel={
               selectedId && (

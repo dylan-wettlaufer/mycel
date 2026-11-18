@@ -50,3 +50,28 @@ test("connection-only mode keeps direction and restores the complete graph when 
   expect(focusGraph(nodes, edges, null, true).nodes).toHaveLength(4);
   expect(focusGraph(nodes, edges, "deleted-node", true).edges).toHaveLength(4);
 });
+
+test("selection keeps uncertainty and arrow direction visible on behaviour edges", () => {
+  const [edge] = focusGraph(
+    nodes,
+    [
+      {
+        ...edges[0]!,
+        type: "behaviour",
+        className: "graph-edge-uncertain",
+        label: "unresolved",
+        style: { strokeDasharray: "2 5" },
+      },
+    ],
+    "selected",
+    false,
+  ).edges;
+  expect(edge).toMatchObject({
+    source: "caller",
+    target: "selected",
+    label: "unresolved",
+    markerEnd: { color: "var(--warning)" },
+    style: { stroke: "var(--warning)", strokeDasharray: "2 5" },
+  });
+  expect(edge?.className).toContain("graph-edge-uncertain");
+});

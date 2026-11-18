@@ -31,6 +31,7 @@ try {
   });
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  page.setDefaultTimeout(10_000);
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
@@ -66,6 +67,9 @@ try {
     exact: true,
   });
   const nodes = graph.locator(".react-flow__node");
+  const canvas = graph.locator(".graph-canvas");
+  const fitAll = graph.getByRole("button", { name: "Fit all" });
+  const legend = graph.getByRole("button", { name: "Legend" });
   const selection = graph.getByRole("complementary", {
     name: "Selection details",
   });
@@ -94,6 +98,21 @@ try {
       );
     });
   await expect.poll(() => effectiveTitleSize(event)).toBeGreaterThanOrEqual(16);
+  const spaceBelowCanvas = () =>
+    canvas.evaluate(
+      (element) =>
+        globalThis.innerHeight - element.getBoundingClientRect().bottom,
+    );
+  const canvasHeight = () => canvas.evaluate((element) => element.clientHeight);
+  await expect.poll(spaceBelowCanvas).toBeCloseTo(24);
+  await expect.poll(canvasHeight).toBeGreaterThan(450);
+  const desktopCanvasHeight = await canvasHeight();
+  await expect(event.locator(".react-flow__handle-right")).toHaveCount(1);
+  await expect(legend).toHaveAttribute("aria-expanded", "false");
+  await legend.click();
+  await expect(legend).toHaveAttribute("aria-expanded", "true");
+  await expect(graph.getByText("Unresolved or inferred")).toBeVisible();
+  await legend.click();
   const [eventId, readId, writeId, modelId] = await Promise.all(
     [event, readEndpoint, writeEndpoint, model].map((node) =>
       node.getAttribute("data-id"),
@@ -152,9 +171,11 @@ try {
   const viewport = graph.locator(".react-flow__viewport");
   const readTransform = () =>
     viewport.evaluate((element) => element.style.transform);
-  const transformBefore = await readTransform();
+  const readZoom = async () =>
+    Number((await readTransform()).match(/scale\(([^)]+)\)/)?.[1]);
+  const collapsedZoom = await readZoom();
   const nodesFit = () =>
-    graph.locator(".graph-canvas").evaluate((canvas) => {
+    canvas.evaluate((canvas) => {
       const bounds = canvas.getBoundingClientRect();
       const cards = [...canvas.querySelectorAll(".react-flow__node")];
       return (
@@ -185,6 +206,17 @@ try {
   );
   await writeEndpoint.click();
   await expect(writeEndpoint).toHaveClass(/graph-selected/);
+  await expect.poll(canvasHeight).toBe(desktopCanvasHeight);
+  await expect.poll(readZoom).toBeCloseTo(collapsedZoom);
+  const connectionsFilter = graph.getByRole("button", {
+    name: "Only connections",
+  });
+  await connectionsFilter.click();
+  await expect(connectionsFilter).toHaveAttribute("aria-pressed", "true");
+  await expect(nodes).toHaveCount(3);
+  await expect.poll(readZoom).toBeCloseTo(collapsedZoom);
+  await connectionsFilter.click();
+  await expect(nodes).toHaveCount(4);
   const overview = selection.getByRole("region", { name: "Overview" });
   await expect(
     overview.getByRole("heading", { name: "Create Order" }),
@@ -270,6 +302,7 @@ try {
 
   await dataConnection.click();
   await expect(model).toHaveClass(/graph-selected/);
+  await expect(model).toBeInViewport({ ratio: 0.9 });
   await expect(
     connections.getByRole("button", {
       name: /^Create Order Writes to this model/,
@@ -283,6 +316,7 @@ try {
   await handlerConnection.click();
   await expect(writeHandler).toHaveClass(/graph-selected/);
   await expect(hideWrite).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(nodesFit).toBe(true);
   await writeEndpoint.click();
   await expect(dataConnection).toBeVisible();
   await handlerConnection.click();
@@ -295,22 +329,48 @@ try {
     exact: true,
   });
   await expect(request).toHaveClass(/graph-selected/);
+  await expect(request).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(nodesFit).toBe(true);
   await event
     .getByRole("button", { name: "Hide call steps for form.onSubmit" })
     .click();
   await expect(event).toHaveClass(/graph-selected/);
   await selection.getByRole("button", { name: "Clear selection" }).click();
   await expect(empty).toBeVisible();
-  await graph.getByRole("button", { name: "Fit all" }).click();
+  await fitAll.click();
   await expect.poll(nodesFit).toBe(true);
+  await expect.poll(readZoom).toBeGreaterThan(0.9);
 
+  const zoomBeforeExpansion = await readZoom();
   await showWrite.click();
   await expect(hideWrite).toHaveAttribute("aria-expanded", "true");
   await expect(writeHandler).toBeVisible();
   await expect(writeService).toBeVisible();
   await expect(readService).toHaveCount(0);
   await expect(submitHandler).toHaveCount(0);
-  await expect.poll(readTransform).not.toBe(transformBefore);
+  await expect(writeHandler).toBeInViewport({ ratio: 0.9 });
+  await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
+  for (const toggle of [showRead, hideWrite]) {
+    await expect
+      .poll(() =>
+        toggle.evaluate(
+          (button) =>
+            button.parentElement.scrollWidth <=
+            button.parentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+  }
+  await expect.poll(nodesFit).toBe(true);
+  await expect.poll(readZoom).toBeLessThan(zoomBeforeExpansion);
+  await expect.poll(canvasHeight).toBe(desktopCanvasHeight);
+  const zoomAfterExpansion = await readZoom();
+  const beforePan = await readTransform();
+  await canvas.hover({ position: { x: 110, y: 240 } });
+  await page.mouse.wheel(0, 220);
+  await expect.poll(readTransform).not.toBe(beforePan);
+  await expect.poll(readZoom).toBeCloseTo(zoomAfterExpansion);
+  await fitAll.click();
   await expect.poll(nodesFit).toBe(true);
 
   const edge = async (sourceId, target) => {
@@ -330,9 +390,20 @@ try {
   await expect(writeService).toBeVisible();
   await expect(submitHandler).toHaveCount(0);
   await expect.poll(nodesFit).toBe(true);
+  await event
+    .getByRole("button", { name: "Show call steps for form.onSubmit" })
+    .click();
+  await expect(submitHandler).toBeVisible();
+  await expect.poll(nodesFit).toBe(true);
+  await event
+    .getByRole("button", { name: "Hide call steps for form.onSubmit" })
+    .click();
+  await expect(submitHandler).toHaveCount(0);
+  await expect.poll(nodesFit).toBe(true);
 
   await writeService.click();
   await expect(writeService).toHaveClass(/graph-selected/);
+  await expect.poll(nodesFit).toBe(true);
   await expect(
     selection.getByText("services/orders.ts:2", { exact: true }),
   ).toBeVisible();
@@ -343,7 +414,6 @@ try {
   await expect(
     selection.getByText("app/api/orders/route.ts:4", { exact: true }),
   ).toBeVisible();
-  const beforeCollapse = await readTransform();
   await hideWrite.click();
   await expect(writeService).toHaveCount(0);
   await expect(writeHandler).toHaveCount(0);
@@ -358,12 +428,25 @@ try {
   await expect(
     selection.getByText("app/api/orders/route.ts:2", { exact: true }),
   ).toBeVisible();
-  await expect.poll(readTransform).toBe(beforeCollapse);
+  await expect.poll(nodesFit).toBe(true);
+  await expect(writeEndpoint).toBeInViewport({ ratio: 0.9 });
 
   await hideRead.click();
   await expect(readService).toHaveCount(0);
   await expect(nodes).toHaveCount(4);
+  await graph.getByRole("button", { name: "Readable zoom" }).click();
+  await expect.poll(readZoom).toBeGreaterThan(1);
+  const zoomBeforeResize = await readZoom();
+  await page.setViewportSize({ width: 1100, height: 780 });
+  await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
+  await expect.poll(spaceBelowCanvas).toBeCloseTo(24);
+  await expect.poll(readZoom).toBeCloseTo(zoomBeforeResize);
+  await expect(
+    overview.getByRole("heading", { name: "Create Order" }),
+  ).toBeVisible();
+  await expect(writeEndpoint).toBeInViewport({ ratio: 0.9 });
   await selection.getByRole("button", { name: "Clear selection" }).click();
+  await expect.poll(nodesFit).toBe(true);
   await readEndpoint.press("Enter");
   await expect(
     selection.getByRole("heading", { name: "List Orders", exact: true }),
@@ -372,7 +455,10 @@ try {
   await expect(empty).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
   await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
+  await expect.poll(spaceBelowCanvas).toBeCloseTo(16);
+  const mobileCanvasHeight = await canvasHeight();
   await expect
     .poll(() =>
       writeEndpoint
@@ -380,21 +466,23 @@ try {
         .evaluate((title) => title.scrollWidth <= title.clientWidth),
     )
     .toBe(true);
-  await expect.poll(() => effectiveTitleSize(event)).toBeGreaterThanOrEqual(13);
+  await expect.poll(() => effectiveTitleSize(event)).toBeGreaterThanOrEqual(14);
   await expect
     .poll(() =>
       page.evaluate(() => globalThis.document.documentElement.scrollWidth),
     )
     .toBe(390);
   await showWrite.click();
-  await expect(writeService).toBeVisible();
+  await expect(writeHandler).toBeInViewport({ ratio: 0.9 });
   await expect.poll(nodesFit).toBe(true);
+  await expect.poll(canvasHeight).toBe(mobileCanvasHeight);
   await hideWrite.click();
   await expect(nodes).toHaveCount(4);
   await writeEndpoint.press("Enter");
   await expect(
     overview.getByRole("heading", { name: "Create Order" }),
   ).toBeVisible();
+  await expect.poll(canvasHeight).toBeGreaterThanOrEqual(mobileCanvasHeight);
   await expect
     .poll(() =>
       panelViewport.evaluate(
@@ -418,7 +506,7 @@ try {
   ).toBeVisible();
   assert.deepEqual(errors, [], "browser runtime errors");
   console.log(
-    "PASS: Chromium verified the Orders details, connection navigation, source viewer, and expandable graph and trace on desktop and mobile.",
+    "PASS: Chromium verified the Orders layout, viewport, filtering, and selection details on desktop and mobile.",
   );
 } finally {
   try {
