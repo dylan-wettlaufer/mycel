@@ -31,4 +31,8 @@ export {
   getSemanticFeatures,
   getSemanticFeature,
 } from "./semantic.js";
-export { getBehaviourEntries, traceBehaviour } from "./behaviour.js";
+export {
+  getBehaviourEntries,
+  getFeatureBehaviour,
+  traceBehaviour,
+} from "./behaviour.js";

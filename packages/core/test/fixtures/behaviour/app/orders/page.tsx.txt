@@ -1,2 +1,2 @@
-import { OrderForm } from '../OrderForm';
+import { OrderForm } from '../../OrderForm';
 export default function OrdersPage() { return <OrderForm />; }

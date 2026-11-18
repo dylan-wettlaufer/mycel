@@ -82,6 +82,13 @@ responses. `createGraphQueries` exposes `getFeatures` and `getFeature`;
 `@mycel/db` exposes `getSemanticFeatures` and `getSemanticFeature`. Existing semantic
 snapshot and neighborhood queries also include the new candidates and memberships.
 
+The dashboard's **Features** view uses
+`GET /api/graph/semantic/features/:id/behaviour` to read membership and up to
+eight UI event traces in one project revision. It matches events to page or
+component declarations by structural symbol ID. The membership `limit` follows
+the detail endpoint, and the response reports truncation when membership, event,
+or trace limits omit results.
+
 ## Incremental behavior and limits
 
 Discovery runs on the captured semantic snapshot, after declaration extraction and

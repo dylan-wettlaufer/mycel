@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   Activity,
+  Boxes,
   FolderTree,
   LayoutDashboard,
   Network,
@@ -21,11 +22,13 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "Graph", icon: Network },
+  { label: "Features", icon: Boxes },
   { label: "Activity", icon: Activity },
   { label: "Explorer", icon: FolderTree },
 ];
 
-export type WorkspaceView = "Dashboard" | "Graph" | "Activity" | "Explorer";
+export type WorkspaceView =
+  "Dashboard" | "Graph" | "Features" | "Activity" | "Explorer";
 
 interface AppShellProps {
   view: WorkspaceView;

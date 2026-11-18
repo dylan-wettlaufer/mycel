@@ -206,6 +206,51 @@ test("form-to-persistence queries return both request branches and supported rev
   assert.ok(reverse.paths.every((path) => path.end === "no-supported-callers"));
 });
 
+test("feature behaviour joins member symbols to UI events from the same revision", async (t) => {
+  const input = await fixture(t);
+  // A second component in the same file must not supply an Orders event.
+  await writeFile(
+    join(input.root, "OrderForm.tsx"),
+    input.sources.get("OrderForm.tsx") +
+      "\n/** @mycelFeature support */\n" +
+      "export function SupportButton() { return <button onClick={() => {}}>Help</button>; }\n",
+  );
+  const indexed = await indexRepository(input);
+  const queries = createGraphQueries(input.database, indexed.projectId);
+  const { features } = queries.getFeatures();
+  const orders = features.find(({ name }) => name === "orders");
+  const support = features.find(({ name }) => name === "support");
+  assert.ok(orders && support);
+
+  const detail = queries.getFeatureBehaviour(orders.id);
+  assert.equal(detail.featureId, orders.id);
+  assert.equal(detail.revision, indexed.revision);
+  assert.equal(detail.truncated, false);
+  assert.ok(detail.entities.some(({ name }) => name === "OrderForm"));
+  assert.deepEqual(
+    detail.traces.map(({ revision }) => revision),
+    [detail.revision],
+  );
+  const [trace] = detail.traces;
+  assert.equal(
+    trace.entities.find(({ id }) => id === trace.rootId).name,
+    "form.onSubmit",
+  );
+  assert.deepEqual(
+    new Set(trace.paths.map(({ hops }) => hops.at(-1).relationship.kind)),
+    new Set(["READS", "WRITES"]),
+  );
+
+  const supportTrace = queries.getFeatureBehaviour(support.id).traces[0];
+  assert.equal(
+    supportTrace.entities.find(({ id }) => id === supportTrace.rootId).name,
+    "button.onClick",
+  );
+  const limited = queries.getFeatureBehaviour(orders.id, 1);
+  assert.equal(limited.truncated, true);
+  assert.deepEqual(limited.traces, []);
+});
+
 async function until(check) {
   const deadline = Date.now() + 8000;
   while (!check()) {

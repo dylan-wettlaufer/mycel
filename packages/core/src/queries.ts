@@ -1,5 +1,6 @@
 import {
   getBehaviourEntries,
+  getFeatureBehaviour,
   traceBehaviour,
   getSemanticFeatures,
   getSemanticFeature,
@@ -29,6 +30,7 @@ import type {
   BehaviourEntryList,
   BehaviourTrace,
   BehaviourTraceQuery,
+  FeatureBehaviour,
 } from "@mycel/shared";
 
 /** Project-scoped reads; consumers cannot select a different project per request. */
@@ -40,6 +42,10 @@ export interface GraphQueries {
   ): BehaviourTrace | undefined;
   getFeatures?(query?: SemanticFeatureQuery): SemanticFeatureList;
   getFeature?(id: string, limit?: number): SemanticGraph | undefined;
+  getFeatureBehaviour?(
+    id: string,
+    limit?: number,
+  ): FeatureBehaviour | undefined;
   getSemanticGraph?(limit?: number): SemanticGraph;
   getSemanticNeighborhood?(
     id: string,
@@ -72,6 +78,8 @@ export function createGraphQueries(
     getFeatures: (query) => getSemanticFeatures(database, projectId, query),
     getFeature: (id, limit) =>
       getSemanticFeature(database, projectId, id, limit),
+    getFeatureBehaviour: (id, limit) =>
+      getFeatureBehaviour(database, projectId, id, limit),
     getSemanticGraph: (limit) => getSemanticGraph(database, projectId, limit),
     getSemanticNeighborhood: (id, { depth, limit } = {}) =>
       getSemanticNeighborhood(database, projectId, id, depth, limit),

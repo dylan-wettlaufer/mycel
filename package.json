@@ -26,7 +26,7 @@
     "start": "node packages/cli/dist/bin.js",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm run build && pnpm -r typecheck",
-    "test:workflow": "pnpm build && node scripts/test-dashboard.mjs"
+    "test:workflow": "pnpm build && node scripts/test-dashboard.mjs && node scripts/test-feature-workflow.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

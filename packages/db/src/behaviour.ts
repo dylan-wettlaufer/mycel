@@ -3,10 +3,11 @@ import type {
   BehaviourPath,
   BehaviourTrace,
   BehaviourTraceQuery,
+  FeatureBehaviour,
   SemanticEntity,
 } from "@mycel/shared";
 import type { SqliteDatabase } from "./database.js";
-import { readSemanticSelection } from "./semantic.js";
+import { getSemanticFeature, readSemanticSelection } from "./semantic.js";
 
 function integer(value: number, min: number, max: number, name: string) {
   if (!Number.isSafeInteger(value) || value < min || value > max)
@@ -40,6 +41,53 @@ export function getBehaviourEntries(
       revision: graph.revision,
       entries: graph.entities,
       truncated: graph.truncated,
+    };
+  })();
+}
+
+const featureEntryLimit = 8;
+
+/** Match events to member declarations by structural symbol within one revision. */
+export function getFeatureBehaviour(
+  db: SqliteDatabase,
+  projectId: string,
+  featureId: string,
+  limit = 100,
+): FeatureBehaviour | undefined {
+  return db.transaction(() => {
+    const membership = getSemanticFeature(db, projectId, featureId, limit);
+    if (!membership) return;
+    const uiMembers = membership.entities
+      .filter(({ kind }) => kind === "component" || kind === "page")
+      .map(({ id }) => id);
+    const entries = db
+      .prepare<[string, string, number], { id: string }>(
+        `SELECT DISTINCT entry.id
+        FROM semantic_sources member_source
+        JOIN nodes symbol ON symbol.project_id = member_source.project_id
+          AND symbol.id = member_source.node_id AND symbol.kind = 'function'
+        JOIN semantic_sources entry_source ON entry_source.project_id = symbol.project_id
+          AND entry_source.node_id = symbol.id
+        JOIN semantic_entities entry ON entry.project_id = entry_source.project_id
+          AND entry.id = entry_source.entity_id
+        WHERE member_source.project_id = ?
+          AND member_source.entity_id IN (SELECT value FROM json_each(?))
+          AND entry.kind = 'service_operation'
+          AND json_extract(entry.attributes, '$.traceRole') = 'ui_event'
+        ORDER BY entry.id LIMIT ?`,
+      )
+      .all(projectId, JSON.stringify(uiMembers), featureEntryLimit + 1);
+    const traces = entries
+      .slice(0, featureEntryLimit)
+      .map(({ id }) => traceBehaviour(db, projectId, id)!);
+    return {
+      ...membership,
+      featureId,
+      traces,
+      truncated:
+        membership.truncated ||
+        entries.length > featureEntryLimit ||
+        traces.some((trace) => trace.truncated),
     };
   })();
 }

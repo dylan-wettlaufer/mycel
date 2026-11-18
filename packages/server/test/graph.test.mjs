@@ -557,6 +557,22 @@ test("feature routes retrieve candidate memberships and validate status and size
   const result = await detail.json();
   assert.equal(result.entities.length, 2);
   assert.equal(result.relationships[0].sources[0].nodeId, "node:save");
+  const behaviourPath =
+    "/api/graph/semantic/features/feature%3Aorders/behaviour";
+  const behaviour = await app.request(behaviourPath);
+  assert.equal(behaviour.status, 200);
+  assert.deepEqual(await behaviour.json(), {
+    ...result,
+    featureId: feature.id,
+    traces: [],
+  });
+  assert.equal((await app.request(`${behaviourPath}?limit=501`)).status, 400);
+  assert.equal(
+    (await app.request("/api/graph/semantic/features/missing/behaviour"))
+      .status,
+    404,
+  );
+  assert.equal((await createApp().request(behaviourPath)).status, 503);
   assert.equal(
     (await app.request("/api/graph/semantic/features/missing")).status,
     404,

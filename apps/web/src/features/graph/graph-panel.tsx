@@ -99,7 +99,7 @@ export function GraphPanel({
             nodes={layout.nodes}
             edges={layout.edges}
             selectedId={clearedFor === selected.id ? null : selected.id}
-            symbols
+            mode="symbols"
             details={details}
             onClear={() => setClearedFor(selected.id)}
             onSelect={(id) => {

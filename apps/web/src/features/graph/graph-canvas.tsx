@@ -1,5 +1,12 @@
 import { Focus, Filter, Scan, ZoomIn } from "lucide-react";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Background,
   Controls,
@@ -14,8 +21,12 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { graphNodeTypes } from "./graph-node";
 import { focusGraph, graphConnections } from "./graph-focus";
+
+const fitViewOptions = { padding: 0.15, minZoom: 0.03, maxZoom: 0.8 };
+const behaviourFitViewOptions = { ...fitViewOptions, maxZoom: 1 };
 
 function name(node: Node): string {
   return String(node.data.name ?? node.data.label);
@@ -45,7 +56,8 @@ export function GraphCanvas({
   onClear,
   onOpen,
   openLabel,
-  symbols = false,
+  mode = "imports",
+  initialFocusId,
   details,
 }: {
   nodes: Node[];
@@ -55,12 +67,50 @@ export function GraphCanvas({
   onClear: () => void;
   onOpen?: ((id: string) => void) | undefined;
   openLabel?: string;
-  symbols?: boolean;
+  mode?: "imports" | "symbols" | "behaviour";
+  initialFocusId?: string | undefined;
   details?: ReactNode;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
   const [nodeState, setNodeState] = useState(() => new Map<string, Node>());
   const flow = useRef<ReactFlowInstance | null>(null);
+  const canvas = useRef<HTMLDivElement>(null);
+  const behaviour = mode === "behaviour";
+  const fitOptions = behaviour ? behaviourFitViewOptions : fitViewOptions;
+  const initialFitOptions = useMemo(() => {
+    if (!initialFocusId) return fitOptions;
+    const entry = graphConnections(nodes, edges, initialFocusId);
+    const nearby = new Set(entry.ids);
+    for (const next of entry.outgoing)
+      for (const node of graphConnections(nodes, edges, next.id).outgoing)
+        nearby.add(node.id);
+    return { ...fitOptions, nodes: [...nearby].map((id) => ({ id })) };
+  }, [fitOptions, initialFocusId, nodes, edges]);
+  useEffect(() => {
+    const element = canvas.current;
+    // Expanded traces open at their entry point and keep their zoom on resize.
+    if (!behaviour || !element || initialFocusId) return;
+    let size: string | undefined;
+    let frame = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      const nextSize = `${width}:${height}`;
+      if (size !== undefined && size !== nextSize && width > 0 && height > 0) {
+        cancelAnimationFrame(frame);
+        // Wait for React Flow to observe the new canvas dimensions first.
+        frame = requestAnimationFrame(() => {
+          void flow.current?.fitView({ ...fitOptions, duration: 200 });
+        });
+      }
+      size = nextSize;
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [behaviour, fitOptions, initialFocusId]);
   const focused = useMemo(
     () => focusGraph(nodes, edges, selectedId, onlyConnections),
     [nodes, edges, selectedId, onlyConnections],
@@ -79,8 +129,20 @@ export function GraphCanvas({
             ),
           ),
       );
+      if (behaviour) {
+        const selection = changes.find(
+          (change) => change.type === "select" && change.selected,
+        );
+        if (selection?.type === "select") onSelect(selection.id);
+        else if (
+          changes.some(
+            (change) => change.type === "select" && change.id === selectedId,
+          )
+        )
+          onClear();
+      }
     },
-    [nodes],
+    [behaviour, nodes, onClear, onSelect, selectedId],
   );
   const connections = useMemo(
     () => graphConnections(nodes, edges, selectedId),
@@ -88,8 +150,20 @@ export function GraphCanvas({
   );
   const selected = nodes.find((node) => node.id === selectedId);
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden">
-      <div className="graph-canvas min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card">
+    <div
+      className={cn(
+        "relative flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden",
+        behaviour && "flex-col lg:flex-row",
+      )}
+    >
+      <div
+        ref={canvas}
+        className={cn(
+          "graph-canvas min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card",
+          behaviour &&
+            "h-[min(30rem,58dvh)] min-h-72 flex-none lg:h-auto lg:flex-1",
+        )}
+      >
         <ReactFlow<Node, Edge>
           nodes={visibleNodes}
           edges={focused.edges}
@@ -97,7 +171,7 @@ export function GraphCanvas({
           fitView
           minZoom={0.03}
           maxZoom={2}
-          fitViewOptions={{ padding: 0.15, minZoom: 0.03, maxZoom: 0.8 }}
+          fitViewOptions={initialFitOptions}
           colorMode="dark"
           nodesDraggable
           nodesConnectable={false}
@@ -120,7 +194,9 @@ export function GraphCanvas({
                 title="Readable zoom"
                 aria-label="Readable zoom"
                 onClick={() => {
-                  void flow.current?.zoomTo(0.8, { duration: 200 });
+                  void flow.current?.zoomTo(fitOptions.maxZoom, {
+                    duration: 200,
+                  });
                 }}
               >
                 <ZoomIn aria-hidden />
@@ -132,9 +208,7 @@ export function GraphCanvas({
                 aria-label="Fit all"
                 onClick={() => {
                   void flow.current?.fitView({
-                    minZoom: 0.03,
-                    maxZoom: 0.8,
-                    padding: 0.15,
+                    ...fitOptions,
                     duration: 200,
                   });
                 }}
@@ -149,9 +223,8 @@ export function GraphCanvas({
                 disabled={!selected}
                 onClick={() => {
                   void flow.current?.fitView({
+                    ...fitOptions,
                     nodes: [...connections.ids].map((id) => ({ id })),
-                    minZoom: 0.03,
-                    maxZoom: 0.8,
                     padding: 0.2,
                     duration: 200,
                   });
@@ -172,20 +245,29 @@ export function GraphCanvas({
               </Button>
             </div>
           </Panel>
-          <Panel position="top-left">
+          <Panel
+            position="top-left"
+            className={
+              behaviour ? "max-w-[calc(100%-64px)] hidden sm:block" : undefined
+            }
+          >
             <div aria-label="Graph legend" className="graph-legend">
               <span className="graph-legend-heading">Legend</span>
               <span>
                 <i className="graph-legend-arrow" aria-hidden />
-                {symbols ? "Arrow: imports or calls" : "A → B: A imports B"}
+                {mode === "symbols"
+                  ? "Arrow: imports or calls"
+                  : behaviour
+                    ? "Arrow follows the flow"
+                    : "A → B: A imports B"}
               </span>
-              {symbols && (
+              {mode !== "imports" && (
                 <span>
                   <i
                     className="graph-legend-arrow graph-legend-dashed"
                     aria-hidden
                   />
-                  Dashed: contains
+                  {behaviour ? "Dashed: combined steps" : "Dashed: contains"}
                 </span>
               )}
               <span>
@@ -211,15 +293,21 @@ export function GraphCanvas({
       {selected && (
         <aside
           aria-label="Selection details"
-          className="absolute inset-y-0 right-0 z-10 flex w-[340px] max-w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border bg-card shadow-lg lg:static lg:shadow-none"
+          className={
+            behaviour
+              ? "flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-lg border bg-card lg:w-[300px] lg:max-w-[40%]"
+              : "absolute inset-y-0 right-0 z-10 flex w-[340px] max-w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border bg-card shadow-lg lg:static lg:shadow-none"
+          }
         >
           <div className="flex shrink-0 flex-wrap items-start gap-2 border-b p-4">
             <div className="mr-auto min-w-0">
-              <h3 className="break-all text-base font-semibold">
-                {name(selected)}
+              <h3 className="break-words text-base font-semibold">
+                {behaviour ? String(selected.data.label) : name(selected)}
               </h3>
               <p className="break-all font-mono text-xs text-muted-foreground">
-                {String(selected.data.context ?? "")}
+                {behaviour
+                  ? name(selected)
+                  : String(selected.data.context ?? "")}
               </p>
             </div>
             {onOpen && (
@@ -234,20 +322,29 @@ export function GraphCanvas({
           <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-5 p-4">
               {details}
-              <section aria-label="Selected connections" className="space-y-5">
-                <Connections
-                  title={symbols ? "Points to selection" : "Used by"}
-                  nodes={connections.incoming}
-                  onSelect={onSelect}
-                  direction="incoming"
-                />
-                <Connections
-                  title={symbols ? "Selection points to" : "Depends on"}
-                  nodes={connections.outgoing}
-                  onSelect={onSelect}
-                  direction="outgoing"
-                />
-              </section>
+              {!behaviour && (
+                <section
+                  aria-label="Selected connections"
+                  className="space-y-5"
+                >
+                  <Connections
+                    title={
+                      mode === "symbols" ? "Points to selection" : "Used by"
+                    }
+                    nodes={connections.incoming}
+                    onSelect={onSelect}
+                    direction="incoming"
+                  />
+                  <Connections
+                    title={
+                      mode === "symbols" ? "Selection points to" : "Depends on"
+                    }
+                    nodes={connections.outgoing}
+                    onSelect={onSelect}
+                    direction="outgoing"
+                  />
+                </section>
+              )}
             </div>
           </ScrollArea>
         </aside>

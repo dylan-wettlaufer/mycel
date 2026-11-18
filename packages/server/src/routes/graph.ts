@@ -140,6 +140,22 @@ export function createGraphRoutes(graph?: GraphQueries) {
       : context.json({ error: "Feature not found" }, 404);
   });
 
+  routes.get("/semantic/features/:id/behaviour", (context) => {
+    const limit = integerParameter(
+      context.req.queries("limit"),
+      "limit",
+      100,
+      1,
+      500,
+    );
+    if (!graph?.getFeatureBehaviour)
+      return context.json({ error: "Feature behaviour unavailable" }, 503);
+    const result = graph.getFeatureBehaviour(context.req.param("id"), limit);
+    return result
+      ? context.json(result)
+      : context.json({ error: "Feature not found" }, 404);
+  });
+
   routes.get("/semantic", (context) => {
     const limit = integerParameter(
       context.req.queries("limit"),

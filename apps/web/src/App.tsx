@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { Explorer } from "@/features/explorer/explorer";
 import { NodeDetailsPanel } from "@/features/details/node-details";
+import { FeatureBrowser } from "@/features/semantic/feature-browser";
 import { RecordedChanges } from "@/features/activity/recorded-changes";
 import { SourcePanel } from "@/features/source/source-panel";
 import { useBackendHealth } from "@/hooks/use-backend-health";
@@ -28,7 +29,7 @@ const RepositoryOverview = lazy(() =>
 
 export function App() {
   const { navigation, navigate } = useNavigation();
-  const { view, nodeId, rootId, changeId, source } = navigation;
+  const { view, nodeId, rootId, featureId, changeId, source } = navigation;
   const activity = useActivity();
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
@@ -80,6 +81,13 @@ export function App() {
         />
       ) : view === "Explorer" ? (
         <Explorer revision={activity.revision} onSelect={openNode} />
+      ) : view === "Features" ? (
+        <FeatureBrowser
+          featureId={featureId}
+          revision={activity.revision}
+          onSelect={(id) => navigate({ view: "Features", featureId: id })}
+          onBack={() => navigate({ view: "Features" })}
+        />
       ) : view === "Activity" ? (
         <>
           {nodeId && (

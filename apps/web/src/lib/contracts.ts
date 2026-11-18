@@ -1,6 +1,14 @@
-import type { GraphNode, SearchResult } from "@mycel/shared";
+import type { GraphNode, SearchResult, SourceRange } from "@mycel/shared";
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+export function isSourceRange(value: unknown): value is SourceRange {
+  return (
+    isRecord(value) &&
+    ["start", "end", "startLine", "startColumn", "endLine", "endColumn"].every(
+      (key) => typeof value[key] === "number",
+    )
+  );
 }
 export function isNode(value: unknown): value is GraphNode {
   return (
@@ -13,13 +21,7 @@ export function isNode(value: unknown): value is GraphNode {
     typeof value.path === "string" &&
     typeof value.contentHash === "string" &&
     typeof value.revision === "number" &&
-    isRecord(value.range) &&
-    ["start", "end", "startLine", "startColumn", "endLine", "endColumn"].every(
-      (key) =>
-        typeof value.range === "object" &&
-        value.range !== null &&
-        typeof (value.range as Record<string, unknown>)[key] === "number",
-    )
+    isSourceRange(value.range)
   );
 }
 export function isSearchResult(value: unknown): value is SearchResult {

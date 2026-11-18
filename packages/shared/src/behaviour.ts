@@ -1,5 +1,9 @@
 import type { GraphQueryContext } from "./queries.js";
-import type { SemanticEntity, SemanticRelationship } from "./semantic.js";
+import type {
+  SemanticEntity,
+  SemanticGraph,
+  SemanticRelationship,
+} from "./semantic.js";
 
 export type BehaviourRole =
   "callable" | "ui_event" | "http_request" | "prisma_operation" | "unresolved";
@@ -39,4 +43,10 @@ export interface BehaviourTrace extends GraphQueryContext {
 export interface BehaviourEntryList extends GraphQueryContext {
   entries: SemanticEntity[];
   truncated: boolean;
+}
+
+/** Feature membership and the behaviour paths from its own UI events. */
+export interface FeatureBehaviour extends SemanticGraph {
+  featureId: string;
+  traces: BehaviourTrace[];
 }
