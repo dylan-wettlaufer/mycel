@@ -31,16 +31,14 @@ See [architecture](../ARCHITECTURE.md#http-api).
 - [x] `GET /api/graph/nodes/:id`, returning 404 for unknown ids.
 - [x] `GET /api/graph/nodes/:id/neighborhood` with bounded `depth` and
       `limit` parameters.
-- [ ] `GET /api/files/content?path=`: resolve the path with `realpath`, reject
-      anything outside the project root (including through symlinks), and
-      return 404 for missing files.
+- [x] `GET /api/files/content?path=`: validate the repository-relative path and
+      return captured source from the current indexed project.
 - [x] Validate graph query parameters and return 400 with a JSON error body for bad
       input.
 - [ ] Extend `/api/health` with index and database status from the engine.
 - [x] Wire initial indexing and graph queries into CLI/dev startup; close storage
       on shutdown and failed startup through `startIndexedServer`.
-- [ ] Add a `GET /api/stats` route for the dashboard cards, or include the
-      counts in `/api/project`.
+- [x] Add `GET /api/graph/stats` for the dashboard cards.
 
 ### Phase 4: history and events
 
@@ -59,7 +57,7 @@ See [architecture](../ARCHITECTURE.md#http-api).
       `localhost:<port>`, which guards against DNS rebinding.
 - [ ] Reject cross-origin API requests by checking `Origin`, and send no
       permissive CORS headers.
-- [ ] Keep all routes read-only in the MVP.
+- [x] Keep the inspection APIs read-only.
 
 ### Phase 7: robustness
 
@@ -77,5 +75,6 @@ See [architecture](../ARCHITECTURE.md#http-api).
 
 ## Done when
 
-- Every route in the PRD API contract is implemented with shared types.
+- V0 architecture and drill-down queries expose source evidence and revision
+  through shared types.
 - The browser never sees data that has not been committed to the database.

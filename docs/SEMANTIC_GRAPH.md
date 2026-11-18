@@ -1,9 +1,11 @@
 # Semantic application graph
 
-The foundation below was introduced in phase 6.1.
-[Behaviour tracing](BEHAVIOUR_TRACING.md) adds source-backed event, HTTP, and Prisma
-paths using the same persistence model. Phase 6.2A adds
-[automatic feature candidates and membership queries](FEATURE_DISCOVERY.md).
+The semantic graph connects application concepts to the files and symbols that
+implement them. It is the evidence layer behind the current Features view and
+the foundation for the [V0 architecture map](../mycel_prd.md#v0-03--high-level-architecture-visualization).
+[Feature discovery](FEATURE_DISCOVERY.md) identifies candidate areas and their
+members. [Behavior tracing](BEHAVIOUR_TRACING.md) follows supported event,
+HTTP, and Prisma paths using the same persistence model.
 
 ## Audit and integration
 
@@ -19,9 +21,9 @@ paths using the same persistence model. Phase 6.2A adds
 - `GraphQueries` binds reads to one project. `/api/graph` exposes bounded structural
   queries used by React Flow. Semantic queries are additive and use separate types.
 
-The semantic layer enriches a captured graph; it does not alter structural symbol
-identities, graph statistics, history events, or dashboard responses. There is no
-agent tracking or AI explanation generation.
+Semantic records enrich a captured graph and live alongside structural nodes
+and events. The browser uses semantic queries for feature discovery and
+drill-down, while structural queries provide file and symbol navigation.
 
 ## Data model
 
@@ -47,9 +49,16 @@ Each entity and relationship carries one or more source mappings to an existing
 structural file or symbol node, a repository-relative path, and a source range.
 Identity is project-scoped and independent of line offsets. Provenance records
 `deterministic`, `heuristic`, or `ai`, extractor identifier, version, rule, and
-confidence in [0, 1]. Deterministic source rules and heuristic feature discovery
-are implemented; AI extraction is not.
-Confidence describes evidence strength, not runtime reachability or execution.
+confidence in [0, 1]. Current extractors use deterministic source rules and
+heuristic discovery. Confidence measures the strength of the supporting evidence
+for a static claim.
+
+The [V0 semantic design](ARCHITECTURE.md#semantic-mappings) extends this
+foundation to distinguish features, flows, and subsystems, and keeps logical
+feature identity independent of implementation paths. The
+[agent proposal design](ARCHITECTURE.md#agent-proposed-context-v0-target) records
+the origin of suggestions and validates their source references and relationship
+claims independently. Proposal ingestion is planned V0 work.
 
 Migration 003 adds `semantic_entities`, `semantic_relationships`, and
 `semantic_sources`. Sources have exactly one semantic owner and a same-project
@@ -158,8 +167,8 @@ source declarations of the same feature aggregate their source evidence. Tags
 express author declarations; extraction does not evaluate whether they are true.
 `READS` and `WRITES` are emitted only for verified supported Prisma operations by
 [behaviour tracing](BEHAVIOUR_TRACING.md); imports and return types alone do not
-establish data access. Feature discovery adds heuristic records; there are no AI
-extractors.
+establish data access. [Feature discovery](FEATURE_DISCOVERY.md) adds heuristic
+records alongside source declarations.
 
 Direct semantic calls resolve only to recognized operations. The binding pass
 omits ambiguous star-export chains, type-only value references, overloaded or

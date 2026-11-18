@@ -4,7 +4,7 @@ Shared types and API contracts used by every backend package and the browser.
 It must stay dependency-free and browser-safe: no Node.js imports, no runtime
 code beyond small pure helpers.
 
-See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
+See [architecture](../ARCHITECTURE.md#data-model) for the data model.
 
 ## Current state
 
@@ -57,7 +57,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned) for the data model.
       `apps/web/src/features/dashboard/types.ts` once shared event versions exist.
       Its node kinds already come from shared contracts.
 
-### Post-MVP
+### Post-V0
 
 - [ ] Define `Attribution` (`confirmed`, `inferred`, `unknown`) and
       `AgentSession` types.

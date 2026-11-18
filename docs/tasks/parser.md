@@ -6,7 +6,7 @@ files, touch SQLite, or know about the server. Cross-file resolution belongs
 to `@mycel/core`.
 
 See [package usage and contracts](../../packages/parser/README.md) and
-[architecture](../ARCHITECTURE.md#change-pipeline-planned).
+[architecture](../ARCHITECTURE.md#change-pipeline).
 
 ## Current state
 

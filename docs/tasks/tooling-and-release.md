@@ -10,16 +10,14 @@ release.
   `dev:server`, and `dev:web` scripts.
 - Strict TypeScript base config in `tsconfig.json`.
 - Package tests for cli, server, and web. No continuous integration.
-- No linter or formatter configured.
+- ESLint and Prettier run through the root `lint` and `format` scripts.
 
 ## Tasks
 
 ### Phase 1: workspace
 
-- [ ] Choose and configure linting and formatting (open decision 6), with
-      root `lint` and `format` scripts.
-- [ ] Add `pnpm.onlyBuiltDependencies` for native packages (`better-sqlite3`,
-      and Tree-sitter if native bindings are chosen).
+- [x] Configure linting and formatting with root `lint` and `format` scripts.
+- [x] Add `pnpm.onlyBuiltDependencies` for SQLite and Tree-sitter.
 - [ ] Add continuous integration that runs install, build, typecheck, lint, and
       test on macOS, Linux, and Windows with Node.js 22.
 
@@ -27,10 +25,10 @@ release.
 
 - [ ] Fixture repositories under a shared test directory, reused by parser,
       core, and server tests.
-- [ ] End-to-end test: launch Mycel on a fixture repository, add a function and
+- [x] End-to-end test: launch Mycel on a fixture repository, add a function and
       update its caller, then assert the graph, activity feed, and diff.
-- [ ] Run the PRD acceptance test manually with Claude Code modifying a small
-      repository.
+- [ ] Run the [V0 release validation](../../mycel_prd.md#release-validation) for
+      the architecture map, source drill-down, live edits, and agent proposals.
 - [ ] Test on a moderately sized real-world TypeScript repository.
 
 ### Phase 7: performance

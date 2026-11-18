@@ -1,5 +1,10 @@
 # Change history and live events
 
+History lets developers review a source change while exploring the current
+architecture. The current feed records structural node and edge changes. The
+[V0 update flow](ARCHITECTURE.md#change-pipeline) also needs to refresh features
+and their evidence when a commit changes only semantic mappings.
+
 The live indexer compares stable node and edge identities with the persisted
 project graph. Changes to content, ranges, or relationships produce created,
 modified, and deleted events; revision metadata alone does not produce events.

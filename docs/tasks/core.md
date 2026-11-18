@@ -6,7 +6,7 @@ graph states into change events, and emits committed events. The server and
 CLI talk to it through one engine API. It must not depend on the server or the
 frontend.
 
-See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
+See [architecture](../ARCHITECTURE.md#change-pipeline).
 
 ## Current state
 
@@ -20,11 +20,20 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - `openIndexedProject` owns the database and initial scan, exposes queries after
   the commit, and closes storage on shutdown or startup failure.
 - Live updates watch source files, skip unchanged hashes, preserve valid graphs
-  through parser failures, and expose per-stage commit timings. Import/call
-  relationships are resolved from cached parse facts. The broader engine/event
-  lifecycle remains planned. See [usage and boundaries](../../packages/core/README.md).
+  through parser failures, and expose per-stage commit timings. Core resolves
+  imports and calls from cached parse facts, rebuilds semantic enrichment,
+  and emits structural change events after committing. See
+  [usage and boundaries](../../packages/core/README.md).
 
 ## Tasks
+
+### V0 semantic mappings and queries
+
+- [ ] Reconcile feature identities independently of implementation paths and
+      invalidate stale source mappings after edits.
+- [ ] Validate agent-proposed references and relationships against the index.
+- [ ] Expose scoped architecture and feature queries with source evidence and
+      committed revisions. Cover refreshes from semantic-only commits.
 
 ### Phase 2: engine API and full index
 
@@ -46,8 +55,8 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
       shared extension contract. Those extensions are currently excluded.
 - [x] Resolve relative imports to files, including extension and `index`
       resolution.
-- [ ] Decide how far to honor `tsconfig` `paths`, `baseUrl`, and workspace
-      packages in the first version (open decision 7).
+- [x] Resolve supported `tsconfig` `paths`, `baseUrl`, and workspace-package
+      imports. See [resolution scope](../../packages/core/README.md#relationship-resolution).
 - [x] Resolve calls to imported or same-file symbols. Leave everything else
       unresolved and record a diagnostic where useful.
 - [ ] Report progress (files indexed of total) for `/api/health`.
@@ -60,9 +69,8 @@ See [architecture](../ARCHITECTURE.md#change-pipeline-planned).
 - [x] Reparse only changed files and replace their nodes and edges.
 - [x] Re-resolve edges in files that import the changed file when its exports
       change. Resolution currently recomputes from all cached facts.
-- [x] Handle deletion (remove nodes and incoming edges) and rename (open
-      decision 5: pair unlink and add by content hash or treat as delete plus
-      create). Implemented as delete plus create.
+- [x] Handle deletion and remove incoming edges. Record file renames as a
+      delete and a create.
 - [x] Apply graph changes and revision allocation in one SQLite transaction.
 - [x] On parse failure, keep the last valid graph for that file and surface a
       diagnostic.

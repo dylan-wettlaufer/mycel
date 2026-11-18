@@ -1,333 +1,234 @@
 # Mycel architecture
 
-Mycel is a local-first tool that keeps a live structural graph of a TypeScript
-repository and shows how it changes. Running `mycel` in a repository starts a
-single local Node.js process that indexes the code, watches for changes, stores
-graph state and history in SQLite, and serves a browser dashboard.
+Mycel turns a TypeScript repository into a living view of the application's
+architecture. The structural index supplies source evidence for features,
+flows, and subsystems. The browser presents those concepts at a useful level of
+detail and lets the developer follow them back to the code.
 
-This document describes the system as it exists today and the target design
-from [the PRD](../mycel_prd.md). Sections marked **Current** describe code in
-the repository; sections marked **Planned** describe intended design that is not
-implemented yet. Per-part work lists live in [`docs/tasks/`](tasks/).
-
-## Guiding principles
-
-- **The repository is the source of truth.** The graph is derived from source
-  code, never maintained by hand or by agents. Agent metadata (post-MVP) is
-  supplementary.
-- **Local only.** The server binds to `127.0.0.1`, source never leaves the
-  machine, and no account or cloud service is required.
-- **Persist, then broadcast.** Graph and event writes are transactional, and
-  the browser only hears about a change after it is committed.
-- **Do not invent structure.** References that cannot be resolved statically
-  stay unresolved; Mycel records a diagnostic rather than guessing an edge.
-- **Independent engine.** The parser and indexing engine do not depend on the
-  HTTP server or the frontend.
+This guide describes the current engine and the target V0 experience. The
+[product requirements](../mycel_prd.md) define the vision, principles, and
+release criteria.
 
 ## System overview
 
-```text
-                         one Node.js process (backend)
- ┌──────────────────────────────────────────────────────────────────────┐
- │                                                                      │
- │  @mycel/cli ── resolves repo, starts engine + server, opens browser  │
- │       │                                                              │
- │       ├──────────────► @mycel/server (Hono)                          │
- │       │                  REST queries · SSE · static dashboard       │
- │       │                        │                                     │
- │       ▼                        ▼                                     │
- │  @mycel/core  ◄────────────────┘  engine API: queries + event stream │
- │    indexer · watcher (Chokidar) · change detection · event bus       │
- │       │                    │                                         │
- │       ▼                    ▼                                         │
- │  @mycel/parser         @mycel/db                                     │
- │   Tree-sitter           SQLite (better-sqlite3), migrations, queries │
- │                                                                      │
- └──────────────────────────────────────────────────────────────────────┘
-          ▲  HTTP + SSE on 127.0.0.1:<port>
-          │
- ┌────────┴─────────┐
- │  apps/web        │  Vite-built React app served as static files
- │  (browser)       │  talks only to /api; never touches disk or SQLite
- └──────────────────┘
+One local Node.js process indexes the repository, watches for edits, stores
+graph state and history in SQLite, and serves the browser UI. The browser
+consumes project-scoped HTTP queries and server-sent events (SSE).
 
- @mycel/shared — types and contracts used by every package and the browser
-```
+| Package | Responsibility |
+| --- | --- |
+| [`@mycel/cli`](../packages/cli/) | Resolve the repository, start the indexed server, and open the browser. |
+| [`@mycel/parser`](../packages/parser/README.md) | Extract TypeScript and TSX facts and source ranges through Tree-sitter. |
+| [`@mycel/core`](../packages/core/README.md) | Discover and watch files, resolve references, build structural and semantic graphs, and publish committed changes. |
+| [`@mycel/db`](../packages/db/README.md) | Own SQLite migrations, persistence, revisions, history, and queries. |
+| [`@mycel/server`](../packages/server/README.md) | Expose Core's project-scoped queries and SSE through Hono and serve the built UI. |
+| [`@mycel/shared`](../packages/shared/README.md) | Define browser-safe types and API contracts. |
+| [`@mycel/web`](../apps/web/) | Present graph views, feature details, source, and activity in React. |
 
-## Packages
+The CLI starts the server, which uses Core's indexed project lifecycle. Core
+uses the parser and database independently of HTTP. The parser works with
+supplied source text. The database owns storage and query behavior. The web
+app depends on `@mycel/shared` for repository-specific contracts and accesses
+indexed data through `/api`.
 
-| Package | Path | Responsibility | Status |
-| --- | --- | --- | --- |
-| `@mycel/cli` | `packages/cli` | `mycel` command, repository resolution, process lifecycle | Current: indexes repository, launches server and browser |
-| `@mycel/server` | `packages/server` | Hono app: REST API, SSE, static dashboard | Current: health/project, graph queries, indexed startup, static serving |
-| `@mycel/core` | `packages/core` | Indexing, watching, change detection, event bus | Current: one-shot structural indexing and project-scoped query facade; resolution/live updates planned |
-| `@mycel/parser` | `packages/parser` | Tree-sitter extraction of symbols, imports, calls | Current: pure TS/TSX extraction with diagnostics |
-| `@mycel/db` | `packages/db` | SQLite schema, migrations, transactional writes, queries | Current: schema, migrations, full-project replacement, graph queries |
-| `@mycel/shared` | `packages/shared` | Shared types and API contracts | Current: project/graph/query contracts, health, source ranges, diagnostics |
-| `@mycel/web` | `apps/web` | Browser dashboard | Current: shell, health badge, project header, sample data |
-| `@mycel/agents` | `packages/agents` | Agent adapters and attribution (post-MVP) | Not created yet |
+## Data model
 
-### Dependency rules
+### Structural facts
 
-```text
-cli ──► server ──► core ──► parser
- │                  │
- └──────► core      └─────► db
+The parser extracts files, declarations, imports, exports, call sites, source
+ranges, and diagnostics. Core builds `CONTAINS`, resolved local `IMPORTS`, and
+supported `CALLS` relationships. Import and export facts support module
+resolution. Unsupported or ambiguous references remain unresolved, with
+diagnostics where supported.
 
-every package ──► shared
-web ──► shared only
-```
+Core hashes the canonical repository root for the project ID. Structural
+node IDs include the project ID and parser identity, including path, kind,
+lexical name, static/accessor distinction, and duplicate ordinal. A named
+declaration keeps its ID when it shifts lines within a file. A move or rename
+can change it, and anonymous declarations have occurrence-based identities.
+Edge IDs incorporate the project, relationship kind, and endpoints.
 
-- `web` depends only on `shared`, so no backend module can end up in the
-  browser bundle.
-- `server` reaches data through `core`, not by importing `db` directly. This
-  keeps one owner for the SQLite connection and for the rule that writes happen
-  before broadcasts.
-- `parser` is pure: it turns source text into structure and does not read the
-  file system, touch SQLite, or know about the server.
-- `db` knows about storage, not about parsing or HTTP.
-- Workspace imports use package names (`@mycel/core`) and `workspace:*`
-  versions. Each package builds with `tsc` into `dist/`; `pnpm -r build` runs in
-  dependency order.
+### Semantic mappings
+
+Current extractors attach semantic entities and relationships to structural
+files or symbols with source paths, ranges, and provenance. Supported React and
+Next.js patterns, explicit declarations, and heuristic discovery supply the
+semantic layer. Behavior traces follow supported bindings, requests, and data
+access, with explicit boundaries where the extractor cannot continue. Static
+evidence establishes a source-level reference or binding. Runtime execution
+remains outside that evidence.
+
+The current feature model supports project-scoped declarations and inferred
+candidates. Candidates are keyed by project, owning package, and area name.
+Line shifts preserve identity, while renaming the area or promoting a
+candidate to a declaration can change its ID. See [the semantic graph](SEMANTIC_GRAPH.md),
+[feature discovery](FEATURE_DISCOVERY.md), and [behavior tracing](BEHAVIOUR_TRACING.md).
+
+**V0 target.** Represent features, flows, and technical subsystems as distinct
+concepts. Give logical features IDs independent of their implementation paths,
+so source anchors can be reconciled as files move. Build architecture-level
+relationships from supporting source-backed relationships, retaining the
+evidence for each displayed connection. Inferred membership can help organize
+the map. A group assignment alone cannot establish a call or data flow.
+
+### Agent-proposed context (V0 target)
+
+Agents may propose names, descriptions, groupings, or source references as
+semantic input. Keep the proposal's origin and review its claims against the
+current project revision. Resolve referenced files and symbols to current
+anchors and corroborate asserted imports, calls, and other relationships
+using the index and supported extractors. A valid source reference grounds the
+proposal in code. The meaning or grouping suggested by the agent retains its
+own provenance. Unsupported claims remain unverified context and cannot supply
+a verified edge. When source changes, revalidate affected mappings before they
+support the architecture view.
+
+The existing semantic contract has a provenance model and supports explicit
+source annotations and heuristic discovery. Agent proposal ingestion and
+stable identity reconciliation are V0 work. Agent session and edit attribution
+are a separate [post-V0 capability](tasks/agents.md).
 
 ## Runtime flow
 
-### Launch (current)
+### Launch
 
-1. `mycel` (`packages/cli/src/bin.ts`) parses `--help`, `--version`, and
-   `--no-open`.
-2. `resolveRepository` runs `git rev-parse --show-toplevel` from the working
-   directory. Outside Git it uses the current folder.
-3. `launchDashboard` checks that `apps/web/dist/index.html` exists, then calls
-   `startIndexedServer(0, { project, webDistPath })`. Core opens the external
-   per-repository database and completes a full structural index, then the
-   server binds to an available port on `127.0.0.1` with graph queries attached.
-4. The CLI prints the URL and opens the browser. `SIGINT` and `SIGTERM` close the
-   server and its database. Standalone/dev startup uses the same helper on port 3000.
+`mycel` resolves the Git working-tree root, falling back to the current
+directory outside Git. `startIndexedServer` opens the repository's external
+SQLite database through Core. Core starts watching before the initial scan,
+reconciles startup saves and offline changes, then exposes the committed
+index. The server starts listening on an available loopback port and the CLI
+opens the browser unless `--no-open` was passed. Shutdown closes the watcher
+and database. See [server startup](../packages/server/README.md#run-against-this-repository).
 
-### Launch (planned)
+### Change pipeline
 
-Move the initial index to the background so the dashboard can open while
-indexing progress is reported through `/api/health` and SSE. Add watching and
-event subscriptions for live graph updates.
+1. Chokidar observes relevant source and metadata changes. Core coalesces
+   bursts of changes and skips unchanged source content hashes.
+2. Core reparses changed source and reuses cached facts for unchanged files.
+   The resolver rebuilds relationships from the accepted captures. On a live
+   parse failure, previously valid source and graph facts are retained when
+   available, together with a current diagnostic.
+3. Semantic enrichment runs against the accepted captures, replacing obsolete
+   derived records. Core computes structural node and edge changes.
+4. SQLite commits the graph, semantic snapshot, diagnostics, source
+   snapshots, history events, and a new project revision in one transaction.
+   Failed writes leave the previous committed state intact.
+5. Hono streams committed structural change events over SSE. The browser
+   batches the events and refetches the relevant data for open views, including
+   feature queries. See [history and SSE behavior](HISTORY.md).
 
-### Full structural index (current library API)
-
-`indexRepository` discovers `.ts`/`.tsx` working-tree files, prunes excluded
-directories, honors root/nested `.gitignore` and configured globs, then captures
-and parses source. It constructs file/symbol nodes, containment, hashes, and
-parser diagnostics, and commits a complete project replacement plus its next
-revision through db. Read failures preserve the previous graph; database
-failures roll back the replacement. CLI/dev startup invokes this index before
-serving queries. Import/call resolution and live updates are still planned.
-See [core usage](../packages/core/README.md).
-
-### Change pipeline (planned)
-
-```text
-file saved
-  → watcher event (Chokidar), debounced per path
-  → read file, compare content hash; skip if unchanged
-  → parser extracts nodes, edges, diagnostics for that file
-  → resolver re-links imports/calls affected by changed exports or symbols
-  → diff old vs. new graph state for the file → change set
-  → one SQLite transaction: nodes, edges, diagnostics, source snapshot,
-    change events, new revision
-  → commit succeeds → event bus emits committed events
-  → server pushes them over SSE → dashboard updates
-```
-
-Each stage should be timed separately so the "visible within one second" target
-for small repositories can be measured: detection, parse, resolve, database
-write, and browser delivery.
-
-## Data model (planned)
-
-Types live in `@mycel/shared` so the backend and browser agree on shapes.
-Structural graph, project, query, and health contracts are now defined. SQLite
-connection setup and the initial graph schema/migrations are implemented;
-full-project graph writes and ID/hash generation are implemented in core/db.
-Project-scoped graph queries are implemented in db and exposed through a core
-facade and Hono routes, attached automatically by CLI/dev startup.
-Import/call resolution remains planned. See the
-[shared contract semantics](../packages/shared/README.md).
-
-| Entity | Key fields |
-| --- | --- |
-| Project | id, name, absolute root, indexing settings |
-| Node | id, project id, kind (`file`, `function`, `class`, `method`), qualified name, path, source range, content hash, revision |
-| Edge | id, project id, source node, target node, kind (`CONTAINS`, `IMPORTS`, `CALLS`; `REFERENCES` only once resolution is reliable), revision |
-| Diagnostic | file, location, severity, parser or resolution message |
-| Change event | monotonic id, timestamp, entity type and id, action (`created`, `modified`, `deleted`), before and after revision references, optional attribution |
-| Snapshot | path, revision, full source content (needed for diffs) |
-| Session | start and end time, starting graph revision |
-| Agent session (post-MVP) | provider, session id, tool metadata, attribution evidence |
-
-Identity rules:
-
-- **Stable ids do not depend on line numbers.** Core hashes the canonical root
-  for project identity, then the project ID and parser-local identity for nodes.
-  Parser identity includes path, kind, lexical name, static/accessor distinction,
-  and duplicate ordinal. A named function shifted down a file keeps its ID;
-  renaming or changing scope produces a different ID. Anonymous scopes retain
-  their occurrence-based limits. Edge IDs hash project, kind, and endpoints.
-- **Revisions are monotonic per project.** Every committed change set gets a
-  new revision. Events reference the before and after revisions so the server
-  can rebuild a diff from snapshots.
-- **Content hashes are for change detection, not history.** Diffs need the
-  stored source, so snapshots hold full content under a retention policy.
+**V0 target.** Refresh the affected architecture and feature views after
+reconciling source mappings, with the map and evidence tied to the same
+committed revision. The refresh path must also cover commits that affect
+semantic mappings without generating a structural change event. Preserve the
+user's scope if it still exists and provide a path back to the map when it
+disappears.
 
 ## HTTP API
 
-All routes are under `/api`, return JSON unless noted, and use types from
-`@mycel/shared`. Unknown `/api` routes return 404 and never fall through to the
-dashboard HTML.
+Current reads are scoped to the selected repository. Graph responses identify
+the committed project revision, and bounded queries report truncation where
+applicable.
 
-| Method | Route | Purpose | Status |
-| --- | --- | --- | --- |
-| GET | `/api/health` | Process liveness, later index and database status | Current (liveness only) |
-| GET | `/api/project` | Selected repository name and root | Current |
-| GET | `/api/graph/search?q=` | Search files and symbols | Current |
-| GET | `/api/graph/nodes/:id` | Node details, relationships, and diagnostics | Current |
-| GET | `/api/graph/nodes/:id/neighborhood` | Bounded connected subgraph | Current |
-| GET | `/api/files/content?path=` | Source content, constrained to the repository root | Planned |
-| GET | `/api/changes` | Paginated change history | Current |
-| GET | `/api/changes/:id/diff` | Before and after source for a change | Current |
-| GET | `/api/events` | SSE stream of committed events, resumable with `Last-Event-ID` | Current |
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` and `GET /api/project` | Process liveness and selected repository metadata. |
+| `GET /api/graph/repository` | Indexed files and directed imports for the current folder overview. |
+| `GET /api/graph/search` and `GET /api/graph/nodes/:id` | Find files and symbols, then read relationships and diagnostics. |
+| `GET /api/graph/nodes/:id/neighborhood` | Bounded structural graph around a node. |
+| `GET /api/graph/semantic` | Bounded semantic snapshot with source mappings and provenance. |
+| `GET /api/graph/semantic/features` and `GET /api/graph/semantic/features/:id/behaviour` | Feature list, membership, and supported behavior traces. |
+| `GET /api/files/content?path=…` | Captured source for an indexed repository-relative path. |
+| `GET /api/changes`, `GET /api/changes/:id/diff`, and `GET /api/events` | Change history, source diffs, and replayable SSE. |
 
-Graph routes validate numeric bounds and return shared query contracts with
-snapshot revisions; see [limits and usage](../packages/server/README.md).
-CLI/dev startup attaches queries after the initial index. Lower-level consumers
-of `createApp`/`startServer` without a graph facade receive JSON 503 on graph routes.
-
-Non-API `GET` requests that accept HTML serve `index.html` so client-side
-routes work. Requests for missing assets return 404.
+See the [server reference](../packages/server/README.md), [semantic API](SEMANTIC_GRAPH.md#query-api),
+and [history API](HISTORY.md#read-only-http-api) for routes and query bounds.
+Hono validates request parameters and delegates to Core's query layer.
+Core and SQLite should provide scoped query results for the V0 architecture
+view and its drill-downs.
 
 ## Frontend
 
-**Current.** `apps/web` is a Vite 8, React 19, and TypeScript app styled with
-Tailwind CSS v4 and shadcn/ui (`new-york` style, components in
-`src/components/ui`). The Mycel theme lives in `src/index.css` as CSS
-variables, dark by default, with Geist and JetBrains Mono bundled locally.
-`useBackendHealth` polls `/api/health` every five seconds, and `useProject`
-loads `/api/project` once connected. Statistics and activity are still sample
-data from `features/dashboard/mock-data.ts`.
+**Current.** The default **Graph** view groups indexed files by folder and
+shows directed imports across groups. **Features** lists explicit and inferred
+features and opens supported behavior graphs with source evidence.
+**Explorer** searches files and symbols. **Dashboard** uses real index counts
+and recent events. **Activity** opens saved changes and source diffs. Hash
+navigation preserves top-level selections across reloads and browser
+Back/Forward. The header reports HTTP health and SSE status separately.
 
-**Planned layout** (from the PRD):
+**V0 target.** The first screen is the architecture map. Selecting a feature
+opens its internal components and behaviors, and selecting a step or
+connection opens its source evidence. Keep the current scope visible and
+restore it on return from source or when navigating back to the map. Use
+bounded views so files and symbols appear at the point where they help answer
+the developer's question.
 
-```text
-apps/web/src/
-├── components/        shared UI (layout, shadcn/ui in components/ui)
-├── features/
-│   ├── dashboard/     overview stats and recent activity
-│   ├── explorer/      searchable file and symbol tree
-│   ├── graph/         React Flow neighborhood view
-│   ├── activity/      live feed backed by SSE
-│   └── source/        Monaco source and diff viewers
-├── hooks/
-└── lib/               API client, formatting, utilities
-```
-
-In development, `pnpm dev:web` runs Vite on port 5173 and proxies `/api` to the
-Hono dev server on port 3000 (`pnpm dev:server`). In production, Hono serves
-the prebuilt `apps/web/dist`, and Vite is not used at runtime.
+The web app uses React Flow, Monaco, Tailwind CSS, and shadcn/ui. In development,
+Vite on port 5173 proxies `/api` to Hono on port 3000. A built installation
+serves the frontend directly from Hono.
 
 ## Security and privacy
 
-- Bind only to `127.0.0.1`. **Current.**
-- Never send source code to an external service. **Current** by construction:
-  there are no outbound calls.
-- Constrain file-read APIs to the repository root after resolving symlinks.
-  **Planned.**
-- Limit browser origins: reject API requests whose `Origin` or `Host` is not the
-  local dashboard, which guards against DNS rebinding and cross-site reads.
-  **Planned.**
-- Store application data outside the tracked repository by default.
-  **Current in db.** Default paths use a per-user data directory, and explicit
-  database destinations inside the repository are rejected, including symlinks.
+- The server binds to `127.0.0.1`. Indexing, storage, and visualization are local.
+- Source queries read accepted project snapshots from SQLite and validate
+  repository-relative paths. Discovery skips symlinked files and directories.
+- SQLite lives outside the tracked repository. Explicit database paths are
+  checked against the canonical repository root.
+- Agent-assisted semantics must preserve the local processing model and keep
+  validation scoped to the selected repository.
 
 ## Storage location
 
-`resolveDatabasePath` selects one database per canonical repository root, named
-by its SHA-256 hash, outside the repository. macOS uses
-`~/Library/Application Support/Mycel`, Linux uses `$XDG_DATA_HOME/mycel`
-(falling back to `~/.local/share/mycel`), and Windows uses `%LOCALAPPDATA%\\Mycel`
-(falling back to `~\\AppData\\Local\\Mycel`). Databases live in a `projects/`
-subdirectory. Explicit absolute paths are supported and checked against the
-repository root. CLI integration remains planned. See
-[database usage](../packages/db/README.md).
+`resolveDatabasePath` selects a database named by a hash of the canonical
+repository root in a `projects/` subdirectory of the per-user Mycel directory.
+macOS uses `~/Library/Application Support/Mycel`, Linux uses `$XDG_DATA_HOME/mycel`
+with a `~/.local/share/mycel` fallback, and Windows uses `%LOCALAPPDATA%\Mycel`
+with a `~\AppData\Local\Mycel` fallback. Graph and source snapshots share
+revision references so saved diffs remain available after an entity is deleted.
+See [database usage](../packages/db/README.md) and [history retention](HISTORY.md#storage-and-retention).
 
 ## Testing strategy
 
-| Area | Tooling | Current coverage |
-| --- | --- | --- |
-| Shared contracts | `tsc` consumer fixtures (`packages/shared/test`) | Public exports, graph/query contracts, legacy payload compatibility, invalid contract rejection |
-| CLI | `node --test` (`packages/cli/test`) | Repository resolution, launch, executable lifecycle |
-| Server | `node --test` (`packages/server/test`) | Health, project, static serving, API 404s |
-| Web | Vitest + Testing Library (jsdom) | Health polling, app rendering with project data |
-| Parser | `node --test` (`packages/parser/test`) | TS/TSX fixtures, containment, imports/exports, callers, recovery, ranges, identities, large files |
-| Database | `node --test` (`packages/db/test`) | Migrations, constraints, rollback, revisions, project isolation, disk persistence, external paths, graph replacement guards |
-| Core | `node --test` (`packages/core/test`) | Exclusions, nested ignore rules, structural graphs, identities/hashes, rescans, persistence, atomic failures |
-| End to end | Planned | None yet |
+Package tests cover extraction, resolution, semantic evidence, persistence,
+watcher reconciliation, API contracts, and browser components. The Chromium
+workflow runs against a temporary repository with the actual server, index, and
+watcher. It covers structural navigation, source and diffs, live changes, and
+reconnects. A separate feature workflow exercises discovery, behavior
+navigation, and source. See [dashboard workflow validation](testing/dashboard-workflow.md).
 
-The MVP acceptance test from the PRD: start Mycel on a small TypeScript
-repository, have a coding agent add a function and update its caller, then
-confirm the graph and activity feed update and the source diff is correct.
+V0 release validation adds an architecture-to-source round trip, source-backed
+architecture changes after an edit, stable feature identity through file moves,
+and independent validation of agent-proposed references and relationships.
+See [V0 acceptance criteria](../mycel_prd.md#minimum-v0-scope).
 
 ## Build and packaging
 
-- pnpm 10.34.7 workspace, Node.js 22 or newer, TypeScript 5.9 in strict mode
-  with `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`.
-- `pnpm build` builds every package; `pnpm typecheck` builds, then checks;
-  `pnpm test` runs each package's tests.
-- `pnpm start` runs the built CLI from the workspace. The CLI currently finds
-  the dashboard through a relative path into `apps/web/dist`, so it only works
-  from a checkout. Bundling the dashboard into the CLI package is a release task.
-- `better-sqlite3` and Tree-sitter ship native code. pnpm 10 skips dependency
-  build scripts unless they are allowed, so they must be added to
-  `pnpm.onlyBuiltDependencies` when introduced.
+`pnpm build` builds the workspace in dependency order. `pnpm typecheck` builds
+and then checks all packages. `pnpm test` runs package tests, and
+`pnpm test:workflow` runs the Chromium workflows. The CLI currently locates the
+dashboard relative to the checkout. Bundling it into the CLI package remains a
+[release task](tasks/tooling-and-release.md).
 
 ## Task lists
 
 | Part | Tasks |
 | --- | --- |
-| Shared contracts | [`tasks/shared.md`](tasks/shared.md) |
-| Parser | [`tasks/parser.md`](tasks/parser.md) |
-| Database | [`tasks/db.md`](tasks/db.md) |
-| Core engine | [`tasks/core.md`](tasks/core.md) |
-| HTTP server | [`tasks/server.md`](tasks/server.md) |
-| CLI | [`tasks/cli.md`](tasks/cli.md) |
-| Web dashboard | [`tasks/web.md`](tasks/web.md) |
-| Agent attribution (post-MVP) | [`tasks/agents.md`](tasks/agents.md) |
-| Tooling, testing, and release | [`tasks/tooling-and-release.md`](tasks/tooling-and-release.md) |
-
-A suggested order that reaches the PRD's first milestone (file save, then
-updated graph, then persisted event, then live browser update) quickly:
-shared graph types, then parser, then db schema and queries, then core full
-index, then server graph routes, then core watcher and change events, then SSE,
-then the web activity feed, explorer, graph, and source views.
+| Shared contracts | [Shared](tasks/shared.md) |
+| Parser | [Parser](tasks/parser.md) |
+| Database | [Database](tasks/db.md) |
+| Core engine | [Core](tasks/core.md) |
+| HTTP server | [Server](tasks/server.md) |
+| CLI | [CLI](tasks/cli.md) |
+| Web dashboard | [Web](tasks/web.md) |
+| Agent context and attribution | [Agents](tasks/agents.md) |
+| Tooling, testing, and release | [Tooling and release](tasks/tooling-and-release.md) |
 
 ## Open decisions
 
-These need a decision before or during the relevant phase:
-
-1. **Texo reuse.** Parser decision resolved: build from scratch without copying
-   Texo code or fixtures. Graph/source-viewer reuse remains a separate decision.
-2. **Tree-sitter binding.** Resolved: native `tree-sitter@0.21.1` with
-   `tree-sitter-typescript@0.23.2`, matching the grammar's peer dependency.
-   This gives the Node backend a synchronous API without WASM initialization
-   or asset loading. See [parser usage](../packages/parser/README.md).
-3. **Data directory.** Resolved for db: platform per-user Mycel directories with
-   one file per canonical repository root. Whether the CLI exposes `--data-dir`
-   remains open.
-4. **History retention.** How many snapshots and events to keep, and whether it
-   can be configured.
-5. **Rename detection.** Chokidar reports a rename as unlink plus add; whether
-   to pair them by content hash within a time window.
-6. **Linting and formatting.** The PRD lists this for phase 1, but no tool is
-   configured yet (for example ESLint plus Prettier, or Biome).
-7. **Import resolution scope.** How far to honor `tsconfig` `paths`,
-   `baseUrl`, package `exports`, and workspace packages in the first version.
-
-Phase 4 history storage, retention, sessions, and SSE behavior are documented in
-[Change history and live events](HISTORY.md).
+V0 design still needs a durable feature identity and reconciliation model, an
+agent proposal format and intake mechanism, and a query and update contract for
+the architecture view. Operational decisions include automatic history
+retention, progress reporting during startup, and how to represent file
+renames in history. See the [product requirements](../mycel_prd.md#minimum-v0-scope)
+for the required outcomes.
