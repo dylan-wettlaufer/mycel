@@ -7,7 +7,7 @@ export function SourcePanel({
   node,
   revision = 0,
 }: {
-  node: GraphNode;
+  node: Pick<GraphNode, "path" | "range">;
   revision?: number;
 }) {
   const { data, error } = useResource(
@@ -21,7 +21,7 @@ export function SourcePanel({
       aria-label="Source code"
     >
       <div className="border-b px-4 py-3">
-        <h3 className="font-mono text-sm">
+        <h3 className="font-mono text-sm [overflow-wrap:anywhere]">
           {node.path}:{node.range.startLine}
         </h3>
         <p className="text-xs text-muted-foreground">

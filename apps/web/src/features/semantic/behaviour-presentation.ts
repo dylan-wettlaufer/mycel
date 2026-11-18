@@ -61,21 +61,25 @@ export function describeBehaviour(
   function describe(entity: SemanticEntity): {
     title: string;
     kind: OperationKind;
+    description: string;
   } {
     const { attributes, name } = entity;
+    const targets = [...(outgoing.get(entity.id) ?? [])].flatMap((id) => {
+      const target = entities.get(id);
+      return target && target.attributes.traceRole !== "unresolved"
+        ? [target]
+        : [];
+    });
     if (entity.kind === "endpoint") {
       const services = new Set<SemanticEntity>();
-      for (const handler of outgoing.get(entity.id) ?? []) {
-        for (const target of outgoing.get(handler) ?? []) {
+      for (const handler of targets) {
+        for (const target of outgoing.get(handler.id) ?? []) {
           const candidate = entities.get(target);
           if (candidate && isService(candidate)) services.add(candidate);
         }
       }
       const [service] = services;
-      if (services.size === 1 && service) {
-        const title = words(service.name);
-        if (title) return { title, kind: "endpoint" };
-      }
+      const serviceName = services.size === 1 ? service?.name : undefined;
       const resource = attributes.pattern
         ?.split("/")
         .filter(
@@ -83,16 +87,29 @@ export function describeBehaviour(
         )
         .at(-1);
       const action = attributes.method && requestActions[attributes.method];
+      const request =
+        attributes.method && attributes.pattern
+          ? `${attributes.method} requests to ${attributes.pattern}`
+          : "incoming HTTP requests";
       return {
         title:
-          action && resource
+          (serviceName && words(serviceName)) ||
+          (action && resource
             ? `${action} ${words(resource)}`
-            : "Handle API Request",
+            : "Handle API Request"),
         kind: "endpoint",
+        description: `Handles ${request}${serviceName ? ` and calls ${serviceName}` : ""}.`,
       };
     }
     if (entity.kind === "data_model")
-      return { title: `${words(name)} Data`, kind: "model" };
+      return {
+        title: `${words(name)} Data`,
+        kind: "model",
+        description:
+          attributes.provider === "prisma"
+            ? `The ${name} model declared in the Prisma schema.`
+            : `The ${name} data model referenced in this trace.`,
+      };
 
     switch (attributes.traceRole) {
       case "ui_event": {
@@ -106,15 +123,20 @@ export function describeBehaviour(
               ? `Submit ${subject ? words(subject) : "Form"}`
               : `Click ${words(attributes.element ?? "") || "Element"}`,
           kind: "event",
+          description:
+            attributes.binding === "resolved" && targets.length === 1
+              ? `Binds ${name} to ${targets[0]!.name}.`
+              : `Records the ${name} event binding in JSX.`,
         };
       }
-      case "http_request":
+      case "http_request": {
+        const { method, url, client } = attributes;
         return {
-          title: attributes.method
-            ? `Send ${attributes.method} Request`
-            : "Send HTTP Request",
+          title: method ? `Send ${method} Request` : "Send HTTP Request",
           kind: "request",
+          description: `Makes ${method ? `a ${method}` : "an HTTP"} request${url ? ` to ${url}` : ""}${client ? ` using ${client}` : ""}.`,
         };
+      }
       case "prisma_operation": {
         const action = dataActions[attributes.operation ?? ""];
         return {
@@ -123,17 +145,34 @@ export function describeBehaviour(
               ? `${action} ${words(attributes.model)} ${attributes.operation === "findMany" ? "Records" : "Record"}`
               : "Access Data",
           kind: "data",
+          description:
+            attributes.operation && attributes.model
+              ? `Runs Prisma’s ${attributes.operation} on the ${attributes.model} model.`
+              : "A data operation recorded in this trace.",
         };
       }
       case "unresolved":
-        return { title: "Unresolved Step", kind: "unresolved" };
-      default:
-        if (entity.provenance.rule === "http-handler-operation")
-          return { title: `Handle ${name} Request`, kind: "function" };
         return {
-          title: words(name) || "Run Function",
-          kind: isService(entity) ? "service" : "function",
+          title: "Unresolved Step",
+          kind: "unresolved",
+          description: "Mycel could not follow this step from source.",
         };
+      default: {
+        const handler = entity.provenance.rule === "http-handler-operation";
+        const calls = [...new Set(targets.map((target) => target.name))];
+        return {
+          title: handler
+            ? `Handle ${name} Request`
+            : words(name) || "Run Function",
+          kind: isService(entity) ? "service" : "function",
+          description:
+            calls.length === 1
+              ? `Calls ${calls[0]}.`
+              : handler
+                ? `The exported ${name} request handler.`
+                : "A function reached by this behaviour trace.",
+        };
+      }
     }
   }
 

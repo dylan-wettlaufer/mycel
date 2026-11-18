@@ -6,6 +6,7 @@ import type {
   SemanticRelationshipKind,
 } from "@mycel/shared";
 import { expect, test } from "vitest";
+import { getBehaviourDetails } from "./behaviour-details-data";
 import { layoutBehaviour } from "./behaviour-layout";
 
 const context = { projectId: "project", revision: 1 };
@@ -112,6 +113,9 @@ test("condensed connections retain distinct paths and use the trace direction fo
     name: "POST /api/orders",
     operationKind: "endpoint",
   });
+  expect(compact.presentation.get("api")?.description).toBe(
+    "Handles POST requests to /api/orders.",
+  );
   expect(compact.edges).toMatchObject([
     { source: "submit", target: "api", data: { paths: [toApi] } },
     {
@@ -122,6 +126,52 @@ test("condensed connections retain distinct paths and use the trace direction fo
     },
   ]);
   expect([...compact.expandable]).toEqual(["submit", "api"]);
+  expect(getBehaviourDetails(compact, "api", [])?.groups).toEqual([
+    {
+      title: "Called from / triggered by",
+      connections: [
+        { id: "submit", labels: new Set(["Connects via 1 step"]) },
+        { id: "dispatch", labels: new Set(["Calls"]), revealFrom: "submit" },
+      ],
+    },
+    {
+      title: "Calls / connects to",
+      connections: [
+        { id: "handler", labels: new Set(["Handled by"]), revealFrom: "api" },
+      ],
+    },
+    {
+      title: "Reads or writes",
+      connections: [
+        {
+          id: "order",
+          labels: new Set(["Reads via 2 steps", "Writes via 2 steps"]),
+        },
+      ],
+    },
+  ]);
+  expect(getBehaviourDetails(compact, "order", [])?.groups.at(-1)).toEqual({
+    title: "Reads or writes",
+    connections: [
+      {
+        id: "api",
+        labels: new Set([
+          "Reads from this model via 2 steps",
+          "Writes to this model via 2 steps",
+        ]),
+      },
+      {
+        id: "read",
+        labels: new Set(["Reads from this model"]),
+        revealFrom: "api",
+      },
+      {
+        id: "write",
+        labels: new Set(["Writes to this model"]),
+        revealFrom: "api",
+      },
+    ],
+  });
   const expanded = layoutBehaviour([input], new Set(["api"]));
   expect(expanded.nodes.map(({ id }) => id)).toEqual([
     "submit",
@@ -141,6 +191,13 @@ test("condensed connections retain distinct paths and use the trace direction fo
   ).toMatchObject([
     { source: "api", target: "handler", data: { paths: [[handles]] } },
   ]);
+  const expandedGroups = getBehaviourDetails(expanded, "api", [])?.groups;
+  expect(expandedGroups?.[1]?.connections).toEqual([
+    { id: "handler", labels: new Set(["Handled by"]) },
+  ]);
+  expect(expandedGroups?.[2]).toEqual(
+    getBehaviourDetails(compact, "api", [])?.groups[2],
+  );
 });
 
 test("independent regions keep shared operations visible while any expanded region uses them", () => {

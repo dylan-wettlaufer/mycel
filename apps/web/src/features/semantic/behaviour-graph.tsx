@@ -5,13 +5,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type {
-  BehaviourTrace,
-  SemanticEntity,
-  SemanticSource,
-} from "@mycel/shared";
+import type { BehaviourTrace, SemanticEntity } from "@mycel/shared";
 import { GraphCanvas } from "@/features/graph/graph-canvas";
-import { layoutBehaviour, relationshipLabels } from "./behaviour-layout";
+import { BehaviourDetails, BehaviourEmptyState } from "./behaviour-details";
+import type { BehaviourConnection } from "./behaviour-details-data";
+import { layoutBehaviour } from "./behaviour-layout";
 
 const narrowScreen = "(width < 40rem)";
 
@@ -25,85 +23,10 @@ function isNarrowScreen() {
   return window.matchMedia(narrowScreen).matches;
 }
 
-function SourceLocations({ sources }: { sources: SemanticSource[] }) {
-  return (
-    <ul className="mt-1 space-y-1">
-      {sources.map(({ nodeId, path, range }) => (
-        <li key={JSON.stringify([nodeId, path, range.start, range.end])}>
-          <code
-            className="break-all text-xs text-muted-foreground"
-            title={`${path}:${range.startLine}:${range.startColumn}`}
-          >
-            {path}:{range.startLine}
-          </code>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function SelectionEvidence({
-  graph,
-  id,
-}: {
-  graph: ReturnType<typeof layoutBehaviour>;
-  id: string;
-}) {
-  const entity = graph.entities.get(id);
-  if (!entity) return null;
-  const links = graph.edges.filter(
-    (edge) => edge.source === id || edge.target === id,
-  );
-  const notices = graph.notices.get(id);
-  return (
-    <>
-      {notices && (
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          {[...notices].map((notice) => (
-            <li key={notice}>{notice}</li>
-          ))}
-        </ul>
-      )}
-      <section>
-        <h4 className="text-sm font-medium">Source locations</h4>
-        <SourceLocations sources={entity.sources} />
-      </section>
-      {links.map((edge) => (
-        <section key={edge.id} className="space-y-2 border-t pt-3">
-          <h4 className="break-all text-sm font-medium">
-            {edge.source === id
-              ? `To ${graph.entities.get(edge.target)?.name}`
-              : `From ${graph.entities.get(edge.source)?.name}`}
-          </h4>
-          {edge.data.paths.map((path) => (
-            <ol
-              key={JSON.stringify(
-                path.map(({ relationship }) => relationship.id),
-              )}
-              className="space-y-3 border-l pl-3"
-            >
-              {path.map(({ toId, relationship }) => (
-                <li key={relationship.id}>
-                  <span className="text-xs text-muted-foreground">
-                    {relationshipLabels[relationship.kind]}{" "}
-                  </span>
-                  <code className="break-all text-xs">
-                    {graph.entities.get(toId)?.name}
-                  </code>
-                  <SourceLocations sources={relationship.sources} />
-                </li>
-              ))}
-            </ol>
-          ))}
-        </section>
-      ))}
-    </>
-  );
-}
-
 function BehaviourGraph({
   traces,
   members,
+  revision,
 }: {
   traces: BehaviourTrace[];
   members: SemanticEntity[];
@@ -127,6 +50,16 @@ function BehaviourGraph({
       return { expanded: next, anchorId: id, actionId: previous.actionId + 1 };
     });
   }, []);
+  function selectConnection({ id, revealFrom }: BehaviourConnection) {
+    if (revealFrom !== undefined) {
+      setExpansion((previous) => ({
+        expanded: new Set([...previous.expanded, revealFrom]),
+        anchorId: revealFrom,
+        actionId: previous.actionId + 1,
+      }));
+    }
+    setSelectedId(id);
+  }
   const nodes = useMemo(
     () =>
       graph.nodes.map((node) =>
@@ -148,9 +81,13 @@ function BehaviourGraph({
   if (selectedId && !nodes.some((node) => node.id === selectedId)) {
     setSelectedId(anchorId && graph.expandable.has(anchorId) ? anchorId : null);
   }
+  const clearSelection = () => setSelectedId(null);
   return (
     <section aria-label="Behaviour graph" className="min-w-0 space-y-3">
-      <h3 className="text-base font-semibold">Behaviour graph</h3>
+      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h3 className="text-base font-semibold">Behaviour graph</h3>
+        {nodes.length > 0 && !selectedId && <BehaviourEmptyState />}
+      </div>
       {nodes.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No supported UI event paths found.
@@ -168,9 +105,18 @@ function BehaviourGraph({
             edges={graph.edges}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onClear={() => setSelectedId(null)}
-            details={
-              selectedId && <SelectionEvidence graph={graph} id={selectedId} />
+            onClear={clearSelection}
+            sidePanel={
+              selectedId && (
+                <BehaviourDetails
+                  graph={graph}
+                  selectedId={selectedId}
+                  members={members}
+                  revision={revision}
+                  onSelect={selectConnection}
+                  onClear={clearSelection}
+                />
+              )
             }
           />
         </div>

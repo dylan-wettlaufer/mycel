@@ -93,6 +93,7 @@ export function layoutBehaviour(
   >();
   const visible = new Set(anchors);
   const expandable = new Set<string>();
+  const expandedPaths: BehaviourHop[][] = [];
 
   function connect(path: BehaviourHop[]) {
     const source = path[0]!.fromId;
@@ -116,6 +117,7 @@ export function layoutBehaviour(
       const source = pending[0]!.fromId;
       if (pending.length > 1) expandable.add(source);
       if (pending.length > 1 && expanded.has(source)) {
+        expandedPaths.push(pending);
         for (const step of pending) {
           visible.add(step.toId);
           connect([step]);
@@ -175,5 +177,13 @@ export function layoutBehaviour(
         : {},
     };
   });
-  return { entities, nodes, edges, notices, expandable };
+  return {
+    entities,
+    presentation,
+    nodes,
+    edges,
+    notices,
+    expandable,
+    expandedPaths,
+  };
 }

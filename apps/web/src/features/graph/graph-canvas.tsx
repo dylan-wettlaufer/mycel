@@ -99,6 +99,7 @@ export function GraphCanvas({
   layoutAnchorId,
   fitRequest,
   details,
+  sidePanel,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -111,6 +112,7 @@ export function GraphCanvas({
   layoutAnchorId?: string | undefined;
   fitRequest?: number | undefined;
   details?: ReactNode;
+  sidePanel?: ReactNode;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
   const [nodeState, setNodeState] = useState<NodeState>(() => ({
@@ -358,7 +360,8 @@ export function GraphCanvas({
           <Controls showInteractive={false} showFitView={false} />
         </ReactFlow>
       </div>
-      {selected && (
+      {sidePanel}
+      {!sidePanel && selected && (
         <aside
           aria-label="Selection details"
           className={

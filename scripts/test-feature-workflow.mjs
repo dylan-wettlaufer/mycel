@@ -66,7 +66,14 @@ try {
     exact: true,
   });
   const nodes = graph.locator(".react-flow__node");
+  const selection = graph.getByRole("complementary", {
+    name: "Selection details",
+  });
+  const empty = selection.getByText(
+    "Select a node to see its role, connections, and source.",
+  );
   await expect(nodes).toHaveCount(4);
+  await expect(empty).toBeVisible();
   await expect(event).toBeVisible();
   await expect(readEndpoint).toBeVisible();
   await expect(writeEndpoint).toBeVisible();
@@ -176,6 +183,127 @@ try {
     "Handle Submit, handleSubmit, Function",
     { exact: true },
   );
+  await writeEndpoint.click();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+  const overview = selection.getByRole("region", { name: "Overview" });
+  await expect(
+    overview.getByRole("heading", { name: "Create Order" }),
+  ).toBeVisible();
+  await expect(
+    overview.getByText("API Endpoint", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    overview.getByText("POST /api/orders", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    overview.getByText(
+      "Handles POST requests to /api/orders and calls createOrder.",
+    ),
+  ).toBeVisible();
+  const connections = selection.getByRole("region", { name: "Connections" });
+  await expect(
+    connections.getByRole("heading", { name: "Called from / triggered by" }),
+  ).toBeVisible();
+  await expect(
+    connections.getByRole("button", { name: /^Submit Order/ }),
+  ).toBeVisible();
+  const requestConnection = connections.getByRole("button", {
+    name: /^Send POST Request/,
+  });
+  await expect(requestConnection).toBeVisible();
+  await expect(
+    connections.getByRole("heading", { name: "Calls / connects to" }),
+  ).toBeVisible();
+  const handlerConnection = connections.getByRole("button", {
+    name: /^Handle POST Request/,
+  });
+  await expect(handlerConnection).toBeVisible();
+  await expect(
+    connections.getByRole("heading", { name: "Reads or writes" }),
+  ).toBeVisible();
+  const dataConnection = connections.getByRole("button", {
+    name: "Order Data Writes via 3 steps",
+  });
+  await expect(dataConnection).toBeVisible();
+  const implementation = selection.getByRole("region", {
+    name: "Implementation",
+  });
+  const source = implementation.getByRole("button", {
+    name: "Open source at app/api/orders/route.ts:2 in POST",
+  });
+  await expect(source).toBeInViewport({ ratio: 0.95 });
+
+  const detailedTrace = selection.getByRole("button", {
+    name: "Detailed trace",
+  });
+  await expect(detailedTrace).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toHaveCount(0);
+  await detailedTrace.click();
+  await expect(detailedTrace).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toBeVisible();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+  const panelViewport = selection.locator('[data-slot="scroll-area-viewport"]');
+  await expect
+    .poll(() =>
+      panelViewport.evaluate(
+        (viewport) => viewport.scrollHeight > viewport.clientHeight,
+      ),
+    )
+    .toBe(true);
+  await detailedTrace.click();
+  await expect(detailedTrace).toHaveAttribute("aria-expanded", "false");
+
+  await source.click();
+  const sourceViewer = page.getByRole("dialog", { name: "Source viewer" });
+  await expect(
+    sourceViewer.getByRole("heading", { name: "app/api/orders/route.ts:2" }),
+  ).toBeVisible();
+  await expect(sourceViewer.locator(".monaco-editor")).toBeVisible();
+  await sourceViewer.getByRole("button", { name: "Close source" }).click();
+  await expect(sourceViewer).toHaveCount(0);
+  await expect(source).toBeFocused();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+
+  await dataConnection.click();
+  await expect(model).toHaveClass(/graph-selected/);
+  await expect(
+    connections.getByRole("button", {
+      name: /^Create Order Writes to this model/,
+    }),
+  ).toBeVisible();
+  await connections
+    .getByRole("button", { name: /^Create Order Writes to this model/ })
+    .click();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+
+  await handlerConnection.click();
+  await expect(writeHandler).toHaveClass(/graph-selected/);
+  await expect(hideWrite).toHaveAttribute("aria-expanded", "true");
+  await writeEndpoint.click();
+  await expect(dataConnection).toBeVisible();
+  await handlerConnection.click();
+  await expect(writeHandler).toHaveClass(/graph-selected/);
+  await hideWrite.click();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+
+  await requestConnection.click();
+  const request = graph.getByLabel("Send POST Request, fetch, HTTP Request", {
+    exact: true,
+  });
+  await expect(request).toHaveClass(/graph-selected/);
+  await event
+    .getByRole("button", { name: "Hide call steps for form.onSubmit" })
+    .click();
+  await expect(event).toHaveClass(/graph-selected/);
+  await selection.getByRole("button", { name: "Clear selection" }).click();
+  await expect(empty).toBeVisible();
+  await graph.getByRole("button", { name: "Fit all" }).click();
+  await expect.poll(nodesFit).toBe(true);
+
   await showWrite.click();
   await expect(hideWrite).toHaveAttribute("aria-expanded", "true");
   await expect(writeHandler).toBeVisible();
@@ -205,12 +333,13 @@ try {
 
   await writeService.click();
   await expect(writeService).toHaveClass(/graph-selected/);
-  const selection = graph.getByRole("complementary", {
-    name: "Selection details",
-  });
   await expect(
     selection.getByText("services/orders.ts:2", { exact: true }),
   ).toBeVisible();
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toHaveCount(0);
+  await detailedTrace.click();
   await expect(
     selection.getByText("app/api/orders/route.ts:4", { exact: true }),
   ).toBeVisible();
@@ -227,7 +356,7 @@ try {
       .filter({ hasText: /^POST \/api\/orders$/ }),
   ).toBeVisible();
   await expect(
-    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+    selection.getByText("app/api/orders/route.ts:2", { exact: true }),
   ).toBeVisible();
   await expect.poll(readTransform).toBe(beforeCollapse);
 
@@ -240,7 +369,7 @@ try {
     selection.getByRole("heading", { name: "List Orders", exact: true }),
   ).toBeVisible();
   await readEndpoint.press("Escape");
-  await expect(selection).toHaveCount(0);
+  await expect(empty).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
@@ -262,6 +391,22 @@ try {
   await expect.poll(nodesFit).toBe(true);
   await hideWrite.click();
   await expect(nodes).toHaveCount(4);
+  await writeEndpoint.press("Enter");
+  await expect(
+    overview.getByRole("heading", { name: "Create Order" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      panelViewport.evaluate(
+        (viewport) => viewport.scrollHeight > viewport.clientHeight,
+      ),
+    )
+    .toBe(true);
+  await detailedTrace.click();
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toBeVisible();
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
 
   await page.reload();
   await expect(
@@ -273,7 +418,7 @@ try {
   ).toBeVisible();
   assert.deepEqual(errors, [], "browser runtime errors");
   console.log(
-    "PASS: Chromium fit expanded Orders graphs on desktop and mobile and verified independent regions and source evidence.",
+    "PASS: Chromium verified the Orders details, connection navigation, source viewer, and expandable graph and trace on desktop and mobile.",
   );
 } finally {
   try {
