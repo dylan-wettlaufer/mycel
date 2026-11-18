@@ -140,11 +140,40 @@ async function selectionFitsScreen() {
     Math.abs(sidebar.y + sidebar.height - canvas.y - canvas.height) <= 1,
     "details stay within the canvas height",
   );
-  if (page.viewportSize().width >= 1024)
-    assert.ok(
-      sidebar.x >= canvas.x + canvas.width,
-      "details sit to the right of the graph",
-    );
+  assert.ok(
+    sidebar.x >= canvas.x + canvas.width,
+    "details take their own space beside the graph",
+  );
+  const legend = await page.getByLabel("Graph legend").boundingBox();
+  const toolbar = await page.getByLabel("Graph reading controls").boundingBox();
+  assert.ok(legend && toolbar);
+  assert.ok(
+    legend.x + legend.width <= toolbar.x,
+    "the legend leaves room for canvas controls",
+  );
+  await graphNodesFitCanvas();
+}
+async function graphNodesFitCanvas() {
+  await expect
+    .poll(() =>
+      page.locator(".graph-canvas").evaluate((canvas) => {
+        const bounds = canvas.getBoundingClientRect();
+        const nodes = [...canvas.querySelectorAll(".react-flow__node")];
+        return (
+          nodes.length > 0 &&
+          nodes.every((node) => {
+            const rect = node.getBoundingClientRect();
+            return (
+              rect.left >= bounds.left &&
+              rect.right <= bounds.right &&
+              rect.top >= bounds.top &&
+              rect.bottom <= bounds.bottom
+            );
+          })
+        );
+      }),
+    )
+    .toBe(true);
 }
 async function dragWithoutFlicker(node) {
   await expect
@@ -268,6 +297,14 @@ try {
   const draggedPosition = await nodePosition();
   await folderNode.click();
   await selectionFitsScreen();
+  for (const viewport of [
+    { width: 768, height: 900 },
+    { width: 1024, height: 768 },
+    { width: 1440, height: 1100 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await selectionFitsScreen();
+  }
   assert.equal(
     await nodePosition(),
     draggedPosition,
@@ -277,6 +314,7 @@ try {
     .getByRole("button", { name: "Clear selection", exact: true })
     .click();
   await expect(page.getByLabel("Selection details")).toHaveCount(0);
+  await graphNodesFitCanvas();
   assert.equal(
     await nodePosition(),
     draggedPosition,
@@ -463,6 +501,7 @@ try {
   await expect(page.getByLabel("Selection details")).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 720 });
   await graphFitsScreen();
+  await graphNodesFitCanvas();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await expect(

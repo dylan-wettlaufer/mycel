@@ -446,7 +446,7 @@
   display: grid;
   gap: 6px;
   width: 200px;
-  max-width: calc(100vw - 130px);
+  max-width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -467,7 +467,10 @@
 .graph-reading-controls button {
   box-shadow: var(--shadow-sm);
 }
-@media (min-width: 640px) {
+.graph-canvas {
+  container-type: inline-size;
+}
+@container (min-width: 400px) {
   .graph-reading-controls {
     flex-direction: row;
   }

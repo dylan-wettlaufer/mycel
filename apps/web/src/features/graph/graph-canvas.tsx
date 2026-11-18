@@ -2,6 +2,7 @@ import { ChevronDown, Focus, Filter, Scan, ZoomIn } from "lucide-react";
 import { Collapsible } from "radix-ui";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -127,6 +128,7 @@ export function GraphCanvas({
   }));
   const flow = useRef<ReactFlowInstance | null>(null);
   const userMoved = useRef(false);
+  const canvas = useRef<HTMLDivElement>(null);
   const behaviour = mode === "behaviour";
   const fitOptions = behaviour ? behaviourFitOptions : fitViewOptions;
   const viewportDuration = behaviour ? 0 : 200;
@@ -135,6 +137,30 @@ export function GraphCanvas({
     // that triggered the layout at the same position in the current viewport.
     setNodeState(applyLayout(nodes, nodeState, layoutAnchorId));
   }
+  useEffect(() => {
+    const element = canvas.current;
+    if (behaviour || !element || layoutAnchorId) return;
+    let size: string | undefined;
+    let frame = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      const nextSize = `${width}:${height}`;
+      if (size !== undefined && size !== nextSize && width > 0 && height > 0) {
+        cancelAnimationFrame(frame);
+        // Wait for React Flow to observe the new canvas dimensions first.
+        frame = requestAnimationFrame(() => {
+          void flow.current?.fitView({ ...fitOptions, duration: 200 });
+        });
+      }
+      size = nextSize;
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [behaviour, fitOptions, layoutAnchorId]);
   const focused = useMemo(
     () => focusGraph(nodes, edges, selectedId, onlyConnections),
     [nodes, edges, selectedId, onlyConnections],
@@ -186,6 +212,7 @@ export function GraphCanvas({
       )}
     >
       <div
+        ref={canvas}
         className={cn(
           "graph-canvas min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border bg-card",
           behaviour && "h-full flex-none lg:flex-1",
@@ -289,10 +316,7 @@ export function GraphCanvas({
               userMoved={userMoved}
             />
           )}
-          <Panel
-            position="top-left"
-            className={behaviour ? "max-w-[calc(100%-64px)]" : undefined}
-          >
+          <Panel position="top-left" className="max-w-[calc(100%-64px)]">
             {behaviour ? (
               <Collapsible.Root className="group">
                 <Collapsible.Trigger asChild>
@@ -320,11 +344,12 @@ export function GraphCanvas({
       {!sidePanel && selected && (
         <aside
           aria-label="Selection details"
-          className={
+          className={cn(
+            "flex min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border bg-card",
             behaviour
-              ? "flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-lg border bg-card lg:w-[300px] lg:max-w-[40%]"
-              : "absolute inset-y-0 right-0 z-10 flex w-[340px] max-w-full min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border bg-card shadow-lg lg:static lg:shadow-none"
-          }
+              ? "w-full lg:w-[300px] lg:max-w-[40%]"
+              : "w-[340px] max-w-1/2",
+          )}
         >
           <div className="flex shrink-0 flex-wrap items-start gap-2 border-b p-4">
             <div className="mr-auto min-w-0">
