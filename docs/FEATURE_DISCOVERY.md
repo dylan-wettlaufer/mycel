@@ -1,17 +1,11 @@
-# Automatic feature discovery (phase 6.2A)
+# Automatic feature discovery
 
-## Audit and design
-
-Phase 6.1 already resolves lexical JSX references, direct calls to recognized
-operations, HTTP handler exports, and external imports. It stores project-scoped
-semantic records with provenance and source anchors in the structural transaction.
-Its missing inputs for automatic discovery were layouts and ordinary service
-functions; `@mycelFeature` was the only feature producer.
-
-Discovery is an enrichment pass over this same graph. There is no new parser,
-separate feature graph, LLM dependency, dashboard change, or agent tracking.
-Existing semantic tables already accept heuristic provenance and string-valued
-attributes, so this milestone needs no schema migration.
+Discovery groups supported code into candidate application areas. It enriches
+the [semantic graph](SEMANTIC_GRAPH.md) with heuristic provenance and source
+anchors, and the current **Features** view labels these candidates **Inferred**.
+The [V0 architecture map](../mycel_prd.md#v0-03--high-level-architecture-visualization)
+will use semantic representations of features, flows, and subsystems. The
+rules below describe the current feature candidates and their memberships.
 
 ## Inputs
 
@@ -100,6 +94,10 @@ rule and confidence while its sources retain the supporting evidence. Promoting
 a candidate to an explicit declaration uses the existing explicit identity and
 removes the candidate. A source move updates every affected source mapping and
 relationship. Existing last-good-source retention applies on syntax errors.
+V0 requires [logical feature identity](../mycel_prd.md#v0-02--semantic-feature-representation)
+to survive implementation file moves even when discovery hints change. Today
+the candidate remains addressable as long as its owning package and area name
+remain the same.
 
 Route area names and feature directory names are hints, not product requirements.
 A broad area such as `settings` may contain several real features. Route groups can

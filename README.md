@@ -1,7 +1,16 @@
 # mycel
 
-See your codebase evolve. Mycel is a local-first developer tool for
-understanding structural changes in a codebase.
+> Mycel helps developers understand what their AI agents are building and how it fits into the rest of their application.
+
+Mycel is a local-first tool for keeping a mental model of an application as
+its code evolves. The V0 experience starts with a living architecture map of
+features and subsystems such as Orders, Payments, and persistence. A developer
+can open Orders, follow a source-backed connection to Payments, and inspect
+the exact handler behind it. The map updates as developers and agents edit
+the code.
+
+See the [product vision and V0 requirements](mycel_prd.md) and
+[system architecture](docs/ARCHITECTURE.md).
 
 ## Open a repository
 
@@ -36,45 +45,40 @@ If pnpm reports that its global bin directory is missing from PATH, run
 command connected to this checkout; rebuild after changing source code. The
 CLI and compiled dashboard must remain in the checkout together.
 
-## Workspace
+## Current experience
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the parts fit
-together and [docs/tasks/](docs/tasks/) for the remaining work in each part.
+- **Features** lists declared features and inferred candidates for supported
+  code patterns. Open a feature to explore its supported behavior traces and
+  source evidence. See [feature discovery](docs/FEATURE_DISCOVERY.md) and
+  [behavior tracing](docs/BEHAVIOUR_TRACING.md).
+- **Graph**, the current landing view, groups indexed files by folder and
+  shows directed import counts. Select a folder and choose **Open files**,
+  then select a file and choose **Open file** to inspect symbols and source.
+  Use **Only connections** to narrow the graph or **Focus selection** to
+  frame a node and its neighbors.
+- **Explorer** searches indexed files and symbols. **Activity** shows
+  committed changes and source diffs, including retained source for deleted
+  nodes. Graph and change selections can be reopened through browser history
+  or hash links.
+
+The Hono backend serves the dashboard and project-scoped graph, captured source,
+history, and SSE APIs. Mycel starts watching during the initial index and
+continues watching while it runs. The header shows backend health and live-stream
+connection state separately. See [server usage](packages/server/README.md).
+
+## Workspace
 
 | Directory | Package | Responsibility |
 | --- | --- | --- |
 | `packages/cli` | `@mycel/cli` | Command-line entry point and application lifecycle |
 | `packages/server` | `@mycel/server` | Local HTTP API, events, and static asset serving |
-| `packages/core` | `@mycel/core` | Indexing, watching, and change coordination |
+| `packages/core` | `@mycel/core` | Indexing, watching, semantic extraction, and change coordination |
 | `packages/parser` | `@mycel/parser` | Source structure extraction |
 | `packages/db` | `@mycel/db` | SQLite persistence and queries |
 | `packages/shared` | `@mycel/shared` | Shared contracts and utilities |
-| `apps/web` | `@mycel/web` | Browser dashboard |
+| `apps/web` | `@mycel/web` | Browser dashboard and source exploration |
 
-`apps/web` is a Vite + React + TypeScript dashboard styled with Tailwind CSS v4
-and shadcn/ui. It provides a searchable file and symbol explorer, scoped React Flow
-graphs, relationship details, and locally bundled Monaco source and diff viewers.
-The default Graph view shows every indexed file grouped into folders, with directed
-import counts between groups. Click a node to highlight its direct connections:
-blue links point into it, green links point out, and unrelated links fade. Use
-**Only connections** to hide unrelated nodes, **Focus selection** to frame its
-connections, or **Readable zoom** for a closer view. Compact zoom/focus controls sit at the
-canvas’s top right, and the legend stays fixed in a box at the top left, and paths distinguish files with the same
-name. **Fit all** shows the complete map at a smaller scale.
-
-Select a folder and choose **Open files** to inspect file dependencies, then
-select a file and choose **Open file** to drill into its symbols and source.
-Double-clicking also opens folders and files. TypeScript aliases and local
-workspace-package imports connect modules across package boundaries.
-The dashboard shows real index counts. Activity arrives through SSE, with recent
-node highlights and saved metadata and source for deleted nodes. Hash-based links
-preserve graph selections, individual changes, and source views across reloads and
-browser Back/Forward navigation.
-
-The Hono backend serves the dashboard and project-scoped graph, captured source,
-history, and SSE APIs. CLI startup indexes the repository and then watches it for
-changes. The header shows backend health and live-stream connection state
-separately; see [server usage](packages/server/README.md).
+See the [package task lists](docs/tasks/) for remaining work.
 
 ## Development
 
@@ -97,12 +101,11 @@ pnpm exec playwright install chromium
 pnpm test:workflow
 ```
 
-The test uses a disposable Git repository and a real server, watcher, SQLite database,
-and Chromium browser. It checks search, graph controls, relationships, Monaco source
-and recorded diffs, live creation/modification/deletion, browser navigation, mobile
-layout, and SSE recovery after a server interruption. It also rejects browser runtime
-errors and external asset requests. See [the workflow guide](docs/testing/dashboard-workflow.md)
-for the external coding agent mode and validation evidence.
+The workflows use disposable Git repositories and a real server, watcher,
+SQLite database, and Chromium browser. They cover structural navigation,
+source and diffs, live updates and SSE recovery, and feature behavior
+navigation. See the [workflow guide](docs/testing/dashboard-workflow.md)
+for the dashboard checks and an external coding agent mode.
 
 Code quality commands run across the workspace:
 

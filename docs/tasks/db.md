@@ -4,7 +4,7 @@ SQLite persistence for projects, the graph, diagnostics, source snapshots, and
 change history, using `better-sqlite3`. Owns the schema, migrations,
 transactional writes, and read queries. It knows nothing about parsing or HTTP.
 
-See [architecture](../ARCHITECTURE.md#data-model-planned).
+See [architecture](../ARCHITECTURE.md#data-model).
 
 ## Current state
 
@@ -26,8 +26,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 
 - [x] Add `better-sqlite3` and its types, and allow its build script in
       `pnpm.onlyBuiltDependencies`.
-- [x] Decide the data directory (open decision 3). Implement
-      `resolveDatabasePath(projectRoot)` that returns a per-project file
+- [x] Implement `resolveDatabasePath(projectRoot)` that returns a per-project file
       outside the repository.
 - [x] Open connections with WAL mode, foreign keys on, and a busy timeout.
 - [x] Write a migration runner with a `schema_migrations` table and ordered
@@ -62,7 +61,7 @@ See [architecture](../ARCHITECTURE.md#data-model-planned).
 - [x] `listChanges(cursor, limit)` for pagination.
 - [x] `getEventsAfter(id)` for SSE replay.
 - [x] `getDiff(changeId)` returning before and after content from snapshots.
-- [x] Retention policy (open decision 4): prune old snapshots and events
+- [x] Support explicit pruning of old snapshots and events
       without breaking diffs that are still reachable.
 
 ### Phase 7: robustness

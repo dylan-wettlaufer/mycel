@@ -1,5 +1,12 @@
 # Evidence-backed behaviour tracing
 
+Behavior traces are a drill-down from a feature to its implementation. The
+current **Features** view shows supported traces and their exact source
+references. In V0 this drill-down starts from the
+[architecture map](../mycel_prd.md#v0-04--progressive-feature-exploration).
+See [feature discovery](FEATURE_DISCOVERY.md) for how Mycel groups code into
+candidate areas.
+
 ## Representation and scope
 
 The existing semantic schema is sufficient. `service_operation` records use a
@@ -7,8 +14,8 @@ The existing semantic schema is sufficient. `service_operation` records use a
 or `unresolved`). Ordinary callable steps are not claims that every function is a
 business service. Existing `endpoint`, `data_model`, CALLS, HANDLES, READS, WRITES,
 provenance, source mappings, project identity, and atomic revision writes are
-reused. No SQLite migration, structural graph changes, dashboard changes, agent
-tracking, or runtime execution are needed.
+reused from the [semantic graph](SEMANTIC_GRAPH.md). Traces describe supported
+paths through indexed source.
 
 Behaviour enrichment runs after feature discovery. It does not turn candidate
 feature memberships or directory conventions into behaviour links. Existing
