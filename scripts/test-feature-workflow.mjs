@@ -124,16 +124,116 @@ try {
       ),
     )
     .not.toBe(background);
-  await writeEndpoint.click();
-  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+  const showWrite = writeEndpoint.getByRole("button", {
+    name: "Show call steps for POST /api/orders",
+  });
+  const hideWrite = writeEndpoint.getByRole("button", {
+    name: "Hide call steps for POST /api/orders",
+  });
+  const showRead = readEndpoint.getByRole("button", {
+    name: "Show call steps for GET /api/orders",
+  });
+  const hideRead = readEndpoint.getByRole("button", {
+    name: "Hide call steps for GET /api/orders",
+  });
+  await expect(showWrite).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    event.getByRole("button", { name: "Show call steps for form.onSubmit" }),
+  ).toBeVisible();
+  await expect(model.getByRole("button")).toHaveCount(0);
+
+  const viewport = graph.locator(".react-flow__viewport");
+  const readTransform = () =>
+    viewport.evaluate((element) => element.style.transform);
+  const transformBefore = await readTransform();
+  const nodesFit = () =>
+    graph.locator(".graph-canvas").evaluate((canvas) => {
+      const bounds = canvas.getBoundingClientRect();
+      const cards = [...canvas.querySelectorAll(".react-flow__node")];
+      return (
+        cards.length > 0 &&
+        cards.every((node) => {
+          const card = node.getBoundingClientRect();
+          return (
+            card.left >= bounds.left &&
+            card.right <= bounds.right &&
+            card.top >= bounds.top &&
+            card.bottom <= bounds.bottom
+          );
+        })
+      );
+    });
+  const writeHandler = graph.getByLabel("Handle POST Request, POST, Function", {
+    exact: true,
+  });
+  const writeService = graph.getByLabel("Create Order, createOrder, Service", {
+    exact: true,
+  });
+  const readService = graph.getByLabel("List Orders, listOrders, Service", {
+    exact: true,
+  });
+  const submitHandler = graph.getByLabel(
+    "Handle Submit, handleSubmit, Function",
+    { exact: true },
+  );
+  await showWrite.click();
+  await expect(hideWrite).toHaveAttribute("aria-expanded", "true");
+  await expect(writeHandler).toBeVisible();
+  await expect(writeService).toBeVisible();
+  await expect(readService).toHaveCount(0);
+  await expect(submitHandler).toHaveCount(0);
+  await expect.poll(readTransform).not.toBe(transformBefore);
+  await expect.poll(nodesFit).toBe(true);
+
+  const edge = async (sourceId, target) => {
+    const targetId = await target.getAttribute("data-id");
+    const id = JSON.stringify([sourceId, targetId]);
+    return graph.locator(`.react-flow__edge[data-id=${JSON.stringify(id)}]`);
+  };
+  await expect(await edge(writeId, writeHandler)).toHaveCount(1);
+  await expect(
+    await edge(await writeHandler.getAttribute("data-id"), writeService),
+  ).toHaveCount(1);
+  await expect(await edge(readId, model)).toHaveCount(1);
+
+  await showRead.click();
+  await expect(hideRead).toHaveAttribute("aria-expanded", "true");
+  await expect(readService).toBeVisible();
+  await expect(writeService).toBeVisible();
+  await expect(submitHandler).toHaveCount(0);
+  await expect.poll(nodesFit).toBe(true);
+
+  await writeService.click();
+  await expect(writeService).toHaveClass(/graph-selected/);
   const selection = graph.getByRole("complementary", {
     name: "Selection details",
   });
-  const createOrder = selection
-    .getByRole("listitem")
-    .filter({ has: page.getByText("createOrder", { exact: true }) })
-    .filter({ hasText: "app/api/orders/route.ts:4" });
-  await expect(createOrder).toHaveCount(1);
+  await expect(
+    selection.getByText("services/orders.ts:2", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toBeVisible();
+  const beforeCollapse = await readTransform();
+  await hideWrite.click();
+  await expect(writeService).toHaveCount(0);
+  await expect(writeHandler).toHaveCount(0);
+  await expect(readService).toBeVisible();
+  await expect(hideRead).toHaveAttribute("aria-expanded", "true");
+  await expect(writeEndpoint).toHaveClass(/graph-selected/);
+  await expect(
+    selection
+      .getByRole("paragraph")
+      .filter({ hasText: /^POST \/api\/orders$/ }),
+  ).toBeVisible();
+  await expect(
+    selection.getByText("app/api/orders/route.ts:4", { exact: true }),
+  ).toBeVisible();
+  await expect.poll(readTransform).toBe(beforeCollapse);
+
+  await hideRead.click();
+  await expect(readService).toHaveCount(0);
+  await expect(nodes).toHaveCount(4);
   await selection.getByRole("button", { name: "Clear selection" }).click();
   await readEndpoint.press("Enter");
   await expect(
@@ -141,29 +241,6 @@ try {
   ).toBeVisible();
   await readEndpoint.press("Escape");
   await expect(selection).toHaveCount(0);
-  const callSteps = graph.getByRole("button", { name: "Show call steps" });
-  await callSteps.click();
-  await expect(callSteps).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    graph.getByLabel("Handle Submit, handleSubmit, Function", { exact: true }),
-  ).toHaveCount(1);
-  await expect(event).toBeInViewport();
-  await expect.poll(() => effectiveTitleSize(event)).toBeGreaterThanOrEqual(16);
-  await expect(
-    graph.getByLabel("List Orders, listOrders, Service", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    graph.getByLabel("Create Order, createOrder, Service", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    graph.getByLabel("Create Order Record, Order.create, Data Operation", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await graph.getByRole("button", { name: "Fit all", exact: true }).click();
-  await expect(model).toBeInViewport();
-  await callSteps.click();
-  await expect(nodes).toHaveCount(4);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(event.locator(".react-flow__handle-bottom")).toHaveCount(1);
@@ -180,8 +257,11 @@ try {
       page.evaluate(() => globalThis.document.documentElement.scrollWidth),
     )
     .toBe(390);
-  await writeEndpoint.click();
-  await expect(selection).toBeVisible();
+  await showWrite.click();
+  await expect(writeService).toBeVisible();
+  await expect.poll(nodesFit).toBe(true);
+  await hideWrite.click();
+  await expect(nodes).toHaveCount(4);
 
   await page.reload();
   await expect(
@@ -193,7 +273,7 @@ try {
   ).toBeVisible();
   assert.deepEqual(errors, [], "browser runtime errors");
   console.log(
-    "PASS: Chromium opened Orders, verified both React Flow branches, and inspected call steps and source evidence.",
+    "PASS: Chromium fit expanded Orders graphs on desktop and mobile and verified independent regions and source evidence.",
   );
 } finally {
   try {

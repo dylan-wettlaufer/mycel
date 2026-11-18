@@ -105,7 +105,7 @@ test("condensed connections retain distinct paths and use the trace direction fo
       end: "data-access",
     },
   ]);
-  const compact = layoutBehaviour([input], false);
+  const compact = layoutBehaviour([input]);
   expect(compact.nodes.map(({ id }) => id)).toEqual(["submit", "api", "order"]);
   expect(compact.nodes.find(({ id }) => id === "api")?.data).toMatchObject({
     label: "Post to Orders",
@@ -121,10 +121,74 @@ test("condensed connections retain distinct paths and use the trace direction fo
       data: { paths: [read, write] },
     },
   ]);
-  const expanded = layoutBehaviour([input], true);
+  expect([...compact.expandable]).toEqual(["submit", "api"]);
+  const expanded = layoutBehaviour([input], new Set(["api"]));
+  expect(expanded.nodes.map(({ id }) => id)).toEqual([
+    "submit",
+    "api",
+    "order",
+    "handler",
+    "read",
+    "write",
+  ]);
+  expect(expanded.edges[0]).toMatchObject({
+    source: "submit",
+    target: "api",
+    data: { paths: [toApi] },
+  });
   expect(
     expanded.edges.filter(({ label }) => label === "handled by"),
-  ).toMatchObject([{ source: "api", target: "handler" }]);
+  ).toMatchObject([
+    { source: "api", target: "handler", data: { paths: [[handles]] } },
+  ]);
+});
+
+test("independent regions keep shared operations visible while any expanded region uses them", () => {
+  const sharedRead = hop("load", "order", "READS");
+  const postToLoad = hop("post", "load");
+  const getToLoad = hop("get", "load");
+  const input = trace(
+    [
+      entity("submit"),
+      entity("post", "endpoint"),
+      entity("get", "endpoint"),
+      entity("load"),
+      entity("order", "data_model"),
+    ],
+    [
+      {
+        entityIds: ["submit", "post", "load", "order"],
+        hops: [hop("submit", "post"), postToLoad, sharedRead],
+        end: "data-access",
+      },
+      {
+        entityIds: ["submit", "get", "load", "order"],
+        hops: [hop("submit", "get"), getToLoad, sharedRead],
+        end: "data-access",
+      },
+    ],
+  );
+  const both = layoutBehaviour([input], new Set(["post", "get"]));
+  expect(both.nodes.filter(({ id }) => id === "load")).toHaveLength(1);
+  expect(both.edges.filter(({ source }) => source === "load")).toMatchObject([
+    { target: "order", data: { paths: [[sharedRead]] } },
+  ]);
+
+  const one = layoutBehaviour([input], new Set(["get"]));
+  const ranks = new Map(one.nodes.map(({ id, position }) => [id, position.x]));
+  expect(ranks.get("post")).toEqual(ranks.get("get"));
+  expect(one.nodes.some(({ id }) => id === "load")).toBe(true);
+  expect(one.edges.find(({ source }) => source === "post")).toMatchObject({
+    target: "order",
+    data: { paths: [[postToLoad, sharedRead]] },
+  });
+  expect(one.edges.find(({ source }) => source === "get")).toMatchObject({
+    target: "load",
+    data: { paths: [[getToLoad]] },
+  });
+  expect(layoutBehaviour([input]).nodes.some(({ id }) => id === "load")).toBe(
+    false,
+  );
 });
 
 test("cycle steps remain visible and terminal evidence stays on the affected node", () => {
@@ -144,7 +208,7 @@ test("cycle steps remain visible and terminal evidence stays on the affected nod
       },
     ],
   );
-  const result = layoutBehaviour([input], false);
+  const result = layoutBehaviour([input]);
   expect(result.edges.map(({ source, target }) => [source, target])).toEqual([
     ["submit", "a"],
     ["a", "b"],

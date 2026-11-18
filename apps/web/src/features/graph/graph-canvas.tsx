@@ -48,6 +48,45 @@ function withNodeState(nodes: Node[], state: Map<string, Node>): Node[] {
   });
 }
 
+type NodeState = { layout: Node[]; byId: Map<string, Node> };
+
+function applyLayout(
+  layout: Node[],
+  previous: NodeState,
+  anchorId: string | undefined,
+): NodeState {
+  const before =
+    previous.byId.get(anchorId ?? "") ??
+    previous.layout.find((node) => node.id === anchorId);
+  const after = layout.find((node) => node.id === anchorId);
+  const offset =
+    before && after
+      ? {
+          x: before.position.x - after.position.x,
+          y: before.position.y - after.position.y,
+        }
+      : { x: 0, y: 0 };
+  return {
+    layout,
+    byId: new Map(
+      layout.map((node) => {
+        const measured = previous.byId.get(node.id)?.measured;
+        return [
+          node.id,
+          {
+            ...node,
+            ...(measured ? { measured } : {}),
+            position: {
+              x: node.position.x + offset.x,
+              y: node.position.y + offset.y,
+            },
+          },
+        ];
+      }),
+    ),
+  };
+}
+
 export function GraphCanvas({
   nodes,
   edges,
@@ -57,7 +96,8 @@ export function GraphCanvas({
   onOpen,
   openLabel,
   mode = "imports",
-  initialFocusId,
+  layoutAnchorId,
+  fitRequest,
   details,
 }: {
   nodes: Node[];
@@ -68,28 +108,29 @@ export function GraphCanvas({
   onOpen?: ((id: string) => void) | undefined;
   openLabel?: string;
   mode?: "imports" | "symbols" | "behaviour";
-  initialFocusId?: string | undefined;
+  layoutAnchorId?: string | undefined;
+  fitRequest?: number | undefined;
   details?: ReactNode;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
-  const [nodeState, setNodeState] = useState(() => new Map<string, Node>());
+  const [nodeState, setNodeState] = useState<NodeState>(() => ({
+    layout: nodes,
+    byId: new Map(),
+  }));
   const flow = useRef<ReactFlowInstance | null>(null);
+  const fittedRequest = useRef(fitRequest);
   const canvas = useRef<HTMLDivElement>(null);
   const behaviour = mode === "behaviour";
   const fitOptions = behaviour ? behaviourFitViewOptions : fitViewOptions;
-  const initialFitOptions = useMemo(() => {
-    if (!initialFocusId) return fitOptions;
-    const entry = graphConnections(nodes, edges, initialFocusId);
-    const nearby = new Set(entry.ids);
-    for (const next of entry.outgoing)
-      for (const node of graphConnections(nodes, edges, next.id).outgoing)
-        nearby.add(node.id);
-    return { ...fitOptions, nodes: [...nearby].map((id) => ({ id })) };
-  }, [fitOptions, initialFocusId, nodes, edges]);
+  if (behaviour && nodeState.layout !== nodes) {
+    // Apply the new positions before React Flow sees them, keeping the card
+    // that triggered the layout at the same position in the current viewport.
+    setNodeState(applyLayout(nodes, nodeState, layoutAnchorId));
+  }
   useEffect(() => {
     const element = canvas.current;
-    // Expanded traces open at their entry point and keep their zoom on resize.
-    if (!behaviour || !element || initialFocusId) return;
+    // Once the user unfolds a region, opening details must not shrink the graph.
+    if (!behaviour || !element || layoutAnchorId) return;
     let size: string | undefined;
     let frame = 0;
     const observer = new ResizeObserver(([entry]) => {
@@ -110,25 +151,52 @@ export function GraphCanvas({
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [behaviour, fitOptions, initialFocusId]);
+  }, [behaviour, fitOptions, layoutAnchorId]);
   const focused = useMemo(
     () => focusGraph(nodes, edges, selectedId, onlyConnections),
     [nodes, edges, selectedId, onlyConnections],
   );
   const visibleNodes = useMemo(
-    () => withNodeState(focused.nodes, nodeState),
-    [focused.nodes, nodeState],
+    () => withNodeState(focused.nodes, nodeState.byId),
+    [focused.nodes, nodeState.byId],
   );
+  const nodesMeasured =
+    visibleNodes.length > 0 &&
+    visibleNodes.every(({ measured }) => measured?.width && measured.height);
+  useEffect(() => {
+    if (
+      fitRequest === undefined ||
+      fittedRequest.current === fitRequest ||
+      !nodesMeasured
+    )
+      return;
+
+    const frame = requestAnimationFrame(() => {
+      if (!flow.current) return;
+      fittedRequest.current = fitRequest;
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      void flow.current.fitView({
+        ...fitOptions,
+        duration: reducedMotion ? 0 : 200,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [fitOptions, fitRequest, nodesMeasured]);
   const onNodesChange = useCallback<OnNodesChange>(
     (changes) => {
-      setNodeState(
-        (previous) =>
-          new Map(
-            applyNodeChanges(changes, withNodeState(nodes, previous)).map(
+      setNodeState((previous) => {
+        const layout = behaviour ? previous.layout : nodes;
+        return {
+          layout,
+          byId: new Map(
+            applyNodeChanges(changes, withNodeState(layout, previous.byId)).map(
               (node) => [node.id, node],
             ),
           ),
-      );
+        };
+      });
       if (behaviour) {
         const selection = changes.find(
           (change) => change.type === "select" && change.selected,
@@ -171,7 +239,7 @@ export function GraphCanvas({
           fitView
           minZoom={0.03}
           maxZoom={2}
-          fitViewOptions={initialFitOptions}
+          fitViewOptions={fitOptions}
           colorMode="dark"
           nodesDraggable
           nodesConnectable={false}

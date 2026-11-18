@@ -1,6 +1,8 @@
 import { memo } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { ChangeAction, NodeKind } from "@mycel/shared";
 
 const operationKinds = {
@@ -24,11 +26,19 @@ type StructuralNode = {
   operationKind?: never;
 };
 
+type OperationNode = {
+  operationKind: OperationKind;
+  expansion?: {
+    expanded: boolean;
+    onToggle: (id: string) => void;
+  };
+};
+
 export type CodeNode = Node<
   {
     label: string;
     name: string;
-  } & (StructuralNode | { operationKind: OperationKind }),
+  } & (StructuralNode | OperationNode),
   "code"
 >;
 
@@ -37,6 +47,7 @@ export function operationKindLabel(kind: OperationKind) {
 }
 
 const GraphNode = memo(function GraphNode({
+  id,
   data,
   targetPosition = Position.Left,
   sourcePosition = Position.Right,
@@ -51,9 +62,32 @@ const GraphNode = memo(function GraphNode({
         >
           <div className="operation-node-title">{data.label}</div>
           <code className="operation-node-identifier">{data.name}</code>
-          <Badge variant="ghost" className="operation-node-type">
-            {operationKindLabel(data.operationKind)}
-          </Badge>
+          <div className="mt-auto flex w-full items-center justify-between gap-2">
+            <Badge variant="ghost" className="operation-node-type">
+              {operationKindLabel(data.operationKind)}
+            </Badge>
+            {data.expansion && (
+              <Button
+                variant="outline"
+                size="xs"
+                className="nodrag nopan"
+                aria-label={`${data.expansion.expanded ? "Hide" : "Show"} call steps for ${data.name}`}
+                aria-expanded={data.expansion.expanded}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  data.expansion?.onToggle(id);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                {data.expansion.expanded ? (
+                  <ChevronUp aria-hidden />
+                ) : (
+                  <ChevronDown aria-hidden />
+                )}
+                {data.expansion.expanded ? "Hide steps" : "Show steps"}
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <div

@@ -396,7 +396,6 @@
   white-space: nowrap;
 }
 .operation-node-type {
-  margin-top: auto;
   padding: 0;
   border: 0;
   color: var(--operation-accent);

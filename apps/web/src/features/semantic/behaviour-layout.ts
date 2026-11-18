@@ -48,7 +48,7 @@ function edgeLabel(paths: BehaviourHop[][]): string {
 
 export function layoutBehaviour(
   traces: BehaviourTrace[],
-  showCalls: boolean,
+  expanded: ReadonlySet<string> = new Set(),
   direction: "LR" | "TB" = "LR",
   members: SemanticEntity[] = [],
 ) {
@@ -59,23 +59,22 @@ export function layoutBehaviour(
   );
   const paths = traces.flatMap((trace) => trace.paths);
   const presentation = describeBehaviour(entities, paths, members);
-  const visible = new Set(traces.map((trace) => trace.rootId));
+  const anchors = new Set(traces.map((trace) => trace.rootId));
   const notices = new Map<string, Set<string>>();
   for (const { id, kind, attributes } of entities.values()) {
     if (
-      showCalls ||
       kind === "endpoint" ||
       kind === "data_model" ||
       attributes.traceRole === "unresolved"
     )
-      visible.add(id);
+      anchors.add(id);
   }
   for (const path of paths) {
     const terminal = path.entityIds.at(-1);
     if (!terminal) continue;
-    visible.add(terminal);
+    anchors.add(terminal);
     // Keep the full cycle visible so a condensed link cannot look like a self-call.
-    if (path.end === "cycle") for (const id of path.entityIds) visible.add(id);
+    if (path.end === "cycle") for (const id of path.entityIds) anchors.add(id);
     const notice = path.boundary?.message ?? terminalLabels[path.end];
     if (notice) {
       const existing = notices.get(terminal) ?? new Set<string>();
@@ -92,38 +91,55 @@ export function layoutBehaviour(
       paths: Map<string, BehaviourHop[]>;
     }
   >();
-  // Condense within each returned path, then merge shared visual connections.
-  // This keeps alternate paths' evidence separate and preserves traversal direction.
+  const visible = new Set(anchors);
+  const expandable = new Set<string>();
+
+  function connect(path: BehaviourHop[]) {
+    const source = path[0]!.fromId;
+    const target = path.at(-1)!.toId;
+    const id = JSON.stringify([source, target]);
+    const link = links.get(id) ?? { source, target, paths: new Map() };
+    link.paths.set(
+      JSON.stringify(path.map(({ relationship }) => relationship.id)),
+      path,
+    );
+    links.set(id, link);
+  }
+
+  // Split at the original anchors before revealing intermediate nodes so an
+  // operation shared by two regions cannot unfold its other region by itself.
   for (const path of paths) {
     let pending: BehaviourHop[] = [];
     for (const hop of path.hops) {
       pending.push(hop);
-      if (!visible.has(hop.toId)) continue;
+      if (!anchors.has(hop.toId)) continue;
       const source = pending[0]!.fromId;
-      const target = hop.toId;
-      const id = JSON.stringify([source, target]);
-      const link = links.get(id) ?? { source, target, paths: new Map() };
-      link.paths.set(
-        JSON.stringify(pending.map(({ relationship }) => relationship.id)),
-        pending,
-      );
-      links.set(id, link);
+      if (pending.length > 1) expandable.add(source);
+      if (pending.length > 1 && expanded.has(source)) {
+        for (const step of pending) {
+          visible.add(step.toId);
+          connect([step]);
+        }
+      } else connect(pending);
       pending = [];
     }
   }
 
   const vertical = direction === "TB";
   const width = vertical ? 200 : 234;
-  const height = 114;
+  const height = 122;
   const layout = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   layout.setGraph({
-    rankdir: direction,
+    rankdir: vertical ? "BT" : "RL",
+    ranker: "longest-path",
     nodesep: vertical ? 38 : 68,
     ranksep: vertical ? 70 : 112,
   });
   for (const id of visible) layout.setNode(id, { width, height });
+  // Dagre ranks the longest path from each sink. Reverse only the layout so
+  // ranks follow the entry points and shorter sibling branches stay nearby.
   for (const { source, target } of links.values())
-    layout.setEdge(source, target);
+    layout.setEdge(target, source);
   dagre.layout(layout);
 
   const nodes: CodeNode[] = [...visible].map((id) => {
@@ -159,5 +175,5 @@ export function layoutBehaviour(
         : {},
     };
   });
-  return { entities, nodes, edges, notices };
+  return { entities, nodes, edges, notices, expandable };
 }
