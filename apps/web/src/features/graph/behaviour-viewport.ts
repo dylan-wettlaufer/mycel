@@ -9,6 +9,8 @@ import {
 } from "@xyflow/react";
 
 const readableMinimum = 0.74;
+// Layered cards stay legible a little smaller than the initial fit allows.
+const refitMinimum = 0.55;
 const minZoom = 0.03;
 export const behaviourFitOptions = { padding: 0.12, minZoom, maxZoom: 1.05 };
 
@@ -97,6 +99,7 @@ export function BehaviourViewport({
       }
     | undefined
   >(undefined);
+  const placed = useRef<Viewport | null>(null);
 
   useEffect(() => {
     if (
@@ -120,15 +123,27 @@ export function BehaviourViewport({
         (!!previous &&
           (width !== previous.width || height !== previous.height));
       const layoutChanged = fitRequest !== (previous?.fitRequest ?? 0);
-      if (layoutChanged) userMoved.current = false;
+      const current = flow.getViewport();
+      const last = placed.current;
+      // Pressing a locked card starts a pan gesture even when the view stays put.
+      if (
+        layoutChanged ||
+        (last &&
+          Math.abs(current.x - last.x) < 1 &&
+          Math.abs(current.y - last.y) < 1 &&
+          Math.abs(current.zoom - last.zoom) < 1e-3)
+      )
+        userMoved.current = false;
       const keepExpandedFitted = hasExpandedSteps && !userMoved.current;
+      // Opening or closing the details panel resizes the canvas; refit unless
+      // the reader has positioned the view themselves.
+      const refit = resized && !userMoved.current;
       const autoFit =
         !previous ||
         layoutChanged ||
         (breakpointChanged && !userMoved.current) ||
-        (resized && keepExpandedFitted);
+        refit;
       previousFrame.current = { wide, width, height, reveal, fitRequest };
-      const current = flow.getViewport();
       let viewport = current;
 
       if (autoFit) {
@@ -141,8 +156,11 @@ export function BehaviourViewport({
           behaviourFitOptions.maxZoom,
           { x: `${paddingX}px`, top: `${paddingY}px`, bottom: "20px" },
         );
+        const focus = (selectedId && flow.getNode(selectedId)?.id) || root;
         viewport =
-          layoutChanged || keepExpandedFitted || fit.zoom >= readableMinimum
+          layoutChanged ||
+          keepExpandedFitted ||
+          fit.zoom >= (refit ? refitMinimum : readableMinimum)
             ? fit
             : revealBounds(
                 getViewportForBounds(
@@ -153,7 +171,7 @@ export function BehaviourViewport({
                   readableMinimum,
                   0,
                 ),
-                flow.getNodesBounds([root]),
+                flow.getNodesBounds([focus]),
                 width,
                 height,
               );
@@ -186,6 +204,7 @@ export function BehaviourViewport({
         viewport.zoom !== current.zoom
       )
         void flow.setViewport(viewport);
+      placed.current = viewport;
     });
     return () => cancelAnimationFrame(frame);
   }, [

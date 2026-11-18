@@ -214,14 +214,17 @@ try {
   await writeEndpoint.click();
   await expect(writeEndpoint).toHaveClass(/graph-selected/);
   await expect.poll(canvasHeight).toBe(desktopCanvasHeight);
-  await expect.poll(readZoom).toBeCloseTo(collapsedZoom);
+  // The details panel narrows the canvas, so the whole diagram refits.
+  await expect.poll(nodesFit).toBe(true);
+  await expect.poll(readZoom).toBeLessThan(collapsedZoom);
+  const selectedZoom = await readZoom();
   const connectionsFilter = graph.getByRole("button", {
     name: "Only connections",
   });
   await connectionsFilter.click();
   await expect(connectionsFilter).toHaveAttribute("aria-pressed", "true");
   await expect(nodes).toHaveCount(3);
-  await expect.poll(readZoom).toBeCloseTo(collapsedZoom);
+  await expect.poll(readZoom).toBeCloseTo(selectedZoom);
   await connectionsFilter.click();
   await expect(nodes).toHaveCount(4);
   const overview = selection.getByRole("region", { name: "Overview" });
