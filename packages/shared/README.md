@@ -107,6 +107,9 @@ returns `ArchitectureFileResult`: the file, or issues with dotted JSON paths.
 specificity-based overlap resolution and folder fallback for unassigned files.
 `ArchitectureConnection` and `ArchitectureConnectionEvidence` represent
 evidence-backed import and call dependencies crossing between parts.
+`ArchitectureGitChanges`, `ArchitecturePartWithChanges`, and
+`ArchitectureConnectionWithChanges` annotate parts and connections with recent
+git status (`new | changed | unchanged`) and uncommitted highlights.
 
 ## Health compatibility
 

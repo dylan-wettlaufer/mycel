@@ -333,3 +333,32 @@ export const architectureConnection = {
   ],
   truncated: false,
 } satisfies import("@mycel/shared").ArchitectureConnection;
+export const architectureGitChanges = {
+  available: true,
+  requestedWindow: "branch",
+  resolvedWindow: "branch",
+  branch: "feat/orders",
+  baseRef: "main",
+  baseCommit: "0123456789abcdef0123456789abcdef01234567",
+  addedFiles: ["packages/orders/src/index.ts"],
+  modifiedFiles: ["packages/core/src/index.ts"],
+  deletedFiles: [],
+  uncommittedFiles: ["packages/orders/src/index.ts"],
+} satisfies import("@mycel/shared").ArchitectureGitChanges;
+export const architecturePartWithChanges = {
+  ...architectureAssignment.parts[0]!,
+  change: {
+    status: "changed",
+    uncommitted: true,
+    addedFiles: 0,
+    modifiedFiles: 1,
+    uncommittedFiles: 1,
+  },
+} satisfies import("@mycel/shared").ArchitecturePartWithChanges;
+export const architectureConnectionWithChanges = {
+  ...architectureConnection,
+  change: {
+    status: "new",
+    uncommitted: false,
+  },
+} satisfies import("@mycel/shared").ArchitectureConnectionWithChanges;

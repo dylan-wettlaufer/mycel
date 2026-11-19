@@ -31,6 +31,11 @@ export type {
   ComputeConnectionsOptions,
   GraphLinkSource,
 } from "./architecture-connections.js";
+export {
+  applyGitChangesToArchitecture,
+  collectGitChanges,
+} from "./architecture-git.js";
+export type { GitChangesOptions } from "./architecture-git.js";
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";

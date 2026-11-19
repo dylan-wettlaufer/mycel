@@ -137,7 +137,7 @@ Unknown keys are rejected, so declared connections are invalid by construction.
 | 2. Folder fallback                              | Done   |
 | 3. Assign files to parts                        | Done   |
 | 4. Connections between parts                    | Done   |
-| 5. Recent changes from git                      | To do  |
+| 5. Recent changes from git                      | Done   |
 | 6. API and live updates                         | To do  |
 | 7. Architecture map as the landing view         | To do  |
 | 8. Agent skill and `mycel architecture` command | To do  |

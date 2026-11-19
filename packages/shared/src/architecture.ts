@@ -106,3 +106,59 @@ export interface ArchitectureConnection {
   /** True when `evidence` was capped by a limit; counts remain exact. */
   truncated: boolean;
 }
+
+export type ArchitectureChangeWindow = "uncommitted" | "branch" | "7d" | "30d";
+
+export type ArchitectureChangeStatus = "new" | "changed" | "unchanged";
+
+/** File-level git changes for a requested architecture comparison window. */
+export interface ArchitectureGitChanges {
+  /** False when the directory is not a git repository or git cannot be run. */
+  available: boolean;
+  /** Short machine-readable reason when `available` is false. */
+  reason?: string;
+  /** The window requested by the caller. */
+  requestedWindow: ArchitectureChangeWindow;
+  /**
+   * The effective window applied. `"branch"` resolves to `"7d"` when on the
+   * default branch or detached HEAD.
+   */
+  resolvedWindow: ArchitectureChangeWindow;
+  /** Current branch name, or `null` when detached or unavailable. */
+  branch: string | null;
+  /** Base branch ref used for `"branch"` diffs (such as `"main"`), or `null`. */
+  baseRef: string | null;
+  /** Base commit SHA used for the diff, or `null` when uncommitted-only or empty history. */
+  baseCommit: string | null;
+  /** Sorted repository-relative paths that did not exist before the window. */
+  addedFiles: string[];
+  /** Sorted repository-relative paths that existed before the window and changed. */
+  modifiedFiles: string[];
+  /** Sorted repository-relative paths deleted within the window. */
+  deletedFiles: string[];
+  /** Sorted repository-relative paths with uncommitted working-tree changes. */
+  uncommittedFiles: string[];
+}
+
+export interface ArchitecturePartChange {
+  status: ArchitectureChangeStatus;
+  /** True when any file in this part has uncommitted working-tree changes. */
+  uncommitted: boolean;
+  addedFiles: number;
+  modifiedFiles: number;
+  uncommittedFiles: number;
+}
+
+export interface ArchitectureConnectionChange {
+  status: ArchitectureChangeStatus;
+  /** True when any backing evidence endpoint has uncommitted working-tree changes. */
+  uncommitted: boolean;
+}
+
+export interface ArchitecturePartWithChanges extends AssignedArchitecturePart {
+  change: ArchitecturePartChange;
+}
+
+export interface ArchitectureConnectionWithChanges extends ArchitectureConnection {
+  change: ArchitectureConnectionChange;
+}
