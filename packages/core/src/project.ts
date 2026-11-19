@@ -1,5 +1,7 @@
 import { createHistoryQueries } from "./history-queries.js";
 import type { HistoryQueries } from "./history-queries.js";
+import { createArchitectureQueries } from "./architecture-map.js";
+import type { ArchitectureQueries } from "./architecture-map.js";
 import { openDatabase } from "@mycel/db";
 import type { IndexingSettings, Project, ProjectInfo } from "@mycel/shared";
 import type { GraphUpdateTiming } from "./live-index.js";
@@ -20,6 +22,7 @@ export interface IndexedProject {
   project: Project;
   graph: GraphQueries;
   history: HistoryQueries;
+  architecture: ArchitectureQueries;
   readonly lastUpdate: GraphUpdateTiming | undefined;
   flush(): Promise<void>;
   close(): void;
@@ -48,6 +51,18 @@ export async function openIndexedProject(
       ...(options.indexing === undefined ? {} : { indexing: options.indexing }),
     });
     const shutdown = new AbortController();
+    const architecture = createArchitectureQueries({
+      projectRoot: live.project.root,
+      projectId: live.project.id,
+      database,
+      signal: shutdown.signal,
+      onIndexCommit: live.onCommit,
+      onArchitectureFile: live.onArchitectureFile,
+      ...(options.debounceMs === undefined
+        ? {}
+        : { debounceMs: options.debounceMs }),
+      ...(options.onError === undefined ? {} : { onError: options.onError }),
+    });
     return {
       project: live.project,
       graph: createGraphQueries(database, live.project.id),
@@ -57,6 +72,7 @@ export async function openIndexedProject(
         live.onEvent,
         shutdown.signal,
       ),
+      architecture,
       get lastUpdate() {
         return live.lastUpdate;
       },

@@ -21,6 +21,7 @@ export async function startIndexedServer(
       project: options.project,
       graph: indexed.graph,
       history: indexed.history,
+      architecture: indexed.architecture,
       ...(options.webDistPath === undefined
         ? {}
         : { webDistPath: options.webDistPath }),

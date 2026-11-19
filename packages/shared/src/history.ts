@@ -52,6 +52,10 @@ export interface ChangeDiff {
 
 export type SseMessage =
   | { type: "change"; data: ChangeEvent }
+  | {
+      type: "architecture";
+      data: import("./architecture.js").ArchitectureUpdateEvent;
+    }
   | { type: "index-status"; data: import("./types.js").IndexProgress }
   | {
       type: "diagnostics";

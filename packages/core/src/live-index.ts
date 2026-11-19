@@ -11,6 +11,7 @@ import type { ChangeEvent, Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
 import { buildProjectGraph, hashContent } from "./graph.js";
+import { architectureFilePath } from "./architecture.js";
 import { captureRepository } from "./indexer.js";
 import type { IndexRepositoryOptions } from "./indexer.js";
 import { watchSourceFiles } from "./watcher.js";
@@ -42,6 +43,8 @@ export interface WatchRepositoryOptions extends IndexRepositoryOptions {
 /** Watch before capture so saves during startup are reconciled before returning. */
 export async function watchRepository(options: WatchRepositoryOptions) {
   const listeners = new Set<(event: ChangeEvent) => void>();
+  const commitListeners = new Set<(revision: number) => void>();
+  const architectureFileListeners = new Set<() => void>();
   if (options.onEvent) listeners.add(options.onEvent);
   const publish = (events: ChangeEvent[]) => {
     for (const event of events)
@@ -57,6 +60,32 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         }
       }
   };
+  const notifyCommit = (revision: number) => {
+    for (const listener of commitListeners) {
+      try {
+        listener(revision);
+      } catch (error) {
+        try {
+          options.onError(error);
+        } catch {
+          /* Observers cannot invalidate a commit. */
+        }
+      }
+    }
+  };
+  const notifyArchitectureFile = () => {
+    for (const listener of architectureFileListeners) {
+      try {
+        listener();
+      } catch (error) {
+        try {
+          options.onError(error);
+        } catch {
+          /* Observers cannot invalidate file watching. */
+        }
+      }
+    }
+  };
   let sessionId: string | undefined;
   const startup: SourceChange[] = [];
   let queue: ReturnType<typeof createSourceChangeQueue> | undefined;
@@ -64,6 +93,10 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     root: options.project.root,
     ...(options.indexing === undefined ? {} : { indexing: options.indexing }),
     onChange: (change) => {
+      if (change.path === architectureFilePath) {
+        notifyArchitectureFile();
+        return;
+      }
       if (queue) queue.enqueue(change);
       else startup.push(change);
     },
@@ -196,6 +229,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           writeMs: completedAt - resolvedAt,
         });
         publish(events);
+        if (events.length > 0) notifyCommit(revision);
       },
     });
     // Recheck the startup snapshot even if OS events have not arrived yet.
@@ -216,6 +250,18 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           listeners.delete(listener);
         };
       },
+      onCommit(listener: (revision: number) => void) {
+        commitListeners.add(listener);
+        return () => {
+          commitListeners.delete(listener);
+        };
+      },
+      onArchitectureFile(listener: () => void) {
+        architectureFileListeners.add(listener);
+        return () => {
+          architectureFileListeners.delete(listener);
+        };
+      },
       get lastUpdate(): GraphUpdateTiming | undefined {
         return lastUpdate;
       },
@@ -224,6 +270,8 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         if (options.database.open)
           endMonitoringSession(options.database, sessionId!);
         listeners.clear();
+        commitListeners.clear();
+        architectureFileListeners.clear();
         // Stop callbacks synchronously, before the owner closes storage.
         return Promise.all([queue!.close(), watcher.close()]).then(() => {});
       },

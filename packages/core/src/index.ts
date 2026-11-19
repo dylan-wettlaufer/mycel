@@ -36,6 +36,18 @@ export {
   collectGitChanges,
 } from "./architecture-git.js";
 export type { GitChangesOptions } from "./architecture-git.js";
+export {
+  buildArchitectureMap,
+  createArchitectureQueries,
+  loadProjectArchitecture,
+} from "./architecture-map.js";
+export type {
+  ArchitectureMapQueryOptions,
+  ArchitectureQueries,
+  BuildArchitectureMapOptions,
+  CreateArchitectureQueriesOptions,
+  LoadedProjectArchitecture,
+} from "./architecture-map.js";
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";

@@ -3,7 +3,12 @@ import { fileURLToPath } from "node:url";
 
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createHistoryRoutes } from "./routes/history.js";
-import type { HistoryQueries, GraphQueries } from "@mycel/core";
+import { createArchitectureRoutes } from "./routes/architecture.js";
+import type {
+  ArchitectureQueries,
+  GraphQueries,
+  HistoryQueries,
+} from "@mycel/core";
 import type { HealthResponse, ProjectInfo } from "@mycel/shared";
 import { Hono } from "hono";
 import { createGraphRoutes } from "./routes/graph.js";
@@ -17,6 +22,7 @@ export interface AppOptions {
   project?: ProjectInfo;
   graph?: GraphQueries;
   history?: HistoryQueries;
+  architecture?: ArchitectureQueries;
 }
 
 export function createApp({
@@ -24,6 +30,7 @@ export function createApp({
   project,
   graph,
   history,
+  architecture,
 }: AppOptions = {}) {
   const app = new Hono();
 
@@ -56,8 +63,9 @@ export function createApp({
       : context.json({ error: "Indexed file not found" }, 404);
   });
 
+  app.route("/api/architecture", createArchitectureRoutes(architecture));
   app.route("/api/graph", createGraphRoutes(graph));
-  app.route("/api", createHistoryRoutes(history));
+  app.route("/api", createHistoryRoutes(history, undefined, architecture));
 
   // API misses must never fall through to the frontend's HTML entry point.
   app.all("/api", (context) => context.json({ error: "Not found" }, 404));

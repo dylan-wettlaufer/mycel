@@ -1,3 +1,6 @@
+import type { Revision } from "./graph.js";
+import type { ProjectId } from "./project.js";
+
 export type ArchitecturePartKind =
   "app" | "service" | "library" | "data" | "integration" | "cli";
 
@@ -161,4 +164,36 @@ export interface ArchitecturePartWithChanges extends AssignedArchitecturePart {
 
 export interface ArchitectureConnectionWithChanges extends ArchitectureConnection {
   change: ArchitectureConnectionChange;
+}
+
+/** Complete architecture map snapshot returned by `GET /api/architecture`. */
+export interface ArchitectureMap {
+  projectId: ProjectId;
+  revision: Revision;
+  /** `"agent"` when loaded from `.mycel/architecture.json`, `"folder-fallback"` otherwise. */
+  source: ArchitectureSource;
+  /** Present when `.mycel/architecture.json` supplied a `generatedAt` timestamp. */
+  generatedAt?: string;
+  /** Validation issues when `.mycel/architecture.json` exists but is invalid. */
+  fileIssues?: ArchitectureIssue[];
+  /** Parts with assigned files and git change status. */
+  parts: ArchitecturePartWithChanges[];
+  /** Directed cross-part connections with evidence and git change status. */
+  connections: ArchitectureConnectionWithChanges[];
+  /** Git change metadata for the selected window. */
+  changes: ArchitectureGitChanges;
+  /** Files not matched by any declared part (assigned to fallback parts). */
+  unassignedFiles: string[];
+  /** Tie warnings when multiple declared parts match a file with identical specificity. */
+  tieWarnings: ArchitectureTieWarning[];
+}
+
+export type ArchitectureUpdateReason = "file" | "index" | "git";
+
+/** SSE notification emitted when the architecture map should be refreshed. */
+export interface ArchitectureUpdateEvent {
+  projectId: ProjectId;
+  revision: Revision;
+  reason: ArchitectureUpdateReason;
+  timestamp: string;
 }

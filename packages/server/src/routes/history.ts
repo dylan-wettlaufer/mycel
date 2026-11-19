@@ -1,6 +1,7 @@
 import { streamSSE } from "hono/streaming";
 import { Hono } from "hono";
-import type { HistoryQueries } from "@mycel/core";
+import type { ArchitectureQueries, HistoryQueries } from "@mycel/core";
+import type { ArchitectureUpdateEvent } from "@mycel/shared";
 import { HTTPException } from "hono/http-exception";
 function cursor(value: string | undefined): string | undefined {
   if (
@@ -13,6 +14,7 @@ function cursor(value: string | undefined): string | undefined {
 export function createHistoryRoutes(
   history?: HistoryQueries,
   heartbeatMs = 15_000,
+  architecture?: ArchitectureQueries,
 ) {
   if (
     !Number.isSafeInteger(heartbeatMs) ||
@@ -77,11 +79,17 @@ export function createHistoryRoutes(
       let stopped = false;
       let wake: (() => void) | undefined;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const pendingArchitecture: ArchitectureUpdateEvent[] = [];
       const unsubscribe = history.onEvent(() => wake?.());
+      const unsubscribeArchitecture = architecture?.onUpdate((event) => {
+        pendingArchitecture.push(event);
+        wake?.();
+      });
       const stop = () => {
         stopped = true;
         clearTimeout(timer);
         unsubscribe();
+        unsubscribeArchitecture?.();
         wake?.();
       };
       const abort = () => stream.abort();
@@ -101,7 +109,15 @@ export function createHistoryRoutes(
             });
             lastId = event.id;
           }
-          if (!events.length && !stopped) {
+          const architectureEvents = pendingArchitecture.splice(0);
+          for (const archEvent of architectureEvents) {
+            if (stopped) break;
+            await stream.writeSSE({
+              event: "architecture",
+              data: JSON.stringify(archEvent),
+            });
+          }
+          if (!events.length && !pendingArchitecture.length && !stopped) {
             let heartbeat = false;
             await new Promise<void>((resolve) => {
               wake = resolve;

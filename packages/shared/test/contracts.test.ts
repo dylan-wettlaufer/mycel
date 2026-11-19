@@ -253,6 +253,7 @@ export function eventId(
   message: import("@mycel/shared").SseMessage,
 ): string | undefined {
   if (message.type === "change") return message.data.id;
+  if (message.type === "architecture") return message.data.reason;
   if (message.type === "diagnostics") return String(message.data.revision);
   return message.data.status;
 }
@@ -362,3 +363,19 @@ export const architectureConnectionWithChanges = {
     uncommitted: false,
   },
 } satisfies import("@mycel/shared").ArchitectureConnectionWithChanges;
+export const architectureMap = {
+  projectId: project.id,
+  revision: 1,
+  source: "agent",
+  parts: [architecturePartWithChanges],
+  connections: [architectureConnectionWithChanges],
+  changes: architectureGitChanges,
+  unassignedFiles: [],
+  tieWarnings: [],
+} satisfies import("@mycel/shared").ArchitectureMap;
+export const architectureUpdate = {
+  projectId: project.id,
+  revision: 2,
+  reason: "file",
+  timestamp: "2026-11-18T22:00:00.000Z",
+} satisfies import("@mycel/shared").ArchitectureUpdateEvent;

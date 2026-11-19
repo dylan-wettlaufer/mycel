@@ -110,6 +110,8 @@ evidence-backed import and call dependencies crossing between parts.
 `ArchitectureGitChanges`, `ArchitecturePartWithChanges`, and
 `ArchitectureConnectionWithChanges` annotate parts and connections with recent
 git status (`new | changed | unchanged`) and uncommitted highlights.
+`ArchitectureMap` and `ArchitectureUpdateEvent` describe the HTTP snapshot and
+live SSE refresh notifications.
 
 ## Health compatibility
 
