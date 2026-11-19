@@ -618,10 +618,10 @@
     background-color 150ms;
 }
 .react-flow .arch-part-kind-app {
-  --part-accent: var(--chart-1);
+  --part-accent: oklch(0.78 0.12 245);
 }
 .react-flow .arch-part-kind-service {
-  --part-accent: var(--chart-3);
+  --part-accent: oklch(0.76 0.14 285);
 }
 .react-flow .arch-part-kind-library {
   --part-accent: var(--primary);
@@ -630,10 +630,10 @@
   --part-accent: var(--warning);
 }
 .react-flow .arch-part-kind-integration {
-  --part-accent: var(--chart-2);
+  --part-accent: oklch(0.77 0.13 200);
 }
 .react-flow .arch-part-kind-cli {
-  --part-accent: var(--chart-4);
+  --part-accent: oklch(0.78 0.13 320);
 }
 .react-flow .arch-part-new {
   border-color: var(--success);

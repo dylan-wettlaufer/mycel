@@ -53,6 +53,8 @@ export type NodeHandle = {
   id: string;
   type: "source" | "target";
   position: Position;
+  /** Optional percentage offset (0–100) along the node edge for distributed ports. */
+  offset?: number;
 };
 
 type StructuralNode = {

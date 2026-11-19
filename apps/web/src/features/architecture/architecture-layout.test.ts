@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ArchitectureMap } from "@mycel/shared";
-import { layoutArchitectureMap } from "./architecture-layout";
+import { layoutArchitectureMap, partNodeSize } from "./architecture-layout";
 
 const sampleMap: ArchitectureMap = {
   projectId: "project:demo",
@@ -165,5 +165,90 @@ describe("layoutArchitectureMap", () => {
     const forwardRoute = coreToDb.data?.route as { label: { y: number } };
     const backwardRoute = dbToCore.data?.route as { label: { y: number } };
     expect(backwardRoute.label.y).toBeGreaterThan(forwardRoute.label.y);
+  });
+
+  test("routes long-skip edges around intermediate cards without intersecting them and fans out handles", () => {
+    const mkPart = (id: string) => ({
+      id,
+      name: id,
+      purpose: `${id} part.`,
+      kind: "library" as const,
+      paths: [`packages/${id}/**`],
+      files: [`packages/${id}/index.ts`],
+      change: {
+        status: "unchanged" as const,
+        uncommitted: false,
+        addedFiles: 0,
+        modifiedFiles: 0,
+        uncommittedFiles: 0,
+      },
+    });
+    const mkConn = (sourcePartId: string, targetPartId: string) => ({
+      id: `${sourcePartId}->${targetPartId}`,
+      sourcePartId,
+      targetPartId,
+      count: 2,
+      importCount: 2,
+      callCount: 0,
+      truncated: false,
+      evidence: [],
+      change: { status: "unchanged" as const, uncommitted: false },
+    });
+
+    const multiColumnMap: ArchitectureMap = {
+      ...sampleMap,
+      parts: ["cli", "server", "core", "db", "parser", "web", "shared"].map(
+        mkPart,
+      ),
+      connections: [
+        mkConn("cli", "server"),
+        mkConn("cli", "shared"),
+        mkConn("server", "core"),
+        mkConn("server", "shared"),
+        mkConn("core", "db"),
+        mkConn("core", "parser"),
+        mkConn("core", "shared"),
+        mkConn("db", "shared"),
+        mkConn("parser", "shared"),
+        mkConn("web", "shared"),
+      ],
+    };
+
+    const { nodes, edges } = layoutArchitectureMap(multiColumnMap);
+    const shared = nodes.find((node) => node.id === "shared")!;
+    const sharedTargetHandles = (shared.data.handles ?? []).filter(
+      (handle) => handle.type === "target",
+    );
+    expect(sharedTargetHandles.length).toBeGreaterThan(1);
+
+    // Every routed edge segment must stay clear of every unrelated part card.
+    const boxes = nodes.map((node) => ({
+      id: node.id,
+      left: node.position.x,
+      right: node.position.x + partNodeSize.width,
+      top: node.position.y,
+      bottom: node.position.y + partNodeSize.height,
+    }));
+    for (const edge of edges) {
+      const route = edge.data?.route as {
+        source: { x: number; y: number };
+        target: { x: number; y: number };
+        bends: { x: number; y: number }[];
+      };
+      const pts = [route.source, ...route.bends, route.target];
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i]!;
+        const b = pts[i + 1]!;
+        for (const box of boxes) {
+          if (box.id === edge.source || box.id === edge.target) continue;
+          const intersects =
+            Math.max(a.x, b.x) > box.left &&
+            Math.min(a.x, b.x) < box.right &&
+            Math.max(a.y, b.y) > box.top &&
+            Math.min(a.y, b.y) < box.bottom;
+          expect(intersects, `${edge.id} crossed ${box.id}`).toBe(false);
+        }
+      }
+    }
   });
 });

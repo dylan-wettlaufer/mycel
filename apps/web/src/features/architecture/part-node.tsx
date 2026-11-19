@@ -84,15 +84,25 @@ export const PartNodeView = memo(function PartNodeView({
 
   return (
     <>
-      {handles.map((handle) => (
-        <Handle
-          key={handle.id}
-          id={handle.id}
-          type={handle.type}
-          position={handle.position}
-          isConnectable={false}
-        />
-      ))}
+      {handles.map((handle) => {
+        const style =
+          handle.offset === undefined
+            ? undefined
+            : handle.position === Position.Left ||
+                handle.position === Position.Right
+              ? { top: `${handle.offset}%` }
+              : { left: `${handle.offset}%` };
+        return (
+          <Handle
+            key={handle.id}
+            id={handle.id}
+            type={handle.type}
+            position={handle.position}
+            style={style}
+            isConnectable={false}
+          />
+        );
+      })}
       <div
         className="part-node-content"
         title={`${data.name} (${partKindLabel(data.kind)})\n${data.purpose}`}

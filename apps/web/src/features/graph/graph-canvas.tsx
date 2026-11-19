@@ -33,6 +33,7 @@ import {
 } from "./behaviour-viewport";
 
 const fitViewOptions = { padding: 0.15, minZoom: 0.03, maxZoom: 0.8 };
+const architectureFitOptions = { padding: 0.08, minZoom: 0.05, maxZoom: 1 };
 const edgeTypes = { behaviour: BehaviourEdgeView };
 
 function name(node: Node): string {
@@ -134,7 +135,11 @@ export function GraphCanvas({
   const userMoved = useRef(false);
   const canvas = useRef<HTMLDivElement>(null);
   const behaviour = mode === "behaviour";
-  const fitOptions = behaviour ? behaviourFitOptions : fitViewOptions;
+  const fitOptions = behaviour
+    ? behaviourFitOptions
+    : mode === "architecture"
+      ? architectureFitOptions
+      : fitViewOptions;
   const viewportDuration = behaviour ? 0 : 200;
   if (behaviour && nodeState.layout !== nodes) {
     // Apply the new positions before React Flow sees them, keeping the card
