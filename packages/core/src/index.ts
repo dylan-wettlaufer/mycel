@@ -21,6 +21,16 @@ export { buildFallbackArchitecture } from "./architecture-fallback.js";
 export type { FallbackArchitectureOptions } from "./architecture-fallback.js";
 export { assignFilesToParts } from "./architecture-assign.js";
 export type { AssignFilesOptions } from "./architecture-assign.js";
+export {
+  computeArchitectureConnections,
+  extractCrossFileLinks,
+  getArchitectureConnections,
+} from "./architecture-connections.js";
+export type {
+  ArchitectureConnectionsSnapshot,
+  ComputeConnectionsOptions,
+  GraphLinkSource,
+} from "./architecture-connections.js";
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";

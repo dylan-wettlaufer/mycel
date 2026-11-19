@@ -71,3 +71,38 @@ export interface ArchitectureAssignment {
   /** Warnings for files matched by multiple declared parts with identical specificity. */
   tieWarnings: ArchitectureTieWarning[];
 }
+
+export type ArchitectureEvidenceKind = "import" | "call";
+
+/** One resolved import or call backing a connection between two parts. */
+export interface ArchitectureConnectionEvidence {
+  kind: ArchitectureEvidenceKind;
+  /** Repository-relative path of the importing or calling file. */
+  file: string;
+  /** 1-based source line in `file`. */
+  line: number;
+  /** Repository-relative path of the imported or called target file. */
+  targetFile: string;
+  /** Calling symbol qualified name when `kind` is `"call"` inside a symbol. */
+  sourceSymbol?: string;
+  /** Target symbol qualified name when `kind` is `"call"`. */
+  symbol?: string;
+}
+
+/** Aggregated directed dependency from one architecture part to another. */
+export interface ArchitectureConnection {
+  /** Deterministic id (`${sourcePartId}->${targetPartId}`). */
+  id: string;
+  sourcePartId: string;
+  targetPartId: string;
+  /** Total resolved cross-part links (`importCount + callCount`). */
+  count: number;
+  /** Number of resolved cross-part `IMPORTS` edges. */
+  importCount: number;
+  /** Number of resolved cross-part `CALLS` edges. */
+  callCount: number;
+  /** Deterministically sorted evidence items backing this connection. */
+  evidence: ArchitectureConnectionEvidence[];
+  /** True when `evidence` was capped by a limit; counts remain exact. */
+  truncated: boolean;
+}

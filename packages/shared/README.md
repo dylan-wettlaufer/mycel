@@ -105,6 +105,8 @@ returns `ArchitectureFileResult`: the file, or issues with dotted JSON paths.
 `ArchitectureAssignment`, `AssignedArchitecturePart`, and
 `ArchitectureTieWarning` describe assigning indexed files to parts with
 specificity-based overlap resolution and folder fallback for unassigned files.
+`ArchitectureConnection` and `ArchitectureConnectionEvidence` represent
+evidence-backed import and call dependencies crossing between parts.
 
 ## Health compatibility
 

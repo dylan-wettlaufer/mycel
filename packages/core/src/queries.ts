@@ -6,6 +6,7 @@ import {
   getSemanticFeature,
   getSemanticGraph,
   getSemanticNeighborhood,
+  getCrossFileLinks,
   getFileSymbols,
   getRepositoryGraph,
   getGraphStats,
@@ -14,7 +15,7 @@ import {
   getNodeDetails,
   searchSymbols,
 } from "@mycel/db";
-import type { SqliteDatabase } from "@mycel/db";
+import type { CrossFileLinksSnapshot, SqliteDatabase } from "@mycel/db";
 import type {
   Neighborhood,
   NeighborhoodQuery,
@@ -51,6 +52,7 @@ export interface GraphQueries {
     id: string,
     query?: NeighborhoodQuery,
   ): SemanticGraph | undefined;
+  getCrossFileLinks?(): CrossFileLinksSnapshot;
   getFileSymbols?(id: NodeId): SearchResult | undefined;
   getRepositoryGraph?(): import("@mycel/shared").RepositoryGraph;
   getStats?(): import("@mycel/shared").GraphStats;
@@ -83,6 +85,7 @@ export function createGraphQueries(
     getSemanticGraph: (limit) => getSemanticGraph(database, projectId, limit),
     getSemanticNeighborhood: (id, { depth, limit } = {}) =>
       getSemanticNeighborhood(database, projectId, id, depth, limit),
+    getCrossFileLinks: () => getCrossFileLinks(database, projectId),
     getFileSymbols: (id) => getFileSymbols(database, projectId, id),
     getRepositoryGraph: () => getRepositoryGraph(database, projectId),
     getStats: () => getGraphStats(database, projectId),

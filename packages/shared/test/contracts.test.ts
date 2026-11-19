@@ -308,3 +308,28 @@ export const architectureAssignment = {
     },
   ],
 } satisfies import("@mycel/shared").ArchitectureAssignment;
+export const architectureConnection = {
+  id: "core->db",
+  sourcePartId: "core",
+  targetPartId: "db",
+  count: 2,
+  importCount: 1,
+  callCount: 1,
+  evidence: [
+    {
+      kind: "import",
+      file: "packages/core/src/project.ts",
+      line: 1,
+      targetFile: "packages/db/src/index.ts",
+    },
+    {
+      kind: "call",
+      file: "packages/core/src/project.ts",
+      line: 29,
+      targetFile: "packages/db/src/database.ts",
+      sourceSymbol: "openIndexedProject",
+      symbol: "openDatabase",
+    },
+  ],
+  truncated: false,
+} satisfies import("@mycel/shared").ArchitectureConnection;

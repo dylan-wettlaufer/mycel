@@ -6,6 +6,7 @@ export { resolveDatabasePath } from "./paths.js";
 export { replaceProjectGraph, applyProjectGraph } from "./graph.js";
 export type { ProjectGraph } from "./graph.js";
 export {
+  getCrossFileLinks,
   getFileSymbols,
   getRepositoryGraph,
   getGraphStats,
@@ -17,6 +18,7 @@ export {
   getCallers,
   getDependencies,
 } from "./queries.js";
+export type { CrossFileLink, CrossFileLinksSnapshot } from "./queries.js";
 export { commitChangeSet, currentRevision, readGraphState } from "./history.js";
 export type { EntityChange, ChangeSet } from "./history.js";
 export { listChanges, parseChangeId } from "./history.js";

@@ -405,3 +405,74 @@ export function getFileSymbols(
     };
   })();
 }
+
+export interface CrossFileLink {
+  kind: "IMPORTS" | "CALLS";
+  sourcePath: string;
+  sourceLine: number;
+  sourceSymbol?: string;
+  targetPath: string;
+  targetSymbol?: string;
+}
+
+export interface CrossFileLinksSnapshot {
+  projectId: ProjectId;
+  revision: number;
+  links: CrossFileLink[];
+}
+
+interface CrossFileLinkRow {
+  kind: "IMPORTS" | "CALLS";
+  sourcePath: string;
+  sourceKind: GraphNode["kind"];
+  sourceName: string;
+  sourceLine: number;
+  targetPath: string;
+  targetKind: GraphNode["kind"];
+  targetName: string;
+}
+
+/** Resolved IMPORTS and CALLS edges crossing between distinct files in one snapshot. */
+export function getCrossFileLinks(
+  database: SqliteDatabase,
+  projectId: ProjectId,
+): CrossFileLinksSnapshot {
+  return database.transaction(() => {
+    const rows = database
+      .prepare<[string], CrossFileLinkRow>(
+        `SELECT
+          e.kind AS kind,
+          s.path AS sourcePath,
+          s.kind AS sourceKind,
+          s.qualified_name AS sourceName,
+          s.start_line AS sourceLine,
+          t.path AS targetPath,
+          t.kind AS targetKind,
+          t.qualified_name AS targetName
+        FROM edges e
+        JOIN nodes s ON s.project_id = e.project_id AND s.id = e.source_id
+        JOIN nodes t ON t.project_id = e.project_id AND t.id = e.target_id
+        WHERE e.project_id = ?
+          AND e.kind IN ('IMPORTS', 'CALLS')
+          AND s.path != t.path
+        ORDER BY s.path, s.start_line, e.kind, t.path, t.qualified_name, e.id`,
+      )
+      .all(projectId);
+    const links: CrossFileLink[] = rows.map((row) => {
+      const link: CrossFileLink = {
+        kind: row.kind,
+        sourcePath: row.sourcePath,
+        sourceLine: row.sourceLine,
+        targetPath: row.targetPath,
+      };
+      if (row.sourceKind !== "file") link.sourceSymbol = row.sourceName;
+      if (row.targetKind !== "file") link.targetSymbol = row.targetName;
+      return link;
+    });
+    return {
+      projectId,
+      revision: getRevision(database, projectId),
+      links,
+    };
+  })();
+}
