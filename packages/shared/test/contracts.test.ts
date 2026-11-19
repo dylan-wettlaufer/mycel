@@ -278,3 +278,33 @@ export const architectureConnections = {
   // @ts-expect-error Connections are computed from code evidence, never declared.
   connections: [["web", "core"]],
 } satisfies import("@mycel/shared").ArchitectureFile;
+export const architectureAssignment = {
+  parts: [
+    {
+      ...architecture.parts[0]!,
+      files: ["apps/web/src/App.tsx"],
+    },
+    {
+      id: "scripts",
+      name: "scripts",
+      purpose: "Source files in scripts.",
+      kind: "library",
+      paths: ["scripts/**"],
+      files: ["scripts/build.ts"],
+      fallback: true,
+    },
+  ],
+  fileToPart: {
+    "apps/web/src/App.tsx": "web",
+    "scripts/build.ts": "scripts",
+  },
+  unassignedFiles: ["scripts/build.ts"],
+  tieWarnings: [
+    {
+      path: "apps/web/src/App.tsx",
+      winnerPartId: "web",
+      tiedPartIds: ["web", "ui"],
+      patterns: ["apps/web/src/**", "apps/web/src/**"],
+    },
+  ],
+} satisfies import("@mycel/shared").ArchitectureAssignment;

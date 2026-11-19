@@ -135,7 +135,7 @@ Unknown keys are rejected, so declared connections are invalid by construction.
 | ----------------------------------------------- | ------ |
 | 1. Architecture file format                     | Done   |
 | 2. Folder fallback                              | Done   |
-| 3. Assign files to parts                        | To do  |
+| 3. Assign files to parts                        | Done   |
 | 4. Connections between parts                    | To do  |
 | 5. Recent changes from git                      | To do  |
 | 6. API and live updates                         | To do  |

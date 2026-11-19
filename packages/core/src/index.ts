@@ -19,6 +19,8 @@ export type {
 export { architectureFilePath, parseArchitectureFile } from "./architecture.js";
 export { buildFallbackArchitecture } from "./architecture-fallback.js";
 export type { FallbackArchitectureOptions } from "./architecture-fallback.js";
+export { assignFilesToParts } from "./architecture-assign.js";
+export type { AssignFilesOptions } from "./architecture-assign.js";
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";

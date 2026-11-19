@@ -305,13 +305,13 @@ function normalizeWorkspacePattern(raw: string): string | undefined {
   return segments.join("/");
 }
 
-function normalizeLine(text: string, maxLength: number): string {
+export function normalizeLine(text: string, maxLength: number): string {
   const collapsed = text.replace(/\s+/g, " ").trim();
   if (collapsed.length <= maxLength) return collapsed;
   return `${collapsed.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
-function slugify(value: string): string {
+export function slugify(value: string): string {
   const slug = value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -328,7 +328,7 @@ function stripScope(packageName: string): string {
   return packageName;
 }
 
-function inferKind(
+export function inferKind(
   dir: string,
   name: string,
   signals: {

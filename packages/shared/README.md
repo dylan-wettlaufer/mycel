@@ -102,6 +102,9 @@ The file declares parts only. Connections between parts are computed from
 indexed imports and calls, so declared edges such as `connections` are
 invalid. `parseArchitectureFile` in `@mycel/core` validates the JSON text and
 returns `ArchitectureFileResult`: the file, or issues with dotted JSON paths.
+`ArchitectureAssignment`, `AssignedArchitecturePart`, and
+`ArchitectureTieWarning` describe assigning indexed files to parts with
+specificity-based overlap resolution and folder fallback for unassigned files.
 
 ## Health compatibility
 
