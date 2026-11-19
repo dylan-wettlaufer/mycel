@@ -17,6 +17,8 @@ export type {
 } from "./live-index.js";
 
 export { architectureFilePath, parseArchitectureFile } from "./architecture.js";
+export { buildFallbackArchitecture } from "./architecture-fallback.js";
+export type { FallbackArchitectureOptions } from "./architecture-fallback.js";
 
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";
