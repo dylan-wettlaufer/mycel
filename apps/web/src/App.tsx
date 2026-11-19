@@ -27,6 +27,12 @@ const RepositoryOverview = lazy(() =>
   })),
 );
 
+const ArchitectureMapView = lazy(() =>
+  import("@/features/architecture/architecture-map").then((module) => ({
+    default: module.ArchitectureMapView,
+  })),
+);
+
 export function App() {
   const { navigation, navigate } = useNavigation();
   const { view, nodeId, rootId, featureId, changeId, source } = navigation;
@@ -125,22 +131,51 @@ export function App() {
               Repository details unavailable
             </p>
           )}
-          <Suspense fallback={<p>Loading repository overview…</p>}>
-            <RepositoryOverview
-              files={navigation.files}
-              folder={navigation.folder}
-              onFiles={(folder) =>
-                navigate({
-                  view: "Graph",
-                  files: true,
-                  ...(folder ? { folder } : {}),
-                })
-              }
-              onOverview={() => navigate({ view: "Graph" })}
-              revision={activity.revision}
-              onSelect={openNode}
-            />
-          </Suspense>
+          {navigation.files ? (
+            <Suspense fallback={<p>Loading file dependencies…</p>}>
+              <RepositoryOverview
+                files
+                folder={navigation.folder}
+                part={navigation.part}
+                onFiles={(folder) =>
+                  navigate({
+                    view: "Graph",
+                    files: true,
+                    ...(folder ? { folder } : {}),
+                  })
+                }
+                onOverview={() => navigate({ view: "Graph" })}
+                revision={activity.revision}
+                onSelect={openNode}
+              />
+            </Suspense>
+          ) : (
+            <Suspense fallback={<p>Loading architecture map…</p>}>
+              <ArchitectureMapView
+                revision={activity.revision}
+                architectureRevision={activity.architectureRevision}
+                onSelectFile={(next) =>
+                  navigate({
+                    view: "Graph",
+                    nodeId: next.id,
+                    rootId: next.id,
+                    source: true,
+                  })
+                }
+                onOpenPartFiles={(part) =>
+                  navigate({
+                    view: "Graph",
+                    files: true,
+                    part: part.id,
+                  })
+                }
+                onAllFiles={() => navigate({ view: "Graph", files: true })}
+                onOpenFeature={(id) =>
+                  navigate({ view: "Features", featureId: id })
+                }
+              />
+            </Suspense>
+          )}
         </div>
       ) : selected.error || root.error ? (
         <section className="space-y-3">

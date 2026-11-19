@@ -98,7 +98,9 @@ export function GraphCanvas({
   nodes,
   edges,
   selectedId,
+  selectedEdgeId = null,
   onSelect,
+  onEdgeSelect,
   onClear,
   onOpen,
   openLabel,
@@ -111,11 +113,13 @@ export function GraphCanvas({
   nodes: Node[];
   edges: Edge[];
   selectedId: string | null;
+  selectedEdgeId?: string | null;
   onSelect: (id: string) => void;
+  onEdgeSelect?: ((id: string) => void) | undefined;
   onClear: () => void;
   onOpen?: ((id: string) => void) | undefined;
   openLabel?: string;
-  mode?: "imports" | "symbols" | "behaviour";
+  mode?: "imports" | "symbols" | "behaviour" | "architecture";
   layoutAnchorId?: string | undefined;
   behaviourView?: BehaviourView;
   details?: ReactNode;
@@ -162,8 +166,8 @@ export function GraphCanvas({
     };
   }, [behaviour, fitOptions, layoutAnchorId]);
   const focused = useMemo(
-    () => focusGraph(nodes, edges, selectedId, onlyConnections),
-    [nodes, edges, selectedId, onlyConnections],
+    () => focusGraph(nodes, edges, selectedId, onlyConnections, selectedEdgeId),
+    [nodes, edges, selectedId, onlyConnections, selectedEdgeId],
   );
   const visibleNodes = useMemo(
     () => withNodeState(focused.nodes, nodeState.byId),
@@ -241,6 +245,7 @@ export function GraphCanvas({
           }}
           onNodeClick={(_, node) => onSelect(node.id)}
           onNodeDoubleClick={(_, node) => onOpen?.(node.id)}
+          onEdgeClick={(_, edge) => onEdgeSelect?.(edge.id)}
           onPaneClick={onClear}
         >
           <Panel position="top-right">
@@ -405,7 +410,11 @@ export function GraphCanvas({
   );
 }
 
-function GraphLegend({ mode }: { mode: "imports" | "symbols" | "behaviour" }) {
+function GraphLegend({
+  mode,
+}: {
+  mode: "imports" | "symbols" | "behaviour" | "architecture";
+}) {
   return (
     <div aria-label="Graph legend" className="graph-legend">
       {mode !== "behaviour" && (
@@ -417,9 +426,33 @@ function GraphLegend({ mode }: { mode: "imports" | "symbols" | "behaviour" }) {
           ? "Arrow: imports or calls"
           : mode === "behaviour"
             ? "Source-verified flow"
-            : "A → B: A imports B"}
+            : mode === "architecture"
+              ? "A → B: imports & calls"
+              : "A → B: A imports B"}
       </span>
-      {mode !== "imports" && (
+      {mode === "architecture" && (
+        <>
+          <span>
+            <i className="graph-legend-swatch graph-swatch-new" aria-hidden />
+            New in window
+          </span>
+          <span>
+            <i
+              className="graph-legend-swatch graph-swatch-changed"
+              aria-hidden
+            />
+            Changed in window
+          </span>
+          <span>
+            <i
+              className="graph-legend-swatch graph-swatch-uncommitted"
+              aria-hidden
+            />
+            Uncommitted edits
+          </span>
+        </>
+      )}
+      {mode !== "imports" && mode !== "architecture" && (
         <span>
           <i className="graph-legend-arrow graph-legend-dashed" aria-hidden />
           {mode === "behaviour" ? "Combined steps" : "Dashed: contains"}
@@ -434,14 +467,24 @@ function GraphLegend({ mode }: { mode: "imports" | "symbols" | "behaviour" }) {
           Unresolved or inferred
         </span>
       )}
-      <span>
-        <i className="graph-legend-swatch graph-swatch-incoming" aria-hidden />
-        Into selection
-      </span>
-      <span>
-        <i className="graph-legend-swatch graph-swatch-outgoing" aria-hidden />
-        Out of selection
-      </span>
+      {mode !== "architecture" && (
+        <>
+          <span>
+            <i
+              className="graph-legend-swatch graph-swatch-incoming"
+              aria-hidden
+            />
+            Into selection
+          </span>
+          <span>
+            <i
+              className="graph-legend-swatch graph-swatch-outgoing"
+              aria-hidden
+            />
+            Out of selection
+          </span>
+        </>
+      )}
       {mode === "behaviour" && <span>Drag or scroll to pan</span>}
     </div>
   );

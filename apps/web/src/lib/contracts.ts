@@ -193,3 +193,111 @@ export function isRepositoryGraph(
       ids.has(edge.targetId),
   );
 }
+
+const architecturePartKinds = new Set([
+  "app",
+  "service",
+  "library",
+  "data",
+  "integration",
+  "cli",
+]);
+const architectureChangeWindows = new Set([
+  "uncommitted",
+  "branch",
+  "7d",
+  "30d",
+]);
+const architectureChangeStatuses = new Set(["new", "changed", "unchanged"]);
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+export function isArchitectureUpdateEvent(
+  value: unknown,
+): value is import("@mycel/shared").ArchitectureUpdateEvent {
+  return (
+    isRecord(value) &&
+    typeof value.projectId === "string" &&
+    typeof value.revision === "number" &&
+    ["file", "index", "git"].includes(String(value.reason)) &&
+    typeof value.timestamp === "string"
+  );
+}
+
+export function isArchitectureMap(
+  value: unknown,
+): value is import("@mycel/shared").ArchitectureMap {
+  if (
+    !isRecord(value) ||
+    typeof value.projectId !== "string" ||
+    typeof value.revision !== "number" ||
+    !["agent", "folder-fallback"].includes(String(value.source)) ||
+    !Array.isArray(value.parts) ||
+    !Array.isArray(value.connections) ||
+    !isRecord(value.changes) ||
+    !isStringArray(value.unassignedFiles) ||
+    !Array.isArray(value.tieWarnings)
+  )
+    return false;
+
+  const changes = value.changes;
+  if (
+    typeof changes.available !== "boolean" ||
+    !architectureChangeWindows.has(String(changes.requestedWindow)) ||
+    !architectureChangeWindows.has(String(changes.resolvedWindow)) ||
+    (changes.branch !== null && typeof changes.branch !== "string") ||
+    (changes.baseRef !== null && typeof changes.baseRef !== "string") ||
+    (changes.baseCommit !== null && typeof changes.baseCommit !== "string") ||
+    !isStringArray(changes.addedFiles) ||
+    !isStringArray(changes.modifiedFiles) ||
+    !isStringArray(changes.deletedFiles) ||
+    !isStringArray(changes.uncommittedFiles)
+  )
+    return false;
+
+  const validParts = value.parts.every(
+    (part) =>
+      isRecord(part) &&
+      typeof part.id === "string" &&
+      typeof part.name === "string" &&
+      typeof part.purpose === "string" &&
+      architecturePartKinds.has(String(part.kind)) &&
+      isStringArray(part.paths) &&
+      isStringArray(part.files) &&
+      isRecord(part.change) &&
+      architectureChangeStatuses.has(String(part.change.status)) &&
+      typeof part.change.uncommitted === "boolean" &&
+      typeof part.change.addedFiles === "number" &&
+      typeof part.change.modifiedFiles === "number" &&
+      typeof part.change.uncommittedFiles === "number",
+  );
+  if (!validParts) return false;
+
+  return value.connections.every(
+    (connection) =>
+      isRecord(connection) &&
+      typeof connection.id === "string" &&
+      typeof connection.sourcePartId === "string" &&
+      typeof connection.targetPartId === "string" &&
+      typeof connection.count === "number" &&
+      typeof connection.importCount === "number" &&
+      typeof connection.callCount === "number" &&
+      typeof connection.truncated === "boolean" &&
+      Array.isArray(connection.evidence) &&
+      connection.evidence.every(
+        (item) =>
+          isRecord(item) &&
+          ["import", "call"].includes(String(item.kind)) &&
+          typeof item.file === "string" &&
+          typeof item.line === "number" &&
+          typeof item.targetFile === "string",
+      ) &&
+      isRecord(connection.change) &&
+      architectureChangeStatuses.has(String(connection.change.status)) &&
+      typeof connection.change.uncommitted === "boolean",
+  );
+}

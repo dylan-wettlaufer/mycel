@@ -32,9 +32,14 @@ export function focusGraph(
   edges: Edge[],
   selectedId: string | null,
   onlyConnections: boolean,
+  selectedEdgeId: string | null = null,
 ) {
   const selected = nodes.some((node) => node.id === selectedId)
     ? selectedId
+    : null;
+  const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+  const edgeEndpoints = selectedEdge
+    ? new Set([selectedEdge.source, selectedEdge.target])
     : null;
   const connections = graphConnections(nodes, edges, selected);
   const incoming = new Set(connections.incoming.map((node) => node.id));
@@ -59,11 +64,15 @@ export function focusGraph(
               className: [
                 node.className,
                 node.id === selected ? "graph-selected" : "",
-                selected && !connections.ids.has(node.id)
+                (selected && !connections.ids.has(node.id)) ||
+                (edgeEndpoints && !edgeEndpoints.has(node.id))
                   ? "graph-unrelated"
                   : "",
                 selected && incoming.has(node.id) ? "graph-incoming" : "",
                 selected && outgoing.has(node.id) ? "graph-outgoing" : "",
+                edgeEndpoints && edgeEndpoints.has(node.id)
+                  ? "graph-selected"
+                  : "",
               ]
                 .filter(Boolean)
                 .join(" "),
@@ -81,21 +90,34 @@ export function focusGraph(
         const behaviour = edge.type === "behaviour";
         const uncertain =
           behaviour && edge.className === "graph-edge-uncertain";
+        const archStatus = edge.data?.changeStatus;
+        const archUncommitted = Boolean(edge.data?.uncommitted);
+        const isSelectedEdge = selectedEdge?.id === edge.id;
         const active =
-          selected && (edge.source === selected || edge.target === selected);
+          isSelectedEdge ||
+          Boolean(
+            selected && (edge.source === selected || edge.target === selected),
+          );
+        const hasSelection = Boolean(selected || selectedEdge);
         const color = uncertain
           ? "var(--warning)"
-          : active
-            ? edge.source === selected
-              ? "var(--primary)"
-              : "var(--chart-1)"
-            : "var(--muted-foreground)";
+          : archStatus === "new"
+            ? "var(--success)"
+            : archStatus === "changed"
+              ? "var(--warning)"
+              : isSelectedEdge
+                ? "var(--primary)"
+                : active
+                  ? edge.source === selected
+                    ? "var(--primary)"
+                    : "var(--chart-1)"
+                  : "var(--muted-foreground)";
         return {
           ...edge,
           className: [
             edge.className,
             behaviour && "graph-behaviour-edge",
-            selected && !active
+            hasSelection && !active
               ? "graph-edge-unrelated"
               : active
                 ? "graph-edge-active"
@@ -103,7 +125,7 @@ export function focusGraph(
           ]
             .filter(Boolean)
             .join(" "),
-          label: selected && !active && !behaviour ? undefined : edge.label,
+          label: hasSelection && !active && !behaviour ? undefined : edge.label,
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color,
@@ -113,15 +135,29 @@ export function focusGraph(
           style: {
             ...edge.style,
             stroke: color,
-            strokeWidth: behaviour ? (active ? 2.6 : 2) : active ? 3 : 1.75,
+            strokeWidth: isSelectedEdge
+              ? 3.2
+              : archUncommitted
+                ? 2.8
+                : behaviour
+                  ? active
+                    ? 2.6
+                    : 2
+                  : active
+                    ? 3
+                    : 1.75,
           },
           labelStyle: {
             fill: uncertain
               ? "var(--warning)"
-              : active || behaviour
-                ? "var(--foreground)"
-                : "var(--muted-foreground)",
-            fontSize: behaviour ? 14 : 12,
+              : archStatus === "new"
+                ? "var(--success)"
+                : archStatus === "changed"
+                  ? "var(--warning)"
+                  : active || behaviour
+                    ? "var(--foreground)"
+                    : "var(--muted-foreground)",
+            fontSize: behaviour ? 13 : 12,
             fontWeight: behaviour ? 600 : 500,
           },
           labelBgStyle: { fill: "var(--background)", fillOpacity: 1 },

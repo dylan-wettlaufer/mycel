@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ChangeAction, NodeKind } from "@mycel/shared";
+import { PartNodeView } from "@/features/architecture/part-node";
 import { LayerNodeView } from "./layer-node";
 
 const operationKinds = {
@@ -195,4 +196,8 @@ const GraphNode = memo(function GraphNode({
     </>
   );
 });
-export const graphNodeTypes = { code: GraphNode, layer: LayerNodeView };
+export const graphNodeTypes = {
+  code: GraphNode,
+  layer: LayerNodeView,
+  part: PartNodeView,
+};

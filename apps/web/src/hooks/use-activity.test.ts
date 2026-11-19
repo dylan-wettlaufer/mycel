@@ -26,16 +26,19 @@ class Stream {
   static instance: Stream;
   onopen?: () => void;
   onerror?: () => void;
-  listener?: (message: { data: string }) => void;
+  listeners = new Map<string, (message: { data: string }) => void>();
   close = vi.fn();
   constructor() {
     Stream.instance = this;
   }
   addEventListener(
-    _name: string,
+    name: string,
     listener: (message: { data: string }) => void,
   ) {
-    this.listener = listener;
+    this.listeners.set(name, listener);
+  }
+  emit(name: string, data: unknown) {
+    this.listeners.get(name)?.({ data: JSON.stringify(data) });
   }
 }
 afterEach(() => {
@@ -67,13 +70,27 @@ test("SSE and initial history converge, reconnects preserve data, pagination loa
   await waitFor(() => expect(result.current.events).toHaveLength(1));
   act(() => {
     Stream.instance.onopen?.();
-    Stream.instance.listener?.({ data: JSON.stringify(event("10")) });
-    Stream.instance.listener?.({ data: JSON.stringify(event("9")) });
+    Stream.instance.emit("change", event("10"));
+    Stream.instance.emit("change", event("9"));
   });
   await waitFor(() =>
     expect(result.current.events.map((item) => item.id)).toEqual(["10", "9"]),
   );
   expect(result.current.connection).toBe("connected");
+  const prevArchRevision = result.current.architectureRevision;
+  act(() => {
+    Stream.instance.emit("architecture", {
+      projectId: "p",
+      revision: 2,
+      reason: "file",
+      timestamp: "2026-11-18T22:00:00Z",
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.architectureRevision).toBeGreaterThan(
+      prevArchRevision,
+    ),
+  );
   act(() => Stream.instance.onerror?.());
   expect(result.current.connection).toBe("disconnected");
   act(() => {

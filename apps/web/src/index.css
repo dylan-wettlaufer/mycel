@@ -598,3 +598,173 @@
 .react-flow .graph-operation-node .react-flow__handle {
   opacity: 0;
 }
+
+/* Architecture map part cards */
+.react-flow .react-flow__node-part {
+  --part-accent: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-left: 4px solid
+    color-mix(in oklch, var(--part-accent) 72%, var(--border));
+  border-radius: 10px;
+  background: var(--background);
+  color: var(--foreground);
+  text-align: left;
+  font-family: var(--font-sans);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  transition:
+    opacity 150ms,
+    border-color 150ms,
+    background-color 150ms;
+}
+.react-flow .arch-part-kind-app {
+  --part-accent: var(--chart-1);
+}
+.react-flow .arch-part-kind-service {
+  --part-accent: var(--chart-3);
+}
+.react-flow .arch-part-kind-library {
+  --part-accent: var(--primary);
+}
+.react-flow .arch-part-kind-data {
+  --part-accent: var(--warning);
+}
+.react-flow .arch-part-kind-integration {
+  --part-accent: var(--chart-2);
+}
+.react-flow .arch-part-kind-cli {
+  --part-accent: var(--chart-4);
+}
+.react-flow .arch-part-new {
+  border-color: var(--success);
+  border-left-color: var(--success);
+  background: color-mix(in oklch, var(--success) 8%, var(--background));
+}
+.react-flow .arch-part-changed {
+  border-color: var(--warning);
+  border-left-color: var(--warning);
+  background: color-mix(in oklch, var(--warning) 8%, var(--background));
+}
+.react-flow .arch-part-uncommitted {
+  box-shadow:
+    0 0 0 2px color-mix(in oklch, var(--primary) 60%, transparent),
+    0 4px 16px rgb(0 0 0 / 22%);
+}
+.react-flow .arch-part-new.arch-part-uncommitted {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--success) 45%, transparent),
+    0 4px 16px rgb(0 0 0 / 22%);
+}
+.react-flow .arch-part-changed.arch-part-uncommitted {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--warning) 45%, transparent),
+    0 4px 16px rgb(0 0 0 / 22%);
+}
+.react-flow .react-flow__node-part.graph-unrelated {
+  opacity: 0.35;
+}
+.react-flow .react-flow__node-part.graph-unrelated:hover {
+  opacity: 0.9;
+}
+.react-flow .react-flow__node-part:is(.selected, .graph-selected) {
+  opacity: 1;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.react-flow .react-flow__node-part .react-flow__handle {
+  opacity: 0;
+}
+.part-node-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px 12px;
+  gap: 6px;
+  overflow: hidden;
+}
+.part-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.part-node-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--part-accent) 16%, transparent);
+  color: var(--part-accent);
+}
+.part-node-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.part-node-kind {
+  font-size: 11px;
+  padding: 0 6px;
+  height: 20px;
+  color: var(--part-accent);
+}
+.part-node-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.part-node-changes {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.part-change-badge {
+  font-size: 10px;
+  padding: 0 6px;
+  height: 18px;
+}
+.part-change-new {
+  border-color: var(--success);
+  color: var(--success);
+}
+.part-change-changed {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.part-uncommitted-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 35%, transparent);
+}
+.part-node-title {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.part-node-purpose {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.graph-swatch-new {
+  background: var(--success);
+}
+.graph-swatch-changed {
+  background: var(--warning);
+}
+.graph-swatch-uncommitted {
+  background: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 40%, transparent);
+}

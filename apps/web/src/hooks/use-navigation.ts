@@ -9,6 +9,7 @@ export interface Navigation {
   source?: boolean;
   files?: boolean;
   folder?: string;
+  part?: string;
 }
 export function parseNavigation(hash: string): Navigation {
   const query = new URLSearchParams(hash.replace(/^#/, ""));
@@ -30,6 +31,7 @@ export function parseNavigation(hash: string): Navigation {
       : {}),
     ...(query.get("files") === "1" ? { files: true } : {}),
     ...(query.get("folder") ? { folder: query.get("folder")! } : {}),
+    ...(query.get("part") ? { part: query.get("part")! } : {}),
     ...(query.get("source") === "1" ? { source: true } : {}),
   };
 }
@@ -47,6 +49,7 @@ export function useNavigation() {
     if (next.changeId) query.set("change", next.changeId);
     if (next.files) query.set("files", "1");
     if (next.folder) query.set("folder", next.folder);
+    if (next.part) query.set("part", next.part);
     if (next.source) query.set("source", "1");
     window.location.hash = query.toString();
   };

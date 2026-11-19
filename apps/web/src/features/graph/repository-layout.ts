@@ -80,14 +80,18 @@ export function layoutRepositoryGroups(
 export function fileScope(
   graph: RepositoryGraph,
   folder?: string,
+  paths?: readonly string[],
 ): RepositoryGraph {
-  if (!folder) return graph;
+  if (!folder && !paths) return graph;
+  const pathSet = paths ? new Set(paths) : undefined;
   const scoped = new Set(
     graph.files
       .filter((file) =>
-        folder === "(root)"
-          ? !file.path.includes("/")
-          : file.path.startsWith(`${folder}/`),
+        pathSet
+          ? pathSet.has(file.path)
+          : folder === "(root)"
+            ? !file.path.includes("/")
+            : file.path.startsWith(`${folder}/`),
       )
       .map((file) => file.id),
   );

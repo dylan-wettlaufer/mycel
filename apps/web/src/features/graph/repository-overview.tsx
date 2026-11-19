@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
-import { isRepositoryGraph } from "@/lib/contracts";
+import { isArchitectureMap, isRepositoryGraph } from "@/lib/contracts";
 import {
   fileScope,
   layoutFileDependencies,
@@ -15,6 +15,7 @@ export function RepositoryOverview({
   onSelect,
   files = false,
   folder,
+  part,
   onFiles,
   onOverview,
 }: {
@@ -22,6 +23,7 @@ export function RepositoryOverview({
   onSelect: (node: GraphNode) => void;
   files?: boolean | undefined;
   folder?: string | undefined;
+  part?: string | undefined;
   onFiles: (folder?: string) => void;
   onOverview: () => void;
 }) {
@@ -30,16 +32,31 @@ export function RepositoryOverview({
     isRepositoryGraph,
     revision,
   );
+  const architecture = useResource(
+    part ? "/api/architecture" : null,
+    isArchitectureMap,
+    revision,
+  );
+  const activePart = part
+    ? architecture.data?.parts.find((entry) => entry.id === part)
+    : undefined;
   const [depth, setDepth] = useState(2);
   const [selection, setSelection] = useState<{
     scope: string;
     id: string;
   } | null>(null);
-  const scope = `${files}:${folder ?? ""}:${depth}`;
+  const scope = `${files}:${part ?? ""}:${folder ?? ""}:${depth}`;
   const selectedId = selection?.scope === scope ? selection.id : null;
   const scoped = useMemo(
-    () => (data ? fileScope(data, folder) : undefined),
-    [data, folder],
+    () =>
+      data
+        ? fileScope(
+            data,
+            part ? undefined : folder,
+            activePart ? activePart.files : part ? [] : undefined,
+          )
+        : undefined,
+    [data, folder, part, activePart],
   );
   const layout = useMemo(
     () =>
@@ -50,6 +67,7 @@ export function RepositoryOverview({
         : { nodes: [], edges: [] },
     [data, scoped, depth, files],
   );
+  const scopeLabel = activePart?.name ?? part ?? folder;
   return (
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
@@ -60,8 +78,11 @@ export function RepositoryOverview({
           <h2 className="text-lg font-semibold">
             {files ? "File dependencies" : "Repository overview"}
           </h2>
-          <p className="truncate text-xs text-muted-foreground" title={folder}>
-            {folder ? `${folder} · ` : ""}
+          <p
+            className="truncate text-xs text-muted-foreground"
+            title={scopeLabel}
+          >
+            {scopeLabel ? `${scopeLabel} · ` : ""}
             {data
               ? `${files && scoped ? scoped.files.length : data.files.length} files · ${files && scoped ? scoped.dependencies.length : data.dependencies.length} imports`
               : "Loading…"}
@@ -71,9 +92,9 @@ export function RepositoryOverview({
           {files ? (
             <>
               <Button variant="outline" size="xs" onClick={onOverview}>
-                Repository overview
+                Architecture map
               </Button>
-              {folder && (
+              {(folder || part) && (
                 <Button variant="outline" size="xs" onClick={() => onFiles()}>
                   All file dependencies
                 </Button>

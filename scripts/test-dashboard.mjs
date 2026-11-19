@@ -258,12 +258,14 @@ async function dragWithoutFlicker(node) {
 try {
   console.log(`Dashboard: ${base} | fixture: ${directory}`);
   await page.goto(base);
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("status").first()).toHaveText("Connected");
   await expect(page.getByLabel("Live connection")).toHaveText("Live updates");
   await expect(
-    page.getByRole("heading", { name: "Repository overview", exact: true }),
+    page.getByRole("heading", { name: "Architecture map", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Graph legend")).toContainText("A imports B");
+  await expect(page.getByLabel("Graph legend")).toContainText(
+    "imports & calls",
+  );
   await graphFitsScreen();
   await expect(page.getByLabel("Selection details")).toHaveCount(0);
   const canvasBounds = await page.locator(".react-flow").boundingBox();
@@ -286,16 +288,15 @@ try {
       toolbarBounds.x >= legendBounds.x + legendBounds.width,
     "canvas controls sit in the top-right without overlapping the legend",
   );
-  const folderNode = page
+  const partNode = page
     .locator(".react-flow__node")
-    .filter({ hasText: "(root)" });
-  const nodePosition = () =>
-    folderNode.evaluate((node) => node.style.transform);
+    .filter({ hasText: "repository" });
+  const nodePosition = () => partNode.evaluate((node) => node.style.transform);
   const originalPosition = await nodePosition();
-  await dragWithoutFlicker(folderNode);
+  await dragWithoutFlicker(partNode);
   await expect.poll(nodePosition).not.toBe(originalPosition);
   const draggedPosition = await nodePosition();
-  await folderNode.click();
+  await partNode.click();
   await selectionFitsScreen();
   for (const viewport of [
     { width: 768, height: 900 },
@@ -320,7 +321,7 @@ try {
     draggedPosition,
     "clearing preserves dragged positions",
   );
-  await folderNode.click();
+  await partNode.click();
   await page.getByRole("button", { name: "Open files", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "File dependencies", exact: true }),
@@ -456,12 +457,12 @@ try {
   await page.getByRole("button", { name: "Show node history" }).click();
   await expect(page.getByLabel("Historical node")).toContainText("obsolete");
   await closeServer();
-  await expect(page.getByRole("status")).toHaveText("Disconnected");
+  await expect(page.getByRole("status").first()).toHaveText("Disconnected");
   await expect(page.getByLabel("Live connection")).toHaveText(
     "Live reconnecting…",
   );
   server = await startIndexedServer(port, options);
-  await expect(page.getByRole("status")).toHaveText("Connected");
+  await expect(page.getByRole("status").first()).toHaveText("Connected");
   await expect(page.getByLabel("Live connection")).toHaveText("Live updates");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
   await phase("reconnect", () =>
