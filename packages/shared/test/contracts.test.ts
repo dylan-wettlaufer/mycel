@@ -256,3 +256,25 @@ export function eventId(
   if (message.type === "diagnostics") return String(message.data.revision);
   return message.data.status;
 }
+export const architecture = {
+  version: 1,
+  source: "agent",
+  parts: [
+    {
+      id: "web",
+      name: "Web app",
+      purpose: "Browser UI for exploring the graph.",
+      kind: "app",
+      paths: ["apps/web/src/**"],
+    },
+  ],
+} satisfies import("@mycel/shared").ArchitectureFile;
+export const architectureIssues = {
+  ok: false,
+  issues: [{ path: "parts.0.kind", message: "Invalid option" }],
+} satisfies import("@mycel/shared").ArchitectureFileResult;
+export const architectureConnections = {
+  ...architecture,
+  // @ts-expect-error Connections are computed from code evidence, never declared.
+  connections: [["web", "core"]],
+} satisfies import("@mycel/shared").ArchitectureFile;

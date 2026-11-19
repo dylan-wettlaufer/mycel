@@ -68,6 +68,41 @@ identifying the committed graph snapshot used to answer the request:
 `ErrorResponse` retains the existing `{ error: string }` JSON error shape.
 These definitions do not add API routes or database/query implementations.
 
+## Architecture file
+
+`ArchitectureFile` describes `.mycel/architecture.json`, which an agent writes
+to name the logical parts of a repository:
+
+```json
+{
+  "version": 1,
+  "source": "agent",
+  "generatedAt": "2026-11-18T21:30:00-05:00",
+  "parts": [
+    {
+      "id": "indexer",
+      "name": "Indexing engine",
+      "purpose": "Parses source files and keeps the graph up to date.",
+      "kind": "library",
+      "paths": ["packages/core/**", "packages/parser/**"]
+    }
+  ]
+}
+```
+
+- `id` is a unique lowercase slug (letters, digits, hyphens; at most 64).
+- `name` (at most 80 characters) and `purpose` (at most 200) are single lines.
+- `kind` is `app | service | library | data | integration | cli`.
+- `paths` are repository-relative globs with forward slashes and no `.`,
+  `..`, or empty segments.
+- `source` (`agent | folder-fallback`) and `generatedAt` (ISO 8601 with an
+  offset) are optional. Files have 1–100 parts; unknown keys are rejected.
+
+The file declares parts only. Connections between parts are computed from
+indexed imports and calls, so declared edges such as `connections` are
+invalid. `parseArchitectureFile` in `@mycel/core` validates the JSON text and
+returns `ArchitectureFileResult`: the file, or issues with dotted JSON paths.
+
 ## Health compatibility
 
 `HealthResponse.status` remains `"ok"` for process liveness. Optional `index`

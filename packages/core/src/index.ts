@@ -16,6 +16,8 @@ export type {
   WatchRepositoryOptions,
 } from "./live-index.js";
 
+export { architectureFilePath, parseArchitectureFile } from "./architecture.js";
+
 export { createHistoryQueries } from "./history-queries.js";
 export type { HistoryQueries } from "./history-queries.js";
 
