@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "source": "agent",
+  "parts": [
+    {
+      "id": "launcher",
+      "name": "Dashboard launcher",
+      "purpose": "Finds the repository, checks its architecture file and starts the local dashboard.",
+      "kind": "cli",
+      "paths": ["packages/cli/**"]
+    },
+    {
+      "id": "api",
+      "name": "Local dashboard API",
+      "purpose": "Serves graph queries, source views and live updates to the dashboard.",
+      "kind": "service",
+      "paths": ["packages/server/**"]
+    },
+    {
+      "id": "indexer",
+      "name": "Repository indexing",
+      "purpose": "Discovers source files, resolves references and updates the index as files change.",
+      "kind": "library",
+      "paths": ["packages/core/**"]
+    },
+    {
+      "id": "parser",
+      "name": "TypeScript source analysis",
+      "purpose": "Extracts symbols, imports and calls from TypeScript syntax trees.",
+      "kind": "library",
+      "paths": ["packages/parser/**"]
+    },
+    {
+      "id": "storage",
+      "name": "Graph and revision storage",
+      "purpose": "Persists graph evidence, source snapshots and revision history in SQLite.",
+      "kind": "data",
+      "paths": ["packages/db/**"]
+    },
+    {
+      "id": "contracts",
+      "name": "Shared graph contracts",
+      "purpose": "Defines the data exchanged between indexing, storage and dashboard views.",
+      "kind": "library",
+      "paths": ["packages/shared/**"]
+    },
+    {
+      "id": "workspace",
+      "name": "Code exploration workspace",
+      "purpose": "Lets users navigate the repository, inspect source and review recent changes.",
+      "kind": "app",
+      "paths": ["apps/web/**"]
+    },
+    {
+      "id": "architecture",
+      "name": "Architecture mapping",
+      "purpose": "Groups indexed files into parts and shows their connections and recent changes.",
+      "kind": "app",
+      "paths": [
+        "packages/core/src/architecture*.ts",
+        "apps/web/src/features/architecture/**"
+      ]
+    },
+    {
+      "id": "behaviour",
+      "name": "Feature and behaviour tracing",
+      "purpose": "Discovers features and traces their behaviour from interface code through services to data access.",
+      "kind": "library",
+      "paths": [
+        "packages/core/src/semantic/**",
+        "packages/core/src/behaviour/**",
+        "apps/web/src/features/semantic/**"
+      ]
+    }
+  ]
+}

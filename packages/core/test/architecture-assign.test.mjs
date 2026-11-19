@@ -6,6 +6,7 @@ import {
   assignFilesToParts,
   buildFallbackArchitecture,
   discoverSourceFiles,
+  findUnmatchedPatterns,
 } from "../dist/index.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -243,5 +244,29 @@ test("handles deleted files and deduplicates repeated paths cleanly", () => {
       ["beta", []],
       ["legacy", []],
     ],
+  );
+});
+
+test("reports each pattern that matches no file, even when its part has other matches", () => {
+  const architecture = makeArchitecture([
+    part("app", ["src/app/**", "src/old-app/**", "src/main.ts"]),
+    part("docs", ["docs"]),
+  ]);
+
+  assert.deepEqual(
+    findUnmatchedPatterns(architecture, ["src/app/page.ts", "src/main.ts"]),
+    [
+      { partId: "app", pattern: "src/old-app/**" },
+      { partId: "docs", pattern: "docs" },
+    ],
+  );
+  assert.deepEqual(
+    findUnmatchedPatterns(architecture, [
+      "src/app/page.ts",
+      "src/old-app/page.ts",
+      "src/main.ts",
+      "docs/guide.ts",
+    ]),
+    [],
   );
 });

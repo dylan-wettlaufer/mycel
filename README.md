@@ -30,6 +30,21 @@ Each launch uses an available port on `127.0.0.1` and prints the dashboard URL.
 Use `mycel --no-open` when you want to open the URL yourself, or `mycel --help`
 for usage. No subcommand is required.
 
+### Describe your architecture with an agent
+
+Without `.mycel/architecture.json`, the map shows one part per workspace
+package or top-level folder. To name real subsystems, install the agent skill
+and ask Codex or Claude Code to use it:
+
+```sh
+mycel install-skill   # writes .agents/skills and .claude/skills
+mycel architecture    # validates the file the agent wrote
+```
+
+`mycel architecture` lists unassigned files, tie warnings, and patterns that
+match no indexed file. It exits with status 1 when the file is missing or
+invalid, or when a pattern matches nothing.
+
 ### Install from source
 
 Requires Node.js 22 or newer and pnpm 10.34.7. From the Mycel workspace:

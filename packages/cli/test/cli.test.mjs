@@ -4,6 +4,7 @@ import { once } from "node:events";
 import {
   mkdir,
   mkdtemp,
+  readFile,
   realpath,
   rm,
   symlink,
@@ -20,6 +21,10 @@ import { launchDashboard, resolveRepository } from "../dist/index.js";
 
 const execFileAsync = promisify(execFile);
 const binary = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
+const skillSource = new URL(
+  "../skills/mycel-architecture/SKILL.md",
+  import.meta.url,
+);
 
 async function fixture(t) {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "mycel cli ")));
@@ -268,4 +273,63 @@ test("help and version work without launching, and obsolete subcommands are reje
       return true;
     },
   );
+});
+
+test("architecture validates the file and diagnoses working-tree assignments", async (t) => {
+  const { root, nested } = await repository(t);
+  const run = () =>
+    execFileAsync(process.execPath, [binary, "architecture"], { cwd: nested });
+  await assert.rejects(run(), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /No \.mycel\/architecture\.json in /);
+    assert.match(error.stderr, /mycel install-skill/);
+    assert.doesNotMatch(error.stderr, /ENOENT/);
+    return true;
+  });
+  await mkdir(join(root, ".mycel"));
+  const file = join(root, ".mycel", "architecture.json");
+  await writeFile(file, '{"version":1,"parts":[]}');
+  await assert.rejects(run(), /parts: Architecture needs/);
+  await writeFile(join(root, "one.ts"), "");
+  await writeFile(join(root, "two.ts"), "");
+  const part = {
+    id: "first",
+    name: "First",
+    purpose: "Runs queries.",
+    kind: "app",
+    paths: ["one.ts"],
+  };
+  const map = { version: 1, parts: [part, { ...part, id: "second" }] };
+  await writeFile(file, JSON.stringify(map));
+  const { stdout } = await run();
+  assert.match(stdout, /Unassigned files: 1\s+two\.ts/);
+  assert.match(
+    stdout,
+    /one\.ts: first \(one\.ts\), second \(one\.ts\); winner: first/,
+  );
+  part.paths.push("missing/**");
+  await writeFile(file, JSON.stringify(map));
+  await assert.rejects(run(), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stdout, /first: missing\/\*\*/);
+    return true;
+  });
+});
+
+test("install-skill writes the packaged skill for Codex and Claude Code", async (t) => {
+  const { root, nested } = await repository(t);
+  const packaged = await readFile(skillSource, "utf8");
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [binary, "install-skill"],
+    { cwd: nested },
+  );
+  for (const directory of [".agents/skills", ".claude/skills"]) {
+    const path = join(directory, "mycel-architecture", "SKILL.md");
+    assert.match(
+      stdout,
+      new RegExp(`Installed ${path.replaceAll(".", "\\.")}`),
+    );
+    assert.equal(await readFile(join(root, path), "utf8"), packaged);
+  }
 });

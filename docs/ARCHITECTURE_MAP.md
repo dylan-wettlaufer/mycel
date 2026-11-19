@@ -140,7 +140,7 @@ Unknown keys are rejected, so declared connections are invalid by construction.
 | 5. Recent changes from git                      | Done   |
 | 6. API and live updates                         | Done   |
 | 7. Architecture map as the landing view         | Done   |
-| 8. Agent skill and `mycel architecture` command | To do  |
+| 8. Agent skill and `mycel architecture` command | Done   |
 | 9. Python imports                               | To do  |
 | 10. Polish and documentation                    | To do  |
 
@@ -169,7 +169,9 @@ Unknown keys are rejected, so declared connections are invalid by construction.
    layout and edge work, with an end-to-end test.
 8. **Agent skill and CLI command.** A skill that tells an agent how to choose
    about 5–15 parts and write the file, plus `mycel architecture` to validate it
-   and print unassigned files and tie warnings.
+   and print unassigned files and tie warnings. The skill ships in
+   `packages/cli/skills`; `mycel install-skill` copies it into a repository's
+   `.agents/skills` and `.claude/skills`.
 9. **Python imports.** Add the Tree-sitter Python grammar with file-level
    imports, so a Python fixture repository gets a correct map.
 10. **Polish and documentation.** Empty and error states, evidence caps for

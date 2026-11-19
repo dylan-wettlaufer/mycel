@@ -36,6 +36,8 @@ export interface LoadedProjectArchitecture {
   architecture: ArchitectureFile;
   source: ArchitectureSource;
   fallback: ArchitectureFile;
+  /** False only when `.mycel/architecture.json` does not exist. */
+  fileFound: boolean;
   fileIssues?: ArchitectureIssue[];
 }
 
@@ -104,6 +106,7 @@ export async function loadProjectArchitecture(
         architecture: fallback,
         source: "folder-fallback",
         fallback,
+        fileFound: true,
         fileIssues: [
           {
             path: "",
@@ -119,6 +122,7 @@ export async function loadProjectArchitecture(
       architecture: fallback,
       source: "folder-fallback",
       fallback,
+      fileFound: false,
     };
   }
 
@@ -128,6 +132,7 @@ export async function loadProjectArchitecture(
       architecture: fallback,
       source: "folder-fallback",
       fallback,
+      fileFound: true,
       fileIssues: parsed.issues,
     };
   }
@@ -136,6 +141,7 @@ export async function loadProjectArchitecture(
     architecture: parsed.file,
     source: parsed.file.source ?? "agent",
     fallback,
+    fileFound: true,
   };
 }
 

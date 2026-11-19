@@ -2,22 +2,41 @@
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
+import { checkArchitecture } from "./architecture.js";
 import { launchDashboard } from "./launch.js";
+import { installSkill } from "./skill.js";
 
 async function main() {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     options: {
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
       "no-open": { type: "boolean" },
     },
-    allowPositionals: false,
+    allowPositionals: true,
   });
+
+  const [command] = positionals;
+  if (
+    positionals.length &&
+    (!["architecture", "install-skill"].includes(command ?? "") ||
+      positionals.length !== 1)
+  )
+    throw new Error(`Unexpected argument: ${positionals.join(" ")}`);
 
   if (values.help) {
     console.info(`Usage: mycel [options]
+       mycel architecture
+       mycel install-skill
 
 Open a live dashboard for the current repository.
+
+Commands:
+  architecture   Validate .mycel/architecture.json and list unassigned files,
+                 tie warnings and unmatched patterns. Exits with 1 when the
+                 file is missing or invalid, or a pattern matches no file.
+  install-skill  Add the mycel-architecture agent skill to .agents/skills
+                 (Codex) and .claude/skills (Claude Code) in this repository.
 
 Options:
   -h, --help     Show help
@@ -34,6 +53,16 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
       await readFile(new URL("../package.json", import.meta.url), "utf8"),
     );
     console.info(manifest.version);
+    return;
+  }
+
+  if (command === "architecture") {
+    await checkArchitecture();
+    return;
+  }
+
+  if (command === "install-skill") {
+    await installSkill();
     return;
   }
 

@@ -87,6 +87,18 @@ function compileParts(parts: readonly ArchitecturePart[]): CompiledPart[] {
   }));
 }
 
+/** Report stale patterns even when another pattern covers the same part. */
+export function findUnmatchedPatterns(
+  architecture: ArchitectureFile,
+  filePaths: readonly string[],
+): { partId: string; pattern: string }[] {
+  return compileParts(architecture.parts).flatMap(({ part, patterns }) =>
+    patterns
+      .filter((pattern) => !filePaths.some((path) => pattern.matches(path)))
+      .map(({ pattern }) => ({ partId: part.id, pattern })),
+  );
+}
+
 function bestMatchForPart(
   compiled: CompiledPart,
   path: string,
