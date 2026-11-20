@@ -599,77 +599,54 @@
   opacity: 0;
 }
 
-/* Architecture map part cards */
+/* Architecture map */
+.architecture-map {
+  --architecture-canvas: #17191c;
+  --architecture-card: #24272b;
+  --architecture-border: #34383e;
+  --architecture-selection: #34d399;
+  --architecture-relationship: #93c5fd;
+  --architecture-edge: #65717e;
+  --architecture-status-new: #b7c0cb;
+  --architecture-status-changed: #c7a078;
+  --architecture-status-dirty: #a6aeb8;
+}
+.architecture-map .graph-canvas {
+  border-color: var(--architecture-border);
+  background: var(--architecture-canvas);
+}
+.architecture-map .react-flow {
+  --xy-background-color: var(--architecture-canvas);
+}
 .react-flow .react-flow__node-part {
-  --part-accent: var(--muted-foreground);
-  border: 1px solid var(--border);
-  border-left: 4px solid
-    color-mix(in oklch, var(--part-accent) 72%, var(--border));
-  border-radius: 10px;
-  background: var(--background);
+  border: 1px solid var(--architecture-border);
+  border-radius: 8px;
+  background: var(--architecture-card);
   color: var(--foreground);
   text-align: left;
   font-family: var(--font-sans);
-  box-shadow: 0 3px 12px rgb(0 0 0 / 12%);
   cursor: pointer;
   transition:
     opacity 150ms,
-    border-color 150ms,
-    background-color 150ms;
+    border-color 150ms;
 }
-.react-flow .arch-part-kind-app {
-  --part-accent: oklch(0.78 0.12 245);
-}
-.react-flow .arch-part-kind-service {
-  --part-accent: oklch(0.76 0.14 285);
-}
-.react-flow .arch-part-kind-library {
-  --part-accent: var(--primary);
-}
-.react-flow .arch-part-kind-data {
-  --part-accent: var(--warning);
-}
-.react-flow .arch-part-kind-integration {
-  --part-accent: oklch(0.77 0.13 200);
-}
-.react-flow .arch-part-kind-cli {
-  --part-accent: oklch(0.78 0.13 320);
-}
-.react-flow .arch-part-new {
-  border-color: var(--success);
-  border-left-color: var(--success);
-  background: color-mix(in oklch, var(--success) 8%, var(--background));
-}
-.react-flow .arch-part-changed {
-  border-color: var(--warning);
-  border-left-color: var(--warning);
-  background: color-mix(in oklch, var(--warning) 8%, var(--background));
-}
-.react-flow .arch-part-uncommitted {
-  box-shadow:
-    0 0 0 2px color-mix(in oklch, var(--primary) 60%, transparent),
-    0 4px 16px rgb(0 0 0 / 22%);
-}
-.react-flow .arch-part-new.arch-part-uncommitted {
-  box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--success) 45%, transparent),
-    0 4px 16px rgb(0 0 0 / 22%);
-}
-.react-flow .arch-part-changed.arch-part-uncommitted {
-  box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--warning) 45%, transparent),
-    0 4px 16px rgb(0 0 0 / 22%);
+.react-flow .react-flow__node-part:hover,
+.react-flow .react-flow__node-part.graph-selected {
+  border-color: var(--architecture-edge);
 }
 .react-flow .react-flow__node-part.graph-unrelated {
-  opacity: 0.35;
+  opacity: 0.48;
 }
 .react-flow .react-flow__node-part.graph-unrelated:hover {
-  opacity: 0.9;
-}
-.react-flow .react-flow__node-part:is(.selected, .graph-selected) {
   opacity: 1;
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+}
+.react-flow .react-flow__node-part.selected {
+  opacity: 1;
+  border-color: var(--architecture-selection);
+}
+.react-flow .react-flow__node-part:focus-visible {
+  outline: 2px solid var(--architecture-selection);
+  outline-offset: 3px;
 }
 .react-flow .react-flow__node-part .react-flow__handle {
   opacity: 0;
@@ -677,113 +654,80 @@
 .part-node-content {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   height: 100%;
-  padding: 10px 12px;
-  gap: 6px;
+  padding: 12px 16px;
+  gap: 4px;
   overflow: hidden;
 }
-.part-node-header {
+.part-node-header,
+.part-node-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
 }
-.part-node-icon {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: color-mix(in oklch, var(--part-accent) 16%, transparent);
-  color: var(--part-accent);
-}
-.part-node-icon svg {
-  width: 13px;
-  height: 13px;
-}
-.part-node-kind {
-  font-size: 11px;
-  padding: 0 6px;
-  height: 20px;
-  color: var(--part-accent);
-}
-.part-node-count {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--muted-foreground);
-  white-space: nowrap;
-}
-.part-node-changes {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.part-change-badge {
-  font-size: 10px;
-  padding: 0 6px;
-  height: 18px;
-}
-.part-change-new {
-  border-color: var(--success);
-  color: var(--success);
-}
-.part-change-changed {
-  border-color: var(--warning);
-  color: var(--warning);
-}
-.part-uncommitted-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 35%, transparent);
-}
 .part-node-title {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 650;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.part-node-purpose {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--muted-foreground);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
-.part-node-used-by {
-  margin: auto 0 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
+.part-node-purpose {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
   color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.react-flow .arch-part-foundation {
-  border-style: dashed;
+.part-node-meta {
+  margin-top: 3px;
+  color: #a6aeb8;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
 }
-.react-flow .arch-part-foundation .part-node-purpose {
-  -webkit-line-clamp: 1;
+.part-node-meta svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
-/* Architecture lines stay faint until a part or line is focused. */
-.react-flow .arch-edge-resting {
-  opacity: 0.22;
+.part-node-status {
+  flex: 0 0 6px;
+  height: 6px;
+  margin-left: auto;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--architecture-status-dirty);
 }
-.react-flow .arch-edge-resting:hover {
-  opacity: 0.8;
-}
+.part-node-status-new,
 .graph-swatch-new {
-  background: var(--success);
+  background: var(--architecture-status-new);
 }
+.part-node-status-changed,
 .graph-swatch-changed {
-  background: var(--warning);
+  background: var(--architecture-status-changed);
+}
+.part-node-status-dirty,
+.graph-swatch-uncommitted {
+  outline: 1px solid var(--architecture-status-dirty);
+  outline-offset: 2px;
 }
 .graph-swatch-uncommitted {
-  background: var(--primary);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 40%, transparent);
+  background: var(--architecture-status-dirty);
+}
+.graph-swatch-relationship {
+  background: var(--architecture-relationship);
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow .react-flow__node-part {
+    transition: none;
+  }
 }

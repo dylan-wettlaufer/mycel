@@ -114,14 +114,35 @@ try {
     .filter({ hasText: "db" });
 
   await expect(serverCard).toContainText("HTTP API server.");
-  await expect(coreCard).toContainText("Changed");
-  await expect(dbCard).toContainText("New");
+  await expect(coreCard).toHaveClass(/arch-part-changed/);
+  await expect(dbCard).toHaveClass(/arch-part-new/);
   // Both one-import connections are minor, so they start hidden.
   await expect(page.locator(".react-flow__edge")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Show minor connections (2)" })
     .click();
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+
+  await expect(coreCard).toContainText("1 file");
+  const edgeLabels = page.locator(".react-flow__edge-text");
+  const edges = page.locator(".react-flow__edge");
+  await expect(edgeLabels).toHaveCount(0);
+  await expect(edges.locator(".react-flow__edge-path").first()).toHaveCSS(
+    "stroke",
+    "rgb(101, 113, 126)",
+  );
+
+  // Move over a real path so the count appears without selecting the connection.
+  const midpoint = await edges
+    .locator(".react-flow__edge-interaction")
+    .first()
+    .evaluate((path) => {
+      const point = path.getPointAtLength(path.getTotalLength() / 2);
+      const { x, y } = point.matrixTransform(path.getScreenCTM());
+      return { x, y };
+    });
+  await page.mouse.move(midpoint.x, midpoint.y);
+  await expect(edgeLabels).toHaveText("1 import · 1 call");
 
   // 2. Selecting a part shows connections, files, and allows drilling into connection evidence and source.
   await coreCard.click();
@@ -131,9 +152,15 @@ try {
   await expect(sidebar).toContainText("Core domain logic.");
   await expect(sidebar).toContainText("Depends on");
   await expect(sidebar).toContainText("Used by");
+  await expect(coreCard).toHaveCSS("border-top-color", "rgb(52, 211, 153)");
+  for (const edge of await edges.locator(".react-flow__edge-path").all()) {
+    await expect(edge).toHaveCSS("stroke", "rgb(147, 197, 253)");
+  }
+  await expect(edgeLabels).toHaveCount(0);
 
   // Open connection evidence (`core -> db`).
   await sidebar.getByRole("button", { name: /db/ }).click();
+  await expect(edgeLabels).toHaveText("1 import · 1 call");
   const evidence = page.getByLabel("Connection evidence");
   await expect(evidence).toContainText("packages/core/src/index.ts");
   await expect(evidence).toContainText("readRows");

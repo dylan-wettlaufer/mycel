@@ -19,7 +19,6 @@ import type {
   ArchitectureChangeStatus,
   ArchitecturePartKind,
 } from "@mycel/shared";
-import { Badge } from "@/components/ui/badge";
 import type { NodeHandle } from "@/features/graph/graph-node";
 
 const partKindLabels: Record<ArchitecturePartKind, string> = {
@@ -65,18 +64,19 @@ export const PartNodeView = memo(function PartNodeView({
   data,
 }: NodeProps<PartNode>) {
   const handles = data.handles ?? [
-    { id: "target-left", type: "target" as const, position: Position.Left },
-    { id: "source-right", type: "source" as const, position: Position.Right },
+    { id: "target-top", type: "target" as const, position: Position.Top },
+    { id: "source-bottom", type: "source" as const, position: Position.Bottom },
   ];
   const Icon = partKindIcons[data.kind];
   const updateNodeInternals = useUpdateNodeInternals();
-  const handleKey = handles.map((handle) => handle.id).join(",");
+  const handleKey = handles
+    .map(({ id, position, offset }) => `${id}:${position}:${offset}`)
+    .join(",");
 
   useEffect(() => {
     updateNodeInternals(id);
   }, [id, handleKey, updateNodeInternals]);
 
-  const fileLabel = `${data.fileCount} ${data.fileCount === 1 ? "file" : "files"}`;
   const statusLabel =
     data.status === "new"
       ? "New"
@@ -110,40 +110,27 @@ export const PartNodeView = memo(function PartNodeView({
         title={`${data.name} (${partKindLabel(data.kind)})\n${data.purpose}`}
       >
         <div className="part-node-header">
-          <span className="part-node-icon" aria-hidden>
-            <Icon />
-          </span>
-          <Badge variant="outline" className="part-node-kind">
-            {partKindLabel(data.kind)}
-          </Badge>
-          <span className="part-node-count">{fileLabel}</span>
+          <div className="part-node-title">{data.name}</div>
           {(statusLabel || data.uncommitted) && (
-            <span className="part-node-changes">
-              {statusLabel && (
-                <Badge
-                  variant="outline"
-                  className={`part-change-badge part-change-${data.status}`}
-                >
-                  {statusLabel}
-                </Badge>
-              )}
-              {data.uncommitted && (
-                <span
-                  className="part-uncommitted-dot"
-                  title="Uncommitted changes"
-                  aria-label="Uncommitted changes"
-                />
-              )}
-            </span>
+            <span
+              className={`part-node-status part-node-status-${data.status}${data.uncommitted ? " part-node-status-dirty" : ""}`}
+              title={[
+                statusLabel,
+                data.uncommitted ? "Uncommitted changes" : undefined,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+              aria-hidden
+            />
           )}
         </div>
-        <div className="part-node-title">{data.name}</div>
         <p className="part-node-purpose">{data.purpose}</p>
-        {data.usedBy !== undefined && (
-          <p className="part-node-used-by">
-            Used by {data.usedBy} {data.usedBy === 1 ? "part" : "parts"}
-          </p>
-        )}
+        <div className="part-node-meta">
+          <Icon aria-hidden />
+          <span>
+            {data.fileCount} {data.fileCount === 1 ? "file" : "files"}
+          </span>
+        </div>
       </div>
     </>
   );

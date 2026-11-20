@@ -154,7 +154,7 @@ export function ArchitectureMapView({
 
   return (
     <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
+      className="architecture-map flex min-h-0 min-w-0 flex-1 flex-col gap-2"
       aria-label="Architecture map"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">

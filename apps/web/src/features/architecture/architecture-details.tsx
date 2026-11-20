@@ -8,6 +8,7 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatLinkSummary } from "./architecture-layout";
 import { partKindLabel } from "./part-node";
 
 interface ArchitectureDetailsProps {
@@ -45,27 +46,15 @@ function ChangeBadges({
       )}
       {uncommitted && (
         <Badge variant="secondary" className="gap-1.5">
-          <span className="part-uncommitted-dot" aria-hidden />
+          <span
+            className="graph-legend-swatch graph-swatch-uncommitted"
+            aria-hidden
+          />
           Uncommitted
         </Badge>
       )}
     </div>
   );
-}
-
-function formatLinkSummary(connection: ArchitectureConnectionWithChanges) {
-  const pieces: string[] = [];
-  if (connection.importCount > 0) {
-    pieces.push(
-      `${connection.importCount} ${connection.importCount === 1 ? "import" : "imports"}`,
-    );
-  }
-  if (connection.callCount > 0) {
-    pieces.push(
-      `${connection.callCount} ${connection.callCount === 1 ? "call" : "calls"}`,
-    );
-  }
-  return pieces.join(" · ") || `${connection.count} links`;
 }
 
 export function ArchitectureDetails({
@@ -209,6 +198,10 @@ export function ArchitectureDetails({
               <Badge variant="outline">
                 {partKindLabel(selectedPart.kind)}
               </Badge>
+              <span className="text-xs text-muted-foreground">
+                {selectedPart.files.length}{" "}
+                {selectedPart.files.length === 1 ? "file" : "files"}
+              </span>
               {selectedPart.fallback && (
                 <Badge variant="secondary">Fallback</Badge>
               )}
@@ -253,6 +246,7 @@ export function ArchitectureDetails({
           {selectedPart.files.length > 0 && (
             <Button
               size="sm"
+              variant="secondary"
               className="gap-1.5"
               onClick={() => onOpenPartFiles(selectedPart)}
             >
@@ -370,7 +364,7 @@ function ConnectionGroup({
     <div>
       <h4 className="mb-2 flex items-center gap-2 text-sm font-medium">
         <i
-          className={`graph-legend-swatch graph-swatch-${direction}`}
+          className="graph-legend-swatch graph-swatch-relationship"
           aria-hidden
         />
         {title}{" "}

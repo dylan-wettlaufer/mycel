@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ArchitectureMap } from "@mycel/shared";
 import {
-  connectionWeight,
   findFoundationParts,
   layoutArchitectureMap,
   partNodeSize,
@@ -135,11 +134,14 @@ const sampleMap: ArchitectureMap = {
   tieWarnings: [],
 };
 
-const mkPart = (id: string) => ({
+const mkPart = (
+  id: string,
+  kind: ArchitectureMap["parts"][number]["kind"] = "library",
+) => ({
   id,
   name: id,
   purpose: `${id} part.`,
-  kind: "library" as const,
+  kind,
   paths: [`packages/${id}/**`],
   files: [`packages/${id}/index.ts`],
   change: {
@@ -164,7 +166,15 @@ const mkConn = (sourcePartId: string, targetPartId: string, count = 3) => ({
 
 const multiColumnMap: ArchitectureMap = {
   ...sampleMap,
-  parts: ["cli", "server", "core", "db", "parser", "web", "shared"].map(mkPart),
+  parts: [
+    mkPart("cli", "cli"),
+    mkPart("server", "service"),
+    mkPart("core"),
+    mkPart("db", "data"),
+    mkPart("parser"),
+    mkPart("web", "app"),
+    mkPart("shared"),
+  ],
   connections: [
     mkConn("cli", "server"),
     mkConn("cli", "shared"),
@@ -190,8 +200,8 @@ describe("layoutArchitectureMap", () => {
 
     expect(core.type).toBe("part");
     expect(core.data.fileCount).toBe(2);
-    expect(web.position.x).toBeLessThan(core.position.x);
-    expect(core.position.x).toBeLessThan(db.position.x);
+    expect(web.position.y).toBeLessThan(core.position.y);
+    expect(core.position.y).toBeLessThan(db.position.y);
     expect(core.className).toContain("arch-part-changed");
     expect(core.className).toContain("arch-part-uncommitted");
     expect(db.className).toContain("arch-part-new");
@@ -202,10 +212,10 @@ describe("layoutArchitectureMap", () => {
     // web->core (2) and db->core (1) are minor; core->db (3) stays.
     expect(hiddenMinorCount).toBe(2);
     expect(edges.map((edge) => edge.id)).toEqual(["core->db"]);
-    expect(edges[0]!.markerStart).toBeUndefined();
+    expect(edges[0]!.data?.bidirectional).toBe(false);
   });
 
-  test("merges opposite connections into one two-headed line and scales width with link count", () => {
+  test("merges opposite connections and keeps their counts and change details", () => {
     const { nodes, edges, hiddenMinorCount } = layoutArchitectureMap(
       sampleMap,
       { showMinor: true },
@@ -224,27 +234,16 @@ describe("layoutArchitectureMap", () => {
     const webToCore = edges.find((edge) => edge.id === "web->core")!;
 
     expect(coreDb.type).toBe("behaviour");
-    expect(coreDb.label).toBe("3 links → · 1 import ←");
-    expect(coreDb.markerStart).toBeDefined();
+    expect(coreDb.label).toBe("1 import · 2 calls → · 1 import ←");
     expect(coreDb.data?.connectionIds).toEqual(["core->db", "db->core"]);
     expect(coreDb.data?.bidirectional).toBe(true);
-    expect(coreDb.style?.stroke).toBe("var(--success)");
+    expect(coreDb.data?.changeStatus).toBe("new");
     expect(coreDb.data?.uncommitted).toBe(true);
     expect(webToCore.label).toBe("2 imports");
-    expect(webToCore.style?.stroke).toBe("var(--warning)");
-    expect(Number(coreDb.style?.strokeWidth)).toBeGreaterThan(
-      Number(webToCore.style?.strokeWidth),
-    );
+    expect(webToCore.data?.changeStatus).toBe("changed");
   });
 
-  test("weights grow with link count and stay within bounds", () => {
-    expect(connectionWeight(1)).toBe(1.25);
-    expect(connectionWeight(2)).toBe(2.5);
-    expect(connectionWeight(8)).toBe(5);
-    expect(connectionWeight(1000)).toBe(6);
-  });
-
-  test("pins parts that most others use and that depend on nothing below the map", () => {
+  test("places foundational dependencies alongside data", () => {
     expect([...findFoundationParts(multiColumnMap)]).toEqual(["shared"]);
     // A widely used part that depends on another part is not a foundation.
     expect(
@@ -254,6 +253,14 @@ describe("layoutArchitectureMap", () => {
       }).size,
     ).toBe(0);
     expect(findFoundationParts(sampleMap).size).toBe(0);
+    expect(
+      findFoundationParts({
+        ...multiColumnMap,
+        parts: multiColumnMap.parts.map((part) =>
+          part.id === "shared" ? { ...part, kind: "app" } : part,
+        ),
+      }).size,
+    ).toBe(0);
 
     const { nodes, edges } = layoutArchitectureMap(multiColumnMap);
     const shared = nodes.find((node) => node.id === "shared")!;
@@ -262,9 +269,11 @@ describe("layoutArchitectureMap", () => {
     for (const node of nodes) {
       if (node.id === "shared") continue;
       expect(node.data.usedBy).toBeUndefined();
-      expect(shared.position.y).toBeGreaterThan(
-        node.position.y + partNodeSize.height,
-      );
+      if (node.id === "db") expect(shared.position.y).toBe(node.position.y);
+      else
+        expect(shared.position.y).toBeGreaterThan(
+          node.position.y + partNodeSize.height,
+        );
     }
 
     const foundationEdges = edges.filter((edge) => edge.data?.foundation);
@@ -285,43 +294,42 @@ describe("layoutArchitectureMap", () => {
     expect(sharedTargetHandles).toHaveLength(6);
   });
 
-  test("routes long-skip edges around intermediate cards without intersecting them", () => {
+  test("anchors direct curves vertically and detours through gaps on skipped rows", () => {
     const { nodes, edges } = layoutArchitectureMap({
       ...multiColumnMap,
       connections: [
         ...multiColumnMap.connections,
         mkConn("cli", "db"),
-        mkConn("web", "core"),
+        mkConn("db", "cli", 1),
       ],
     });
-    const boxes = nodes.map((node) => ({
-      id: node.id,
-      left: node.position.x,
-      right: node.position.x + partNodeSize.width,
-      top: node.position.y,
-      bottom: node.position.y + partNodeSize.height,
-    }));
-    const routed = edges.filter((edge) => !edge.data?.foundation);
-    expect(routed.length).toBeGreaterThanOrEqual(6);
-    for (const edge of routed) {
-      const route = edge.data?.route as {
-        source: { x: number; y: number };
-        target: { x: number; y: number };
-        bends: { x: number; y: number }[];
-      };
-      const pts = [route.source, ...route.bends, route.target];
-      for (let i = 0; i + 1 < pts.length; i++) {
-        const a = pts[i]!;
-        const b = pts[i + 1]!;
-        for (const box of boxes) {
-          if (box.id === edge.source || box.id === edge.target) continue;
-          const intersects =
-            Math.max(a.x, b.x) > box.left &&
-            Math.min(a.x, b.x) < box.right &&
-            Math.max(a.y, b.y) > box.top &&
-            Math.min(a.y, b.y) < box.bottom;
-          expect(intersects, `${edge.id} crossed ${box.id}`).toBe(false);
-        }
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const direct = edges.find((edge) => edge.id === "cli->server")!;
+    expect(direct.data?.curved).toBe(true);
+    expect(direct.data?.curve).toBeUndefined();
+    expect(byId.get("cli")?.data.handles).toContainEqual(
+      expect.objectContaining({ id: direct.sourceHandle, position: "bottom" }),
+    );
+    expect(byId.get("server")?.data.handles).toContainEqual(
+      expect.objectContaining({ id: direct.targetHandle, position: "top" }),
+    );
+
+    const skip = edges.find((edge) => edge.id === "cli->db")!;
+    const curve = skip.data?.curve as { waypoints: { x: number; y: number }[] };
+    expect(curve.waypoints).toHaveLength(4);
+    for (const [index, id] of ["server", "core"].entries()) {
+      const position = byId.get(id)!.position;
+      const [entry, exit] = curve.waypoints.slice(index * 2, index * 2 + 2);
+      expect(entry!.x).toBe(exit!.x);
+      expect(entry!.y).toBeLessThan(position.y);
+      expect(exit!.y).toBeGreaterThan(position.y + partNodeSize.height);
+      for (const node of nodes.filter(
+        (item) => item.position.y === position.y,
+      )) {
+        expect(
+          entry!.x < node.position.x ||
+            entry!.x > node.position.x + partNodeSize.width,
+        ).toBe(true);
       }
     }
   });

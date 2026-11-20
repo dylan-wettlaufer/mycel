@@ -179,10 +179,11 @@ export function GraphCanvas({
       focusGraph(
         nodes,
         edges,
-        previewId ?? selectedId,
+        selectedId,
         onlyConnections,
-        previewId ? null : selectedEdgeId,
+        selectedEdgeId,
         hoveredEdgeId,
+        previewId,
       ),
     [
       nodes,
@@ -461,8 +462,13 @@ function GraphLegend({
       </span>
       {mode === "architecture" && (
         <>
-          <span>Thicker lines carry more links</span>
-          <span>Hover or select a part to trace it</span>
+          <span>
+            <i
+              className="graph-legend-swatch graph-swatch-relationship"
+              aria-hidden
+            />
+            Highlighted dependencies
+          </span>
           <span>
             <i className="graph-legend-swatch graph-swatch-new" aria-hidden />
             New in window

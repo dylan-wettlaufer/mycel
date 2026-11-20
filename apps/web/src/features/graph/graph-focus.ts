@@ -30,62 +30,50 @@ export function graphConnections(
 function focusArchitectureEdge(
   edge: Edge,
   {
-    weight,
     active,
     hasSelection,
-    showLabel,
-    outgoing,
+    hovered,
+    selected,
   }: {
-    weight: number;
     active: boolean;
     hasSelection: boolean;
-    showLabel: boolean;
-    outgoing: boolean;
+    hovered: boolean;
+    selected: boolean;
   },
 ): Edge {
-  const status = edge.data?.changeStatus;
-  const color =
-    status === "new"
-      ? "var(--success)"
-      : status === "changed"
-        ? "var(--warning)"
-        : active
-          ? outgoing
-            ? "var(--primary)"
-            : "var(--chart-1)"
-          : "var(--muted-foreground)";
+  const highlighted = active || hovered;
+  const showLabel = hovered || selected;
+  const color = highlighted
+    ? "var(--architecture-relationship)"
+    : "var(--architecture-edge)";
   const marker = {
     type: MarkerType.ArrowClosed,
     color,
-    width: 18,
-    height: 18,
+    width: 9,
+    height: 9,
   };
   return {
     ...edge,
-    className: [
-      edge.className,
-      active
-        ? "graph-edge-active"
-        : hasSelection
-          ? "graph-edge-unrelated"
-          : "arch-edge-resting",
-    ]
-      .filter(Boolean)
-      .join(" "),
+    className: highlighted
+      ? "graph-edge-active"
+      : hasSelection
+        ? "graph-edge-unrelated"
+        : "arch-edge-resting",
+    zIndex: showLabel ? 2 : active ? 1 : 0,
     label: showLabel ? edge.label : undefined,
     markerEnd: marker,
     ...(edge.data?.bidirectional ? { markerStart: marker } : {}),
     style: {
       ...edge.style,
       stroke: color,
-      strokeWidth: active ? weight + 0.75 : weight,
+      strokeWidth: showLabel ? 2 : active ? 1.65 : 1.25,
     },
     labelStyle: {
-      fill: "var(--foreground)",
+      fill: "var(--architecture-canvas)",
       fontSize: 12,
-      fontWeight: 500,
+      fontWeight: 600,
     },
-    labelBgStyle: { fill: "var(--background)", fillOpacity: 1 },
+    labelBgStyle: { fill: "var(--architecture-relationship)", fillOpacity: 1 },
     labelBgPadding: [7, 4] as [number, number],
     labelBgBorderRadius: 4,
   };
@@ -98,6 +86,7 @@ export function focusGraph(
   onlyConnections: boolean,
   selectedEdgeId: string | null = null,
   hoveredEdgeId: string | null = null,
+  previewId: string | null = null,
 ) {
   const selected = nodes.some((node) => node.id === selectedId)
     ? selectedId
@@ -106,7 +95,8 @@ export function focusGraph(
   const edgeEndpoints = selectedEdge
     ? new Set([selectedEdge.source, selectedEdge.target])
     : null;
-  const connections = graphConnections(nodes, edges, selected);
+  const traceId = selected ?? (selectedEdge ? null : previewId);
+  const connections = graphConnections(nodes, edges, traceId);
   const incoming = new Set(connections.incoming.map((node) => node.id));
   const outgoing = new Set(connections.outgoing.map((node) => node.id));
   // Non-selectable nodes are backdrops such as architecture layers.
@@ -148,16 +138,16 @@ export function focusGraph(
         (edge) =>
           !selected ||
           !onlyConnections ||
-          edge.source === selected ||
-          edge.target === selected,
+          edge.source === traceId ||
+          edge.target === traceId,
       )
       // Architecture lines into foundation parts appear only when focused.
       .filter(
         (edge) =>
           !edge.data?.foundation ||
           edge.id === selectedEdge?.id ||
-          edge.source === selected ||
-          edge.target === selected,
+          edge.source === traceId ||
+          edge.target === traceId,
       )
       .map((edge) => {
         const behaviour = edge.type === "behaviour";
@@ -165,22 +155,19 @@ export function focusGraph(
           behaviour && edge.className === "graph-edge-uncertain";
         const archStatus = edge.data?.changeStatus;
         const archUncommitted = Boolean(edge.data?.uncommitted);
-        const archWeight =
-          typeof edge.data?.weight === "number" ? edge.data.weight : undefined;
         const isSelectedEdge = selectedEdge?.id === edge.id;
         const active =
           isSelectedEdge ||
           Boolean(
-            selected && (edge.source === selected || edge.target === selected),
+            traceId && (edge.source === traceId || edge.target === traceId),
           );
         const hasSelection = Boolean(selected || selectedEdge);
-        if (archWeight !== undefined)
+        if (edge.data?.architecture)
           return focusArchitectureEdge(edge, {
-            weight: archWeight,
             active,
             hasSelection,
-            showLabel: isSelectedEdge || edge.id === hoveredEdgeId,
-            outgoing: edge.source === selected,
+            hovered: edge.id === hoveredEdgeId,
+            selected: isSelectedEdge,
           });
         const color = uncertain
           ? "var(--warning)"
