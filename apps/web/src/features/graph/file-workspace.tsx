@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { FileSymbols } from "@/features/details/file-symbols";
 import { NodeDetailsPanel } from "@/features/details/node-details";
 import { SourcePanel } from "@/features/source/source-panel";
@@ -169,14 +170,20 @@ export function FileWorkspace({
                     onSelect={onSelect}
                     onScope={onScope}
                     revision={revision}
+                    variant="section"
                   />
                   {file && (
-                    <FileSymbols
-                      file={file}
-                      revision={revision}
-                      onSelect={onSelect}
-                    />
+                    <>
+                      <Separator />
+                      <FileSymbols
+                        file={file}
+                        revision={revision}
+                        onSelect={onSelect}
+                        variant="section"
+                      />
+                    </>
                   )}
+                  <Separator />
                   {connections}
                   <Button
                     variant="outline"

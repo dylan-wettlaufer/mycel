@@ -22,6 +22,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { graphNodeTypes } from "./graph-node";
 import { focusGraph, graphConnections } from "./graph-focus";
@@ -534,19 +535,25 @@ export function SelectionConnections({
   connections,
   onSelect,
   symbols,
+  separated = false,
 }: {
   connections: ReturnType<typeof graphConnections>;
   onSelect: (id: string) => void;
   symbols: boolean;
+  separated?: boolean;
 }) {
   return (
-    <section aria-label="Selected connections" className="space-y-5">
+    <section
+      aria-label="Selected connections"
+      className={separated ? "space-y-3" : "space-y-5"}
+    >
       <Connections
         title={symbols ? "Points to selection" : "Used by"}
         nodes={connections.incoming}
         onSelect={onSelect}
         direction="incoming"
       />
+      {separated && <Separator />}
       <Connections
         title={symbols ? "Selection points to" : "Depends on"}
         nodes={connections.outgoing}

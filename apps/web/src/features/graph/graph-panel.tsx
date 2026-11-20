@@ -225,6 +225,7 @@ export function GraphPanel({
               )}
               onSelect={selectFromGraph}
               symbols
+              separated
             />
           }
           revision={revision}
