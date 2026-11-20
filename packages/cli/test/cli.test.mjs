@@ -316,6 +316,118 @@ test("architecture validates the file and diagnoses working-tree assignments", a
   });
 });
 
+test("architecture --component inspects fresh links and reports responsibility ownership", async (t) => {
+  const { root, nested } = await repository(t);
+  const run = (component) =>
+    execFileAsync(
+      process.execPath,
+      [binary, "architecture", "--component", component],
+      { cwd: nested },
+    );
+  await mkdir(join(root, ".mycel"));
+  await mkdir(join(root, "engine", "work"), { recursive: true });
+  await writeFile(
+    join(root, "app.ts"),
+    'import { run } from "./engine/work/run";\nexport function serve() { return run(); }\n',
+  );
+  await writeFile(
+    join(root, "engine/work/run.ts"),
+    'import { read } from "./read";\nimport { save } from "../../storage";\nexport function run() { return save(read()); }\n',
+  );
+  await writeFile(
+    join(root, "engine/work/read.ts"),
+    "export function read() { return 1; }\n",
+  );
+  await writeFile(
+    join(root, "engine/other.ts"),
+    "export const setting = true;\n",
+  );
+  await writeFile(
+    join(root, "storage.ts"),
+    "export function save(value: number) { return value; }\n",
+  );
+  const engine = {
+    id: "engine",
+    name: "Query engine",
+    purpose: "Runs queries.",
+    kind: "library",
+    paths: ["engine/**"],
+  };
+  const definition = {
+    version: 1,
+    parts: [
+      engine,
+      {
+        id: "api",
+        name: "API",
+        purpose: "Runs requests.",
+        kind: "app",
+        paths: ["app.ts"],
+      },
+      {
+        id: "storage",
+        name: "Storage",
+        purpose: "Stores results.",
+        kind: "data",
+        paths: ["storage.ts"],
+      },
+    ],
+  };
+  const path = join(root, ".mycel", "architecture.json");
+  await writeFile(path, JSON.stringify(definition));
+  const { stdout: initial } = await run("Query engine");
+  assert.match(initial, /Query engine \(engine\)/);
+  assert.match(initial, /app\.ts:2 → engine\/work\/run\.ts#run \(call, API\)/);
+  assert.match(
+    initial,
+    /engine\/work\/run\.ts:3 → storage\.ts#save \(call, Storage\)/,
+  );
+  assert.match(
+    initial,
+    /engine\/work\/run\.ts:3 → engine\/work\/read\.ts#read \(call\)/,
+  );
+  assert.match(initial, /No breakdown defined/);
+  engine.subcomponents = [
+    {
+      id: "updates",
+      name: "Updates",
+      purpose: "Runs writes.",
+      paths: ["engine/work/run.ts"],
+    },
+    {
+      id: "capture",
+      name: "Capture",
+      purpose: "Reads input.",
+      paths: ["engine/work/*.ts"],
+    },
+  ];
+  await writeFile(path, JSON.stringify(definition));
+  const { stdout: report } = await run("engine");
+  assert.match(
+    report,
+    /Updates \(engine:updates, 1 file\) \[opening focus\]\s+engine\/work\/run\.ts/,
+  );
+  assert.match(
+    report,
+    /Capture \(engine:capture, 1 file\)\s+engine\/work\/read\.ts/,
+  );
+  assert.match(report, /Other files: 1\s+engine\/other\.ts/);
+  assert.match(
+    report,
+    /Overlapping responsibilities: 1\s+engine\/work\/run\.ts: .* → engine:updates/,
+  );
+  engine.subcomponents[0].paths.push("storage.ts");
+  await writeFile(path, JSON.stringify(definition));
+  await assert.rejects(run("engine"), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(
+      error.stdout,
+      /Unmatched responsibility patterns: 1\s+engine:updates: storage\.ts/,
+    );
+    return true;
+  });
+});
+
 test("install-skill writes the packaged skill for Codex and Claude Code", async (t) => {
   const { root, nested } = await repository(t);
   const packaged = await readFile(skillSource, "utf8");

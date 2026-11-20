@@ -32,7 +32,7 @@ function fileRange(source: string): SourceRange {
   };
 }
 
-export function buildProjectGraph(
+export function buildStructuralGraph(
   project: Project,
   files: readonly CapturedFile[],
   resolution?: ModuleResolver,
@@ -88,18 +88,26 @@ export function buildProjectGraph(
   const relationships = resolveRelationships(project, files, resolution);
   edges.push(...relationships.edges);
   diagnostics.push(...relationships.diagnostics);
-  const semantic = extractSemanticGraph({
-    project,
-    files,
-    nodes,
-    ...(resolution ? { resolution } : {}),
-  });
   return {
     project,
     nodes,
     edges,
     diagnostics,
-    semantic,
     edgeSourceLines: relationships.edgeSourceLines,
   };
+}
+
+export function buildProjectGraph(
+  project: Project,
+  files: readonly CapturedFile[],
+  resolution?: ModuleResolver,
+): ProjectGraph {
+  const graph = buildStructuralGraph(project, files, resolution);
+  const semantic = extractSemanticGraph({
+    project,
+    files,
+    nodes: graph.nodes,
+    ...(resolution ? { resolution } : {}),
+  });
+  return { ...graph, semantic };
 }

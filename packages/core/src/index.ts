@@ -22,12 +22,14 @@ export type { FallbackArchitectureOptions } from "./architecture-fallback.js";
 export {
   assignFilesToParts,
   findUnmatchedPatterns,
+  inspectComponentAssignments,
 } from "./architecture-assign.js";
 export type { AssignFilesOptions } from "./architecture-assign.js";
 export {
   computeArchitectureConnections,
   extractCrossFileLinks,
   getArchitectureConnections,
+  readWorkingTreeLinks,
 } from "./architecture-connections.js";
 export type {
   ArchitectureConnectionsSnapshot,

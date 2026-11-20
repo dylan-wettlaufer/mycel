@@ -45,6 +45,13 @@ mycel architecture    # validates the file the agent wrote
 match no indexed file. It exits with status 1 when the file is missing or
 invalid, or when a pattern matches nothing.
 
+To extend a specific part of the map, ask your coding agent to use the skill
+for that component, for example “Add a Mycel drill-down for Repository
+indexing.” The first responsibility in the resulting breakdown is the opening
+focus. Use `mycel architecture --component indexer` to inspect owned files,
+indexed callers and dependencies, overlaps, and files grouped under
+**Other files**.
+
 ### Install from source
 
 Requires Node.js 22 or newer and pnpm 10.34.7. From the Mycel workspace:

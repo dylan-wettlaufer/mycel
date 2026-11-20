@@ -50,7 +50,7 @@ export async function indexRepository(
 }
 
 export async function captureRepository(
-  options: IndexRepositoryOptions,
+  options: Pick<IndexRepositoryOptions, "project" | "indexing">,
   parse: typeof parseFile = parseFile,
 ) {
   if (typeof options.project.name !== "string" || !options.project.name.trim())

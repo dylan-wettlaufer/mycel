@@ -17,19 +17,21 @@ export interface AssignFilesOptions {
   fallback?: ArchitectureFile;
 }
 
+function componentParts(parent: ArchitecturePart): ArchitecturePart[] {
+  return (parent.subcomponents ?? []).map((child) => ({
+    ...child,
+    id: `${parent.id}:${child.id}`,
+    kind: parent.kind,
+  }));
+}
+
 /** Project a parent's ownership into children while retaining external owners. */
 export function assignComponentFiles(
   assignment: ArchitectureAssignment,
   parent: AssignedArchitecturePart,
   indexedPaths: ReadonlySet<string>,
 ): ArchitectureAssignment {
-  const children: ArchitecturePart[] = (parent.subcomponents ?? []).map(
-    (child) => ({
-      ...child,
-      id: `${parent.id}:${child.id}`,
-      kind: parent.kind,
-    }),
-  );
+  const children = componentParts(parent);
   const local = assignFilesToParts(
     { version: 1, parts: children },
     parent.files,
@@ -153,6 +155,38 @@ export function findUnmatchedPatterns(
       .filter((pattern) => !filePaths.some((path) => pattern.matches(path)))
       .map(({ pattern }) => ({ partId: part.id, pattern })),
   );
+}
+
+/** Use the same ownership rules as the dashboard when checking a breakdown. */
+export function inspectComponentAssignments(
+  assignment: ArchitectureAssignment,
+  parent: AssignedArchitecturePart,
+) {
+  const indexedPaths = new Set(Object.keys(assignment.fileToPart));
+  const projected = assignComponentFiles(assignment, parent, indexedPaths);
+  const children = componentParts(parent);
+  const compiled = compileParts(children);
+  const overlaps = parent.files.flatMap((path) => {
+    const matches = compiled.flatMap((child) => {
+      const matched = bestMatchForPart(child, path);
+      return matched
+        ? [{ partId: child.part.id, pattern: matched.pattern }]
+        : [];
+    });
+    return matches.length > 1
+      ? [{ path, matches, winnerPartId: projected.fileToPart[path]! }]
+      : [];
+  });
+  const childIds = new Set(children.map(({ id }) => id));
+  return {
+    responsibilities: projected.parts.filter(({ id }) => childIds.has(id)),
+    otherFiles: projected.unassignedFiles,
+    overlaps,
+    unmatched: findUnmatchedPatterns(
+      { version: 1, parts: children },
+      parent.files,
+    ),
+  };
 }
 
 function bestMatchForPart(

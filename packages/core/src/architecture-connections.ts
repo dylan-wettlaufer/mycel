@@ -7,7 +7,10 @@ import type {
   GraphEdge,
   GraphNode,
   ProjectId,
+  ProjectInfo,
 } from "@mycel/shared";
+import { buildStructuralGraph } from "./graph.js";
+import { captureRepository } from "./indexer.js";
 
 export interface ComputeConnectionsOptions {
   /** Optional cap on stored evidence items per connection; counts stay exact. */
@@ -28,6 +31,15 @@ export interface GraphLinkSource {
   edges: readonly (Pick<GraphEdge, "kind" | "sourceId" | "targetId"> &
     Partial<Pick<GraphEdge, "id">>)[];
   edgeSourceLines?: NonNullable<ProjectGraph["edgeSourceLines"]>;
+}
+
+/** Read the same resolved links as the indexer without opening a database. */
+export async function readWorkingTreeLinks(projectInfo: ProjectInfo) {
+  const { project, files, paths, resolution } = await captureRepository({
+    project: projectInfo,
+  });
+  const graph = buildStructuralGraph(project, files, resolution);
+  return { paths, links: extractCrossFileLinks(graph) };
 }
 
 function compareStrings(a: string, b: string): number {
