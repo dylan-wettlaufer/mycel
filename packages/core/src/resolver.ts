@@ -54,7 +54,7 @@ export function resolveRelationships(
     resolution?.resolve(from, specifier) ??
     resolveRelativeModule(from, specifier, paths);
   const edges = new Map<string, Omit<GraphEdge, "revision">>();
-  const edgeSourceLines = new Map<string, Set<number>>();
+  const edgeSourceLines = new Map<string, Map<number, boolean>>();
   const diagnostics: Diagnostic[] = [];
   const nodeId = (localId: string) =>
     `node:${hashIdentity([project.id, localId])}`;
@@ -63,14 +63,15 @@ export function resolveRelationships(
     source: string,
     target: string,
     line: number,
+    typeOnly = false,
   ) {
     const sourceId = nodeId(source);
     const targetId = nodeId(target);
     const id = `edge:${hashIdentity([project.id, kind, sourceId, targetId])}`;
     edges.set(id, { id, projectId: project.id, kind, sourceId, targetId });
     const lines = edgeSourceLines.get(id);
-    if (lines) lines.add(line);
-    else edgeSourceLines.set(id, new Set([line]));
+    if (lines) lines.set(line, (lines.get(line) ?? true) && typeOnly);
+    else edgeSourceLines.set(id, new Map([[line, typeOnly]]));
   }
   function diagnostic(
     path: string,
@@ -245,6 +246,10 @@ export function resolveRelationships(
           file.fileId,
           files.get(dependency)!.fileId,
           item.range.startLine,
+          item.typeOnly ||
+            ("bindings" in item &&
+              item.bindings.length > 0 &&
+              item.bindings.every((binding) => binding.typeOnly)),
         );
       else if (
         specifier.startsWith(".") ||

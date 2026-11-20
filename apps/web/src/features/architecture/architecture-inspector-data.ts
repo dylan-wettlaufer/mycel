@@ -2,6 +2,7 @@ import type {
   ArchitectureConnectionEvidence,
   ArchitectureConnectionWithChanges,
   ArchitectureGitChanges,
+  ArchitectureMap,
   ArchitecturePartWithChanges,
 } from "@mycel/shared";
 
@@ -46,6 +47,48 @@ export function groupPartConnections(
 }
 
 const smallPartFileLimit = 8;
+
+export function entryPointsForComponent(map: ArchitectureMap) {
+  const external = new Map(
+    map.parts.filter((part) => part.boundary).map((part) => [part.id, part]),
+  );
+  const entries = new Map<
+    string,
+    { path: string; symbol: string; callers: Set<string>; priority: number }
+  >();
+  for (const connection of map.connections) {
+    const caller = external.get(connection.sourcePartId);
+    if (!caller) continue;
+    const priority =
+      caller.kind === "app" || caller.kind === "service"
+        ? 2
+        : caller.kind === "cli"
+          ? 1
+          : 0;
+    for (const { kind, targetFile, symbol } of connection.evidence) {
+      if (kind !== "call" || !symbol) continue;
+      const key = JSON.stringify([targetFile, symbol]);
+      const entry = entries.get(key) ?? {
+        path: targetFile,
+        symbol,
+        callers: new Set<string>(),
+        priority,
+      };
+      entry.callers.add(caller.name);
+      entry.priority = Math.max(entry.priority, priority);
+      entries.set(key, entry);
+    }
+  }
+  const ranked = [...entries.entries()].sort(
+    ([, a], [, b]) =>
+      b.priority - a.priority ||
+      b.callers.size - a.callers.size ||
+      a.symbol.localeCompare(b.symbol),
+  );
+  return ranked[0]?.[1].priority
+    ? ranked.filter(([, entry]) => entry.priority > 0)
+    : ranked;
+}
 
 export function entryPointsForPart(
   part: Pick<ArchitecturePartWithChanges, "id" | "files">,

@@ -216,6 +216,13 @@ function isStringArray(value: unknown): value is string[] {
   );
 }
 
+function isSourceLineArray(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.every((line) => Number.isSafeInteger(line) && line > 0)
+  );
+}
+
 export function isArchitectureUpdateEvent(
   value: unknown,
 ): value is import("@mycel/shared").ArchitectureUpdateEvent {
@@ -271,6 +278,7 @@ export function isArchitectureMap(
       typeof part.purpose === "string" &&
       architecturePartKinds.has(String(part.kind)) &&
       (part.boundary === undefined || typeof part.boundary === "boolean") &&
+      (part.unassigned === undefined || typeof part.unassigned === "boolean") &&
       (part.subcomponents === undefined ||
         (Array.isArray(part.subcomponents) &&
           part.subcomponents.every(
@@ -310,13 +318,9 @@ export function isArchitectureMap(
           typeof item.file === "string" &&
           typeof item.line === "number" &&
           (item.additionalLines === undefined ||
-            (Array.isArray(item.additionalLines) &&
-              item.additionalLines.every(
-                (line) =>
-                  typeof line === "number" &&
-                  Number.isSafeInteger(line) &&
-                  line > 0,
-              ))) &&
+            isSourceLineArray(item.additionalLines)) &&
+          (item.typeOnlyImportLines === undefined ||
+            isSourceLineArray(item.typeOnlyImportLines)) &&
           (item.approximate === undefined ||
             typeof item.approximate === "boolean") &&
           typeof item.targetFile === "string",

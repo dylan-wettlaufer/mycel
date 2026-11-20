@@ -56,6 +56,7 @@ export function assignComponentFiles(
       kind: parent.kind,
       paths: [],
       files: local.unassignedFiles,
+      unassigned: true,
     });
   }
   parts.push(...assignment.parts.filter(({ id }) => id !== parent.id));

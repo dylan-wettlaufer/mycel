@@ -25,6 +25,7 @@ import {
   groupConnectionEvidence,
   groupPartConnections,
   groupPartFiles,
+  entryPointsForComponent,
   entryPointsForPart,
   splitFilePath,
   type PartConnectionRow,
@@ -54,7 +55,7 @@ function Inspector({
 }: {
   header: ReactNode;
   children: ReactNode;
-  onClear: () => void;
+  onClear?: () => void;
 }) {
   return (
     <aside
@@ -63,16 +64,18 @@ function Inspector({
     >
       <ScrollArea className="min-h-0 flex-1">
         <div className="relative border-b p-4">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Clear selection"
-            title="Close details"
-            className="absolute right-2.5 top-2.5 text-muted-foreground"
-            onClick={onClear}
-          >
-            <X aria-hidden />
-          </Button>
+          {onClear && (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Clear selection"
+              title="Close details"
+              className="absolute right-2.5 top-2.5 text-muted-foreground"
+              onClick={onClear}
+            >
+              <X aria-hidden />
+            </Button>
+          )}
           {header}
         </div>
         {children}
@@ -93,6 +96,14 @@ function linkChangeText(connections: ArchitectureConnectionWithChanges[]) {
 export function ArchitectureDetails(props: ArchitectureDetailsProps) {
   const { map, selectedPart, selectedConnection, onClear } = props;
   const partNames = new Map(map.parts.map(({ id, name }) => [id, name]));
+  const componentDetails = map.component ? (
+    <ComponentDetails
+      map={map}
+      selectedPart={selectedPart}
+      onOpenFile={props.onOpenFile}
+      onSelectPart={props.onSelectPart}
+    />
+  ) : undefined;
   if (selectedConnection) {
     return (
       <ConnectionDetails
@@ -109,17 +120,28 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         onOpenFile={props.onOpenFile}
         revision={props.revision}
         onClear={onClear}
+        componentDetails={componentDetails}
       />
     );
   }
-  if (!selectedPart) return null;
+  if (!selectedPart) {
+    return map.component ? (
+      <Inspector
+        header={<h3 className="text-lg font-semibold">{map.component.name}</h3>}
+      >
+        {componentDetails}
+      </Inspector>
+    ) : null;
+  }
 
   const { twoWay, uses, usedBy, strongest } = groupPartConnections(
     selectedPart.id,
     map.connections,
   );
   const hasConnections = twoWay.length + uses.length + usedBy.length > 0;
-  const isResponsibility = Boolean(map.component && !selectedPart.boundary);
+  const isResponsibility = Boolean(
+    map.component && !selectedPart.boundary && !selectedPart.unassigned,
+  );
   const entries = entryPointsForPart(
     selectedPart,
     map.connections,
@@ -152,9 +174,11 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
           <p className="mt-1 text-xs text-muted-foreground">
             {selectedPart.boundary
               ? "External component"
-              : isResponsibility
-                ? "Responsibility"
-                : partKindLabel(selectedPart.kind)}{" "}
+              : selectedPart.unassigned
+                ? "Unassigned files"
+                : isResponsibility
+                  ? "Responsibility"
+                  : partKindLabel(selectedPart.kind)}{" "}
             · {files.length} {files.length === 1 ? "file" : "files"}
           </p>
           <p className="mt-3 text-sm leading-snug">{selectedPart.purpose}</p>
@@ -195,6 +219,7 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         </>
       }
     >
+      {componentDetails}
       <section
         aria-label="Selected connections"
         className="space-y-3 border-b p-4"
@@ -292,6 +317,71 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         onOpenFile={props.onOpenFile}
       />
     </Inspector>
+  );
+}
+
+function ComponentDetails({
+  map,
+  selectedPart,
+  onOpenFile,
+  onSelectPart,
+}: Pick<
+  ArchitectureDetailsProps,
+  "map" | "selectedPart" | "onOpenFile" | "onSelectPart"
+>) {
+  const entries = entryPointsForComponent(map).slice(0, 3);
+  const other = map.parts.find((part) => part.unassigned);
+  return (
+    <>
+      {entries.length > 0 && (
+        <section
+          aria-label="Component entry points"
+          className="space-y-1 border-b p-4"
+        >
+          <h4 className="text-sm font-semibold">Component entry points</h4>
+          <ul>
+            {entries.map(([id, { path, symbol, callers }]) => (
+              <li key={id}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto w-full justify-start gap-2 whitespace-normal px-2 py-1.5 text-left"
+                  title={path}
+                  onClick={() => onOpenFile(path)}
+                >
+                  <FileCode2
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <span className="min-w-0 break-all">
+                    <code className="block text-xs">{symbol}()</code>
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {[...callers].join(", ")}
+                    </span>
+                  </span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {other && other.id !== selectedPart?.id && (
+        <div className="border-b px-4 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start px-2"
+            onClick={() => onSelectPart(other.id)}
+          >
+            <FolderOpen aria-hidden />
+            Other files
+            <span className="ml-auto text-xs text-muted-foreground">
+              {other.files.length}
+            </span>
+          </Button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -479,6 +569,7 @@ function ConnectionDetails({
   onOpenFile,
   revision,
   onClear,
+  componentDetails,
 }: {
   connection: ArchitectureConnectionWithChanges;
   reverse: ArchitectureConnectionWithChanges | undefined;
@@ -488,6 +579,7 @@ function ConnectionDetails({
   onOpenFile: (path: string) => void;
   revision: number;
   onClear: () => void;
+  componentDetails?: ReactNode;
 }) {
   const [source, setSource] = useState<Pick<
     ArchitectureConnectionEvidence,
@@ -607,7 +699,12 @@ function ConnectionDetails({
                       <div className="flex flex-wrap gap-x-2">
                         {[item.line, ...(item.additionalLines ?? [])].map(
                           (line) => {
-                            const label = `${item.approximate ? "Source starts at line" : "Line"} ${line} · ${item.kind}`;
+                            const kind = item.typeOnlyImportLines?.includes(
+                              line,
+                            )
+                              ? "type-only import"
+                              : item.kind;
+                            const label = `${item.approximate ? "Source starts at line" : "Line"} ${line} · ${kind}`;
                             return (
                               <Button
                                 key={line}
@@ -642,6 +739,7 @@ function ConnectionDetails({
           ))}
         </section>
       )}
+      {!source && componentDetails}
     </Inspector>
   );
 }

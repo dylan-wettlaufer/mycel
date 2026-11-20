@@ -244,6 +244,14 @@ try {
 
   // 3. Writing `.mycel/architecture.json` updates the map live via SSE and clears fallback banner.
   await writeFiles(root, {
+    "packages/server/src/index.ts": [
+      'import { queryCore } from "@acme/core";',
+      'import { openIndexedProject } from "../../core/src/startup";',
+      "export function serve() { return [queryCore(), openIndexedProject()]; }",
+      "",
+    ].join("\n"),
+    "packages/core/src/startup.ts":
+      "export function openIndexedProject() { return true; }\n",
     "packages/core/src/input.ts": "export function readInput() { return 1; }\n",
     "packages/core/src/index.ts": [
       'import { readRows } from "@acme/db";',
@@ -252,6 +260,7 @@ try {
       "  readInput();",
       "  return readRows();",
       "}",
+      'import type { readRows as ReadRows } from "@acme/db";',
       "",
     ].join("\n"),
     ".mycel/architecture.json": {
@@ -325,10 +334,37 @@ try {
   await expect(page.getByTestId("rf__node-storage")).toContainText(
     "External component",
   );
+  await expect(queryCard).toHaveClass(/graph-selected/);
+  await expect(page.getByTestId("rf__node-engine::other")).toHaveCount(0);
+  await expect(sidebar.getByLabel("Component entry points")).toContainText(
+    "openIndexedProject()",
+  );
+  await sidebar.getByRole("button", { name: /^Other files \d+$/ }).click();
+  await expect(sidebar.getByLabel("Part files")).toContainText("startup.ts");
+  await expect(sidebar.getByLabel("Selected connections")).toContainText(
+    "API layer",
+  );
+  await inputCard.click();
+  await expect(inputCard).toHaveClass(/graph-selected/);
+  await expect(queryCard).toBeVisible();
+  await expect(page.getByTestId("rf__node-storage")).toHaveCount(0);
+  await expect(edges).toHaveCount(1);
+  const showAll = page.getByRole("button", { name: "Show all connections" });
+  await showAll.click();
+  await expect(showAll).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("rf__node-storage")).toBeVisible();
+  await expect(page.getByTestId("rf__node-engine::other")).toHaveCount(0);
+  await showAll.click();
+  await expect(page.getByTestId("rf__node-storage")).toHaveCount(0);
   await queryCard.click();
   await expect(sidebar).toContainText("Coordinates input and storage.");
-  await expect(sidebar.getByLabel("Entry points")).toContainText("queryCore()");
+  await expect(
+    sidebar.getByLabel("Entry points", { exact: true }),
+  ).toContainText("queryCore()");
   await sidebar.getByRole("button", { name: /Storage/ }).click();
+  await expect(
+    evidence.getByRole("button", { name: "Line 7 · type-only import" }),
+  ).toBeVisible();
   await evidence
     .getByRole("button", { name: "Line 5 · call · readRows" })
     .click();
@@ -356,6 +392,9 @@ try {
   await expect(inputCard).toHaveClass(/arch-part-changed/);
   await expect(
     evidence.getByRole("button", { name: "Line 6 · call · readRows" }),
+  ).toBeVisible();
+  await expect(
+    evidence.getByRole("button", { name: "Line 8 · type-only import" }),
   ).toBeVisible();
 
   await page.goBack();

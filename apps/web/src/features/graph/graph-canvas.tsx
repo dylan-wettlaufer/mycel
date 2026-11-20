@@ -112,6 +112,7 @@ export function GraphCanvas({
   behaviourView,
   details,
   sidePanel,
+  hideConnectionFilter = false,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -129,6 +130,7 @@ export function GraphCanvas({
   behaviourView?: BehaviourView;
   details?: ReactNode;
   sidePanel?: ReactNode;
+  hideConnectionFilter?: boolean;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
   const [nodeState, setNodeState] = useState<NodeState>(() => ({
@@ -338,17 +340,19 @@ export function GraphCanvas({
               >
                 <Focus aria-hidden />
               </Button>
-              <Button
-                variant={onlyConnections ? "secondary" : "outline"}
-                size="icon-sm"
-                title="Only connections"
-                aria-label="Only connections"
-                disabled={!selected}
-                aria-pressed={Boolean(selected && onlyConnections)}
-                onClick={() => setOnlyConnections((value) => !value)}
-              >
-                <Filter aria-hidden />
-              </Button>
+              {!hideConnectionFilter && (
+                <Button
+                  variant={onlyConnections ? "secondary" : "outline"}
+                  size="icon-sm"
+                  title="Only connections"
+                  aria-label="Only connections"
+                  disabled={!selected}
+                  aria-pressed={Boolean(selected && onlyConnections)}
+                  onClick={() => setOnlyConnections((value) => !value)}
+                >
+                  <Filter aria-hidden />
+                </Button>
+              )}
             </div>
           </Panel>
           {behaviourView && (

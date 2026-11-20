@@ -19,6 +19,7 @@ export interface ArchitectureSubcomponent {
 /** One logical part of the codebase. Connections are computed by Mycel, never declared. */
 export interface ArchitecturePart extends ArchitectureSubcomponent {
   kind: ArchitecturePartKind;
+  /** The first responsibility is selected when opening the component map. */
   subcomponents?: ArchitectureSubcomponent[];
 }
 
@@ -59,6 +60,8 @@ export interface AssignedArchitecturePart extends ArchitecturePart {
   files: string[];
   /** True when synthesized from folder fallback for unassigned files. */
   fallback?: boolean;
+  /** The catch-all group for files outside a component's named responsibilities. */
+  unassigned?: boolean;
 }
 
 /** Result of assigning indexed files to architecture parts. */
@@ -90,6 +93,8 @@ export interface ArchitectureConnectionEvidence {
   line: number;
   /** Other indexed lines for the same relationship, in source order. */
   additionalLines?: number[];
+  /** Indexed import locations that contain only type imports for this target. */
+  typeOnlyImportLines?: number[];
   /** The index only has the enclosing file or declaration location. */
   approximate?: boolean;
   /** Repository-relative path of the imported or called target file. */

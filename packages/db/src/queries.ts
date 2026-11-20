@@ -411,6 +411,7 @@ export interface CrossFileLink {
   sourcePath: string;
   sourceLine: number;
   additionalLines?: number[];
+  typeOnlyImportLines?: number[];
   approximate?: boolean;
   sourceSymbol?: string;
   targetPath: string;
@@ -430,6 +431,7 @@ interface CrossFileLinkRow {
   sourceName: string;
   sourceLine: number;
   sourceLines: string | null;
+  typeOnlyImportLines: string | null;
   targetPath: string;
   targetKind: GraphNode["kind"];
   targetName: string;
@@ -450,6 +452,7 @@ export function getCrossFileLinks(
           s.qualified_name AS sourceName,
           s.start_line AS sourceLine,
           e.source_lines AS sourceLines,
+          e.type_only_import_lines AS typeOnlyImportLines,
           t.path AS targetPath,
           t.kind AS targetKind,
           t.qualified_name AS targetName
@@ -473,6 +476,10 @@ export function getCrossFileLinks(
         targetPath: row.targetPath,
       };
       if (additionalLines.length > 0) link.additionalLines = additionalLines;
+      if (row.typeOnlyImportLines)
+        link.typeOnlyImportLines = JSON.parse(
+          row.typeOnlyImportLines,
+        ) as number[];
       if (firstLine === undefined) link.approximate = true;
       if (row.sourceKind !== "file") link.sourceSymbol = row.sourceName;
       if (row.targetKind !== "file") link.targetSymbol = row.targetName;

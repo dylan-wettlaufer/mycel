@@ -1,5 +1,5 @@
 import { getCrossFileLinks } from "@mycel/db";
-import type { CrossFileLink, SqliteDatabase } from "@mycel/db";
+import type { CrossFileLink, ProjectGraph, SqliteDatabase } from "@mycel/db";
 import type {
   ArchitectureAssignment,
   ArchitectureConnection,
@@ -27,7 +27,7 @@ export interface GraphLinkSource {
   >[];
   edges: readonly (Pick<GraphEdge, "kind" | "sourceId" | "targetId"> &
     Partial<Pick<GraphEdge, "id">>)[];
-  edgeSourceLines?: ReadonlyMap<string, ReadonlySet<number>>;
+  edgeSourceLines?: NonNullable<ProjectGraph["edgeSourceLines"]>;
 }
 
 function compareStrings(a: string, b: string): number {
@@ -69,11 +69,11 @@ export function extractCrossFileLinks(graph: GraphLinkSource): CrossFileLink[] {
     const source = nodesById.get(edge.sourceId);
     const target = nodesById.get(edge.targetId);
     if (!source || !target || source.path === target.path) continue;
-    const lines =
+    const sites =
       edge.id === undefined ? undefined : graph.edgeSourceLines?.get(edge.id);
-    const [firstLine, ...additionalLines] = lines
-      ? [...lines].sort((a, b) => a - b)
-      : [];
+    const lines = sites ? [...sites.keys()].sort((a, b) => a - b) : [];
+    const [firstLine, ...additionalLines] = lines;
+    const typeOnlyImportLines = lines.filter((line) => sites?.get(line));
     const link: CrossFileLink = {
       kind: edge.kind,
       sourcePath: source.path,
@@ -81,6 +81,8 @@ export function extractCrossFileLinks(graph: GraphLinkSource): CrossFileLink[] {
       targetPath: target.path,
     };
     if (additionalLines.length > 0) link.additionalLines = additionalLines;
+    if (typeOnlyImportLines.length > 0)
+      link.typeOnlyImportLines = typeOnlyImportLines;
     if (firstLine === undefined) link.approximate = true;
     if (source.kind !== "file") link.sourceSymbol = source.qualifiedName;
     if (target.kind !== "file") link.targetSymbol = target.qualifiedName;
@@ -149,6 +151,8 @@ export function computeArchitectureConnections(
     if (link.targetSymbol !== undefined) item.symbol = link.targetSymbol;
     if (link.additionalLines?.length)
       item.additionalLines = link.additionalLines;
+    if (link.typeOnlyImportLines?.length)
+      item.typeOnlyImportLines = link.typeOnlyImportLines;
     if (link.approximate) item.approximate = true;
 
     const key = evidenceKey(item);

@@ -31,6 +31,16 @@
       "paths": ["packages/core/**"],
       "subcomponents": [
         {
+          "id": "index-updates",
+          "name": "Index updates",
+          "purpose": "Runs full and incremental indexing and commits graph revisions.",
+          "paths": [
+            "packages/core/src/indexer.ts",
+            "packages/core/src/live-index.ts",
+            "packages/core/src/history.ts"
+          ]
+        },
+        {
           "id": "file-watching",
           "name": "File watching",
           "purpose": "Detects source changes and queues them for indexing.",
@@ -51,22 +61,12 @@
         },
         {
           "id": "dependency-resolution",
-          "name": "Dependency resolution",
-          "purpose": "Resolves modules and builds relationships between files and symbols.",
+          "name": "Graph building and resolution",
+          "purpose": "Resolves code relationships and builds the structural and semantic graphs.",
           "paths": [
             "packages/core/src/module-resolution.ts",
             "packages/core/src/resolver.ts",
             "packages/core/src/graph.ts"
-          ]
-        },
-        {
-          "id": "index-updates",
-          "name": "Index updates",
-          "purpose": "Runs full and incremental indexing and commits graph revisions.",
-          "paths": [
-            "packages/core/src/indexer.ts",
-            "packages/core/src/live-index.ts",
-            "packages/core/src/history.ts"
           ]
         }
       ]

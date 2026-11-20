@@ -26,6 +26,35 @@ export interface ArchitectureLayoutOptions {
   revealConnectionIds?: readonly string[];
 }
 
+/** Keep named responsibilities on the canvas and show only relevant neighbors. */
+export function componentCanvasMap(
+  map: ArchitectureMap,
+  focusId: string | undefined,
+  showAll: boolean,
+): ArchitectureMap {
+  if (!map.component) return map;
+  const unassigned = map.parts.find((part) => part.unassigned);
+  const connections = map.connections.filter(
+    ({ sourcePartId, targetPartId }) =>
+      sourcePartId !== unassigned?.id &&
+      targetPartId !== unassigned?.id &&
+      (showAll || sourcePartId === focusId || targetPartId === focusId),
+  );
+  const connected = new Set(
+    connections.flatMap(({ sourcePartId, targetPartId }) => [
+      sourcePartId,
+      targetPartId,
+    ]),
+  );
+  return {
+    ...map,
+    connections,
+    parts: map.parts.filter(
+      (part) => !part.unassigned && (!part.boundary || connected.has(part.id)),
+    ),
+  };
+}
+
 /** One drawn line: a connection, or two opposite connections merged. */
 interface DisplayConnection {
   id: string;
