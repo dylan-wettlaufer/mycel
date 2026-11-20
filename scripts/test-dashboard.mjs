@@ -33,7 +33,7 @@ await writeFile(
 );
 await writeFile(
   join(root, "main.ts"),
-  'import { double } from "./math";\n\nexport function run() {\n  return double(3);\n}\n',
+  'import {\n  double\n} from "./math";\n\nexport function run() {\n  double(4);\n  return double(3);\n}\n',
 );
 await writeFile(
   join(root, "obsolete.ts"),
@@ -431,12 +431,44 @@ try {
   await page.getByRole("button", { name: "Fit all" }).click();
   await graphNodesFitCanvas();
 
+  await expect(fileSource.locator(".source-connection-highlight")).toHaveCount(
+    0,
+  );
+  const incomingImport = canvas.getByRole("button", {
+    name: /Show source connection from main\.ts\. Imports math\.ts/,
+  });
+  await incomingImport.press("Enter");
+  await expect(
+    fileViewer.getByRole("heading", { name: "main.ts" }),
+  ).toBeVisible();
+  await expect(graphScope).toHaveText("math.ts");
+  await expect(fileSource.locator(".source-connection-active")).toHaveCount(3);
+  await fileSource.getByText('"./math"', { exact: true }).hover();
+  await expect(
+    page.getByText("Imports math.ts", { exact: true }),
+  ).toBeVisible();
+
   await graphNode(/^file main\.ts,/).click();
   await sourceContains("double(3)");
   await expect(graphScope).toHaveText("math.ts");
   await expect(
     fileViewer.getByRole("heading", { name: "main.ts" }),
   ).toBeVisible();
+  await expect(fileSource.locator(".source-connection-active")).toHaveCount(0);
+  await expect(fileSource.locator(".source-connection-highlight")).toHaveCount(
+    3,
+  );
+  await page.getByRole("button", { name: "Expand", exact: true }).click();
+  const callConnection = canvas.getByRole("button", {
+    name: /Show source connection from main\.ts\. Calls double in math\.ts/,
+  });
+  await callConnection.press("Enter");
+  await expect(fileSource.locator(".source-connection-active")).toHaveCount(2);
+  await expect(
+    fileViewer.getByText("main.ts:5", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Collapse", exact: true }).click();
+  await graphNodesFitCanvas();
   await graphNode(/^file math\.ts,/).click();
   await expect(
     fileViewer.getByRole("heading", { name: "math.ts" }),
@@ -514,7 +546,7 @@ try {
   await selectionFitsScreen();
   await expect(
     page.getByRole("region", { name: "Source code" }).getByRole("heading"),
-  ).toHaveText("main.ts:3");
+  ).toHaveText("main.ts:5");
   await page.locator(".react-flow__node").filter({ hasText: "double" }).click();
   await sourceContains("value * 2");
   await phase("create", () =>

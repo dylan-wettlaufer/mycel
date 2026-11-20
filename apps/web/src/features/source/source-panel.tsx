@@ -51,7 +51,12 @@ export function SourcePanel({
             content={data.content}
             path={data.path}
             range={workspace ? undefined : node.range}
-            workspace={workspace}
+            workspace={
+              workspace?.sourceConnections &&
+              workspace.sourceConnections.revision !== data.revision
+                ? { ...workspace, sourceConnections: undefined }
+                : workspace
+            }
           />
         </Suspense>
       )}

@@ -1,6 +1,12 @@
 import { GraphCanvas, SelectionConnections } from "./graph-canvas";
 import { recentChanges } from "@/features/activity/event-node";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
@@ -8,6 +14,7 @@ import { isNeighborhood } from "@/lib/contracts";
 import { FileWorkspace } from "./file-workspace";
 import { graphConnections } from "./graph-focus";
 import { layoutNeighborhood } from "./layout";
+import { sourceConnections } from "./source-connections";
 
 export function GraphPanel({
   root,
@@ -40,6 +47,7 @@ export function GraphPanel({
   const [clearedFor, setClearedFor] = useState<string | null>(null);
   const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const [sourceReveal, setSourceReveal] = useState(0);
+  const [sourceEdgeId, setSourceEdgeId] = useState<string>();
   const [depth, setDepth] = useState(1);
   const fileView = root.kind === "file";
   const { data, error } = useResource(
@@ -61,6 +69,27 @@ export function GraphPanel({
   );
   const selectedInGraph = data?.nodes.find((node) => node.id === selectedId);
   const reading = selected ?? selectedInGraph;
+  const connectionsById = useMemo(
+    () => (fileView && data ? sourceConnections(data) : undefined),
+    [fileView, data],
+  );
+  const connectionSites = useMemo(
+    () =>
+      [...(connectionsById ?? [])].flatMap(
+        ([edgeId, { source, ranges, label }]) =>
+          source.path === reading?.path
+            ? ranges.map((range) => ({ ...range, edgeId, label }))
+            : [],
+      ),
+    [connectionsById, reading?.path],
+  );
+  const sourceEdge = sourceEdgeId
+    ? connectionsById?.get(sourceEdgeId)
+    : undefined;
+  const activeEdgeId =
+    sourceEdge && sourceEdge.source.id === selectedId
+      ? sourceEdgeId
+      : undefined;
   const file =
     reading?.kind === "file"
       ? reading
@@ -75,6 +104,7 @@ export function GraphPanel({
   const select = (node: GraphNode) => {
     setClearedFor(null);
     setDetailsFor(null);
+    setSourceEdgeId(undefined);
     if (fileView && node.kind !== "file" && node.id === selectedId) {
       setSourceReveal((reveal) => reveal + 1);
     }
@@ -84,6 +114,35 @@ export function GraphPanel({
     const node = data?.nodes.find((node) => node.id === id);
     if (node) select(node);
   };
+  const revealConnection = (id: string) => {
+    const connection = connectionsById?.get(id);
+    if (!connection) return;
+    setDetailsFor(null);
+    setSourceEdgeId(id);
+    setSourceReveal((reveal) => reveal + 1);
+    onSelect(connection.source);
+  };
+  const edges = fileView
+    ? layout.edges.map((edge) => {
+        const connection = connectionsById?.get(edge.id);
+        if (!connection)
+          return { ...edge, focusable: false, selectable: false };
+        return {
+          ...edge,
+          selected: edge.id === activeEdgeId,
+          selectable: false,
+          ariaRole: "button",
+          ariaLabel: `Show source connection from ${connection.source.path}. ${connection.label}`,
+          domAttributes: {
+            onKeyDown: (event: KeyboardEvent<SVGGElement>) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              revealConnection(edge.id);
+            },
+          },
+        };
+      })
+    : layout.edges;
   const graph = error ? (
     <p role="alert">Graph unavailable. {error}</p>
   ) : !data ? (
@@ -92,15 +151,18 @@ export function GraphPanel({
     <GraphCanvas
       key={depth}
       nodes={layout.nodes}
-      edges={layout.edges}
+      edges={edges}
       selectedId={graphSelection}
+      selectedEdgeId={activeEdgeId ?? null}
       mode="symbols"
       details={details}
       hideSelectionDetails={fileView}
       onClear={() => {
-        if (!fileView) setClearedFor(selectedId);
+        if (fileView) setSourceEdgeId(undefined);
+        else setClearedFor(selectedId);
       }}
       onSelect={selectFromGraph}
+      onEdgeSelect={fileView ? revealConnection : undefined}
     />
   );
   return (
@@ -166,6 +228,13 @@ export function GraphPanel({
             />
           }
           revision={revision}
+          sourceConnections={
+            data && {
+              revision: data.revision,
+              sites: connectionSites,
+              activeEdgeId,
+            }
+          }
           sourceReveal={sourceReveal}
           detailsOpen={detailsFor === selectedId}
           onDetailsChange={(open) => setDetailsFor(open ? selectedId : null)}

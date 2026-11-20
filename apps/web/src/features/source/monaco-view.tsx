@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import Editor, { loader, type OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api.js";
+import "monaco-editor/editor/contrib/hover/browser/hoverContribution.js";
 import "monaco-editor/languages/definitions/typescript/register.js";
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
-import type { SourceRange } from "@mycel/shared";
+import type { EdgeSourceRange, SourceRange } from "@mycel/shared";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
@@ -33,6 +34,45 @@ export interface SourceWorkspaceOptions {
   wrapped: boolean;
   declarationLine: number | undefined;
   locationKey: string;
+  sourceConnections?: SourceConnections | undefined;
+}
+
+export interface SourceConnections {
+  revision: number;
+  sites: (EdgeSourceRange & { edgeId: string; label: string })[];
+  activeEdgeId: string | undefined;
+}
+
+function markConnections(
+  instance: monaco.editor.IStandaloneCodeEditor,
+  decorations: monaco.editor.IEditorDecorationsCollection,
+  sites: SourceConnections["sites"] | undefined,
+  activeEdgeId: string | undefined,
+) {
+  const model = instance.getModel();
+  if (!model) return;
+  const lineCount = model.getLineCount();
+  decorations.set(
+    (sites ?? [])
+      .filter(({ endLine }) => endLine <= lineCount)
+      .map((site) => ({
+        range: new monaco.Range(
+          site.startLine,
+          1,
+          site.endLine,
+          model.getLineMaxColumn(site.endLine),
+        ),
+        options: {
+          isWholeLine: true,
+          className:
+            site.edgeId === activeEdgeId
+              ? "source-connection-highlight source-connection-active"
+              : "source-connection-highlight",
+          linesDecorationsClassName: "source-connection-gutter",
+          hoverMessage: { value: site.label.replace(/[\\`*_[\]<>]/g, "\\$&") },
+        },
+      })),
+  );
 }
 
 function revealLocation(
@@ -40,6 +80,7 @@ function revealLocation(
   decorations: monaco.editor.IEditorDecorationsCollection,
   range: SourceRange | undefined,
   declarationLine: number | undefined,
+  connectionLine: number | undefined,
 ) {
   if (range) {
     instance.setSelection({
@@ -53,22 +94,23 @@ function revealLocation(
   }
   if (declarationLine === undefined) {
     decorations.clear();
-    return;
-  }
-  const line = Math.max(
-    1,
-    Math.min(declarationLine, instance.getModel()?.getLineCount() ?? 1),
-  );
-  decorations.set([
-    {
-      range: new monaco.Range(line, 1, line, 1),
-      options: {
-        isWholeLine: true,
-        className: "source-declaration-highlight",
+  } else {
+    const line = Math.max(
+      1,
+      Math.min(declarationLine, instance.getModel()?.getLineCount() ?? 1),
+    );
+    decorations.set([
+      {
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: "source-declaration-highlight",
+        },
       },
-    },
-  ]);
-  instance.revealLineInCenterIfOutsideViewport(line);
+    ]);
+  }
+  const line = connectionLine ?? declarationLine;
+  if (line !== undefined) instance.revealLineInCenterIfOutsideViewport(line);
 }
 
 export default function MonacoView({
@@ -85,9 +127,15 @@ export default function MonacoView({
   const editor = useRef<{
     instance: monaco.editor.IStandaloneCodeEditor;
     decorations: monaco.editor.IEditorDecorationsCollection;
+    connectionDecorations: monaco.editor.IEditorDecorationsCollection;
   } | null>(null);
   const declarationLine = workspace?.declarationLine;
   const locationKey = workspace?.locationKey;
+  const sites = workspace?.sourceConnections?.sites;
+  const activeEdgeId = workspace?.sourceConnections?.activeEdgeId;
+  const connectionLine = sites?.find(
+    (site) => site.edgeId === activeEdgeId,
+  )?.startLine;
   useEffect(() => {
     const current = editor.current;
     if (current)
@@ -96,12 +144,31 @@ export default function MonacoView({
         current.decorations,
         range,
         declarationLine,
+        connectionLine,
       );
-  }, [range, declarationLine, locationKey, path, content]);
+  }, [range, declarationLine, connectionLine, locationKey, path, content]);
+  useEffect(() => {
+    const current = editor.current;
+    if (current)
+      markConnections(
+        current.instance,
+        current.connectionDecorations,
+        sites,
+        activeEdgeId,
+      );
+  }, [sites, activeEdgeId, path, content]);
   const onMount: OnMount = (instance) => {
     const decorations = instance.createDecorationsCollection();
-    editor.current = { instance, decorations };
-    revealLocation(instance, decorations, range, declarationLine);
+    const connectionDecorations = instance.createDecorationsCollection();
+    editor.current = { instance, decorations, connectionDecorations };
+    revealLocation(
+      instance,
+      decorations,
+      range,
+      declarationLine,
+      connectionLine,
+    );
+    markConnections(instance, connectionDecorations, sites, activeEdgeId);
   };
   return (
     <Editor

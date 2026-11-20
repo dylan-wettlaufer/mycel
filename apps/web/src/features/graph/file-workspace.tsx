@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileSymbols } from "@/features/details/file-symbols";
 import { NodeDetailsPanel } from "@/features/details/node-details";
 import { SourcePanel } from "@/features/source/source-panel";
+import type { SourceConnections } from "@/features/source/monaco-view";
 import { cn } from "@/lib/utils";
 
 export function FileWorkspace({
@@ -15,6 +16,7 @@ export function FileWorkspace({
   graph,
   connections,
   revision,
+  sourceConnections,
   sourceReveal,
   detailsOpen,
   onDetailsChange,
@@ -27,6 +29,7 @@ export function FileWorkspace({
   graph: ReactNode;
   connections: ReactNode;
   revision: number;
+  sourceConnections: SourceConnections | undefined;
   sourceReveal: number;
   detailsOpen: boolean;
   onDetailsChange: (open: boolean) => void;
@@ -150,6 +153,7 @@ export function FileWorkspace({
                   wrapped,
                   declarationLine,
                   locationKey: `${node.id}:${sourceReveal}`,
+                  sourceConnections,
                 }}
               />
             ) : (

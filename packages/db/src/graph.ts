@@ -17,6 +17,8 @@ export interface ProjectGraph {
   edges: readonly Omit<GraphEdge, "revision">[];
   /** Indexed locations by edge id and source line. A true value marks a type-only import. */
   edgeSourceLines?: ReadonlyMap<string, ReadonlyMap<number, boolean>>;
+  /** Inclusive end lines for multiline sites, keyed by edge id and start line. */
+  edgeSourceEndLines?: ReadonlyMap<string, ReadonlyMap<number, number>>;
   diagnostics: readonly Diagnostic[];
   semantic?: SemanticExtraction;
 }
@@ -208,26 +210,31 @@ function writeProjectGraph(
         insertNode.run({ ...fields, ...rangeParameters(range), revision });
       }
       const insertEdge =
-        database.prepare(`INSERT INTO edges (project_id, id, source_id, target_id, kind, revision, source_lines, type_only_import_lines)
-      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision, @sourceLines, @typeOnlyImportLines)
+        database.prepare(`INSERT INTO edges (project_id, id, source_id, target_id, kind, revision, source_lines, type_only_import_lines, source_end_lines)
+      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision, @sourceLines, @typeOnlyImportLines, @sourceEndLines)
       ${
         incremental
           ? `ON CONFLICT(project_id, id) DO UPDATE SET
         source_id = excluded.source_id, target_id = excluded.target_id,
         kind = excluded.kind, revision = excluded.revision, source_lines = excluded.source_lines,
+        source_end_lines = excluded.source_end_lines,
         type_only_import_lines = excluded.type_only_import_lines
-        WHERE (edges.source_id, edges.target_id, edges.kind, edges.source_lines, edges.type_only_import_lines)
-        IS NOT (excluded.source_id, excluded.target_id, excluded.kind, excluded.source_lines, excluded.type_only_import_lines)`
+        WHERE (edges.source_id, edges.target_id, edges.kind, edges.source_lines, edges.type_only_import_lines, edges.source_end_lines)
+        IS NOT (excluded.source_id, excluded.target_id, excluded.kind, excluded.source_lines, excluded.type_only_import_lines, excluded.source_end_lines)`
           : ""
       }`);
       for (const edge of graph.edges) {
         const sites = graph.edgeSourceLines?.get(edge.id);
         const lines = sites ? [...sites.keys()].sort((a, b) => a - b) : [];
         const typeOnlyImportLines = lines.filter((line) => sites?.get(line));
+        const ends = graph.edgeSourceEndLines?.get(edge.id);
         insertEdge.run({
           ...edge,
           revision,
           sourceLines: lines.length ? JSON.stringify(lines) : null,
+          sourceEndLines: ends?.size
+            ? JSON.stringify(Object.fromEntries(ends))
+            : null,
           typeOnlyImportLines: typeOnlyImportLines.length
             ? JSON.stringify(typeOnlyImportLines)
             : null,

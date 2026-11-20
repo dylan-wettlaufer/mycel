@@ -3,6 +3,7 @@ import type {
   GraphEdge,
   GraphNode,
   Neighborhood,
+  NeighborhoodEdge,
   NodeId,
   NodeDetails,
   NodeList,
@@ -172,15 +173,38 @@ export function getNeighborhood(
     }
 
     const edges = database
-      .prepare<{ projectId: string; ids: string }, GraphEdge>(
+      .prepare<
+        { projectId: string; ids: string },
+        GraphEdge & {
+          sourceLines: string | null;
+          sourceEndLines: string | null;
+        }
+      >(
         `SELECT e.id, e.project_id AS projectId, e.source_id AS sourceId,
-          e.target_id AS targetId, e.kind, e.revision FROM edges e
+          e.target_id AS targetId, e.kind, e.revision,
+          e.source_lines AS sourceLines, e.source_end_lines AS sourceEndLines
+        FROM edges e
         WHERE e.project_id = @projectId
           AND e.source_id IN (SELECT value FROM json_each(@ids))
           AND e.target_id IN (SELECT value FROM json_each(@ids))
         ORDER BY e.id`,
       )
-      .all({ projectId, ids: JSON.stringify([...visited]) });
+      .all({ projectId, ids: JSON.stringify([...visited]) })
+      .map(({ sourceLines, sourceEndLines, ...edge }): NeighborhoodEdge => {
+        if (!sourceLines) return edge;
+        const endLines = sourceEndLines
+          ? (JSON.parse(sourceEndLines) as Record<number, number>)
+          : {};
+        return {
+          ...edge,
+          sourceRanges: (JSON.parse(sourceLines) as number[]).map(
+            (startLine) => ({
+              startLine,
+              endLine: endLines[startLine] ?? startLine,
+            }),
+          ),
+        };
+      });
     return { projectId, revision, rootId: id, nodes, edges, truncated };
   })();
 }

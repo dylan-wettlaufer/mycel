@@ -22,6 +22,7 @@ export type {
   SymbolKind,
 } from "./graph.js";
 export type {
+  EdgeSourceRange,
   ErrorResponse,
   FileContent,
   FileContentQuery,
@@ -29,6 +30,7 @@ export type {
   GraphStats,
   RepositoryGraph,
   Neighborhood,
+  NeighborhoodEdge,
   NeighborhoodQuery,
   NodeDetails,
   NodeDetailsQuery,

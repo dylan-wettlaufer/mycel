@@ -49,7 +49,19 @@ export function isNeighborhood(
         typeof edge.id === "string" &&
         typeof edge.sourceId === "string" &&
         typeof edge.targetId === "string" &&
-        ["CALLS", "CONTAINS", "IMPORTS"].includes(String(edge.kind)),
+        ["CALLS", "CONTAINS", "IMPORTS"].includes(String(edge.kind)) &&
+        (edge.sourceRanges === undefined ||
+          (Array.isArray(edge.sourceRanges) &&
+            edge.sourceRanges.every(
+              (range) =>
+                isRecord(range) &&
+                typeof range.startLine === "number" &&
+                typeof range.endLine === "number" &&
+                Number.isSafeInteger(range.startLine) &&
+                Number.isSafeInteger(range.endLine) &&
+                range.startLine > 0 &&
+                range.endLine >= range.startLine,
+            ))),
     )
   );
 }

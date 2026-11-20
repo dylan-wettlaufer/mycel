@@ -222,6 +222,37 @@ test("neighborhood reports only size truncation and never includes dangling edge
   assert.equal(getNeighborhood(db, project.id, "a", 0, 1).truncated, false);
 });
 
+test("neighborhood includes multiline and legacy single-line locations only for the matching project", (t) => {
+  const nodes = [node("a"), node("b")];
+  const imported = edge("a", "b", "IMPORTS");
+  const db = fixture(t, nodes, [imported]);
+  replaceProjectGraph(db, {
+    project,
+    nodes,
+    edges: [imported],
+    edgeSourceLines: new Map([
+      [
+        imported.id,
+        new Map([
+          [9, false],
+          [2, true],
+        ]),
+      ],
+    ]),
+    edgeSourceEndLines: new Map([[imported.id, new Map([[2, 5]])]]),
+    diagnostics: [],
+  });
+
+  assert.deepEqual(getNeighborhood(db, project.id, "b").edges[0].sourceRanges, [
+    { startLine: 2, endLine: 5 },
+    { startLine: 9, endLine: 9 },
+  ]);
+  assert.equal(
+    getNeighborhood(db, "project:other", "b").edges[0].sourceRanges,
+    undefined,
+  );
+});
+
 test("callers are distinct direct incoming CALLS sources, including file nodes", (t) => {
   const db = fixture(
     t,

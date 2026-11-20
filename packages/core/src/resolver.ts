@@ -55,6 +55,7 @@ export function resolveRelationships(
     resolveRelativeModule(from, specifier, paths);
   const edges = new Map<string, Omit<GraphEdge, "revision">>();
   const edgeSourceLines = new Map<string, Map<number, boolean>>();
+  const edgeSourceEndLines = new Map<string, Map<number, number>>();
   const diagnostics: Diagnostic[] = [];
   const nodeId = (localId: string) =>
     `node:${hashIdentity([project.id, localId])}`;
@@ -62,7 +63,7 @@ export function resolveRelationships(
     kind: "IMPORTS" | "CALLS",
     source: string,
     target: string,
-    line: number,
+    { startLine: line, endLine, endColumn }: SourceRange,
     typeOnly = false,
   ) {
     const sourceId = nodeId(source);
@@ -72,6 +73,12 @@ export function resolveRelationships(
     const lines = edgeSourceLines.get(id);
     if (lines) lines.set(line, (lines.get(line) ?? true) && typeOnly);
     else edgeSourceLines.set(id, new Map([[line, typeOnly]]));
+    const lastLine = endColumn === 1 ? endLine - 1 : endLine;
+    if (lastLine > line) {
+      const ends = edgeSourceEndLines.get(id);
+      if (ends) ends.set(line, Math.max(ends.get(line) ?? line, lastLine));
+      else edgeSourceEndLines.set(id, new Map([[line, lastLine]]));
+    }
   }
   function diagnostic(
     path: string,
@@ -245,7 +252,7 @@ export function resolveRelationships(
           "IMPORTS",
           file.fileId,
           files.get(dependency)!.fileId,
-          item.range.startLine,
+          item.range,
           item.typeOnly ||
             ("bindings" in item &&
               item.bindings.length > 0 &&
@@ -269,9 +276,14 @@ export function resolveRelationships(
           "CALLS",
           call.callerId ?? file.fileId,
           target.symbol.id,
-          call.calleeRange.startLine,
+          call.calleeRange,
         );
     }
   }
-  return { edges: [...edges.values()], diagnostics, edgeSourceLines };
+  return {
+    edges: [...edges.values()],
+    diagnostics,
+    edgeSourceLines,
+    edgeSourceEndLines,
+  };
 }

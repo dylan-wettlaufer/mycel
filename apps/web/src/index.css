@@ -487,6 +487,16 @@
 .source-declaration-highlight {
   background-color: color-mix(in oklch, var(--primary) 16%, transparent);
 }
+.source-connection-highlight {
+  background-color: color-mix(in oklch, var(--primary) 9%, transparent);
+}
+.source-connection-highlight.source-connection-active {
+  background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+}
+.source-connection-gutter {
+  border-inline-start: 2px solid var(--primary);
+  margin-inline-start: 4px;
+}
 .graph-legend > span {
   display: inline-flex;
   gap: 8px;

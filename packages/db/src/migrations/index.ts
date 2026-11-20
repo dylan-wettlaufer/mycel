@@ -26,4 +26,9 @@ export const migrations: readonly Migration[] = [
     name: "type-only import source lines",
     sql: "ALTER TABLE edges ADD COLUMN type_only_import_lines TEXT;",
   },
+  {
+    version: 6,
+    name: "multiline structural edge locations",
+    sql: "ALTER TABLE edges ADD COLUMN source_end_lines TEXT;",
+  },
 ];

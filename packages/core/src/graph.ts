@@ -94,6 +94,7 @@ export function buildStructuralGraph(
     edges,
     diagnostics,
     edgeSourceLines: relationships.edgeSourceLines,
+    edgeSourceEndLines: relationships.edgeSourceEndLines,
   };
 }
 

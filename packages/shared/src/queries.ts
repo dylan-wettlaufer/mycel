@@ -51,12 +51,22 @@ export interface NodeDetails extends GraphQueryContext {
   diagnostics: Diagnostic[];
 }
 
+export interface EdgeSourceRange {
+  /** One-based, inclusive lines in the edge's source file. */
+  startLine: number;
+  endLine: number;
+}
+
+export interface NeighborhoodEdge extends GraphEdge {
+  sourceRanges?: EdgeSourceRange[];
+}
+
 export interface Neighborhood extends GraphQueryContext {
   rootId: NodeId;
   /** Includes the root, even when traversal is truncated. */
   nodes: GraphNode[];
   /** Every endpoint is present in nodes; no dangling edges are returned. */
-  edges: GraphEdge[];
+  edges: NeighborhoodEdge[];
   /** True if the requested traversal was cut short by its size limit. */
   truncated: boolean;
 }
