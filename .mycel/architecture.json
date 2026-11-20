@@ -14,7 +14,41 @@
       "name": "Local dashboard API",
       "purpose": "Serves graph data and live updates.",
       "kind": "service",
-      "paths": ["packages/server/**"]
+      "paths": ["packages/server/**"],
+      "subcomponents": [
+        {
+          "id": "http-routing",
+          "name": "HTTP routing and dashboard hosting",
+          "purpose": "Mounts API routes, serves indexed source, and hosts the dashboard.",
+          "paths": ["packages/server/src/app.ts"]
+        },
+        {
+          "id": "graph-queries",
+          "name": "Graph and architecture queries",
+          "purpose": "Serves architecture maps, graph navigation, search, and feature behaviour.",
+          "paths": [
+            "packages/server/src/routes/architecture.ts",
+            "packages/server/src/routes/graph.ts"
+          ]
+        },
+        {
+          "id": "live-updates",
+          "name": "Change history and live updates",
+          "purpose": "Serves change records and diffs and streams updates to the browser.",
+          "paths": ["packages/server/src/routes/history.ts"]
+        },
+        {
+          "id": "server-startup",
+          "name": "Server startup and entry points",
+          "purpose": "Opens the indexed project and manages the HTTP server lifecycle.",
+          "paths": [
+            "packages/server/src/indexed-server.ts",
+            "packages/server/src/server.ts",
+            "packages/server/src/start.ts",
+            "packages/server/src/index.ts"
+          ]
+        }
+      ]
     },
     {
       "id": "parser",
