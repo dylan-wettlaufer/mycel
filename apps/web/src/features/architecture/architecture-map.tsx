@@ -3,6 +3,7 @@ import { AlertTriangle, Sparkles } from "lucide-react";
 import type { Edge } from "@xyflow/react";
 import type {
   ArchitectureChangeWindow,
+  ArchitectureMap,
   ArchitecturePartWithChanges,
   GraphNode,
   SemanticEntity,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { GraphCanvas } from "@/features/graph/graph-canvas";
 import { isFeatureList } from "@/features/semantic/feature-contracts";
 import { useResource } from "@/hooks/use-resource";
-import { isArchitectureMap, isRepositoryGraph } from "@/lib/contracts";
+import { isRepositoryGraph } from "@/lib/contracts";
 import { ArchitectureDetails } from "./architecture-details";
 import {
   componentCanvasMap,
@@ -95,27 +96,27 @@ function findDisplayEdgeId(
 
 export function ArchitectureMapView({
   revision,
-  architectureRevision,
+  map,
+  mapError,
   component,
   initialPart,
   windowMode,
   onWindowChange,
   onOpenComponent,
-  onCloseComponent,
   onSelectFile,
   onOpenPartFiles,
   onAllFiles,
   onOpenFeature,
 }: {
   revision: number;
-  architectureRevision: number;
+  map: ArchitectureMap | undefined;
+  mapError: string | undefined;
   component?: string | undefined;
   initialPart?: string | undefined;
   windowMode: ArchitectureChangeWindow;
   onWindowChange: (window: ArchitectureChangeWindow) => void;
   onOpenComponent: (id: string) => void;
-  onCloseComponent: () => void;
-  onSelectFile: (node: GraphNode) => void;
+  onSelectFile: (node: GraphNode, part?: string) => void;
   onOpenPartFiles: (part: ArchitecturePartWithChanges) => void;
   onAllFiles: () => void;
   onOpenFeature: (featureId: string) => void;
@@ -127,14 +128,6 @@ export function ArchitectureMapView({
   const [auditComponent, setAuditComponent] = useState<string>();
   const showAll = component !== undefined && component === auditComponent;
 
-  const mapResource = useResource(
-    `/api/architecture?${new URLSearchParams({
-      window: windowMode,
-      ...(component ? { component } : {}),
-    })}`,
-    isArchitectureMap,
-    revision + architectureRevision,
-  );
   const repoResource = useResource(
     "/api/graph/repository",
     isRepositoryGraph,
@@ -146,7 +139,6 @@ export function ArchitectureMapView({
     revision,
   );
 
-  const map = mapResource.data;
   const responsibilities = map?.component
     ? map.parts.filter((part) => !part.boundary && !part.unassigned)
     : [];
@@ -265,7 +257,7 @@ export function ArchitectureMapView({
 
   const openFileByPath = (path: string) => {
     const file = filesByPath.get(path);
-    if (file) onSelectFile(file);
+    if (file) onSelectFile(file, selectedPartId ?? focusId);
   };
 
   return (
@@ -275,18 +267,6 @@ export function ArchitectureMapView({
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          {component && (
-            <nav aria-label="Architecture breadcrumb">
-              <Button
-                variant="link"
-                size="xs"
-                className="h-auto p-0"
-                onClick={onCloseComponent}
-              >
-                Architecture map
-              </Button>
-            </nav>
-          )}
           <h2 className="text-lg font-semibold">
             {map?.component?.name ??
               (component ? "Component map" : "Architecture map")}
@@ -396,8 +376,8 @@ export function ArchitectureMapView({
         </div>
       ) : null}
 
-      {mapResource.error ? (
-        <p role="alert">Architecture map unavailable. {mapResource.error}</p>
+      {mapError ? (
+        <p role="alert">Architecture map unavailable. {mapError}</p>
       ) : (
         map &&
         (map.parts.length === 0 ? (

@@ -415,15 +415,55 @@ try {
   await expect(
     page.getByRole("heading", { name: "File dependencies", exact: true }),
   ).toBeVisible();
+  const breadcrumb = page.getByRole("navigation", { name: "Graph breadcrumb" });
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText(
+    "Read input",
+  );
   await page
-    .getByRole("button", { name: "Component map", exact: true })
+    .locator(".react-flow__node")
+    .filter({ hasText: "input.ts" })
+    .click();
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
+  const fileViewer = page.getByRole("complementary", { name: "File viewer" });
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText(
+    "input.ts",
+  );
+  await fileViewer.getByRole("tab", { name: "Details" }).click();
+  await fileViewer
+    .getByLabel("File symbols")
+    .getByRole("button", { name: /readInput/ })
+    .click();
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText(
+    "readInput",
+  );
+  await page.reload();
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText(
+    "readInput",
+  );
+  await expect(
+    breadcrumb.getByRole("link", { name: "Read input", exact: true }),
+  ).toBeVisible();
+  await breadcrumb.getByRole("link", { name: "input.ts", exact: true }).click();
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText(
+    "input.ts",
+  );
+  await breadcrumb
+    .getByRole("link", { name: "Read input", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "File dependencies", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Repository overview" }),
+  ).toContainText("Read input");
+  await breadcrumb
+    .getByRole("link", { name: "Domain engine", exact: true })
     .click();
   await expect(
     sidebar.getByRole("heading", { name: "Read input", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("navigation", { name: "Architecture breadcrumb" })
-    .getByRole("button", { name: "Architecture map" })
+  await breadcrumb
+    .getByRole("link", { name: "Architecture map", exact: true })
     .click();
   await expect(
     sidebar.getByRole("heading", { name: "Domain engine", exact: true }),
@@ -438,7 +478,7 @@ try {
     page.getByRole("heading", { name: "File dependencies", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Architecture map", exact: true }),
+    breadcrumb.getByRole("link", { name: "Architecture map", exact: true }),
   ).toBeVisible();
 
   assert.deepEqual(errors, [], "no browser runtime errors");

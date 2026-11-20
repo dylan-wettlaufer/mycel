@@ -1,9 +1,9 @@
 import { GraphCanvas } from "./graph-canvas";
 import { useMemo, useState } from "react";
-import type { GraphNode } from "@mycel/shared";
+import type { ArchitecturePartWithChanges, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
-import { isArchitectureMap, isRepositoryGraph } from "@/lib/contracts";
+import { isRepositoryGraph } from "@/lib/contracts";
 import {
   fileScope,
   layoutFileDependencies,
@@ -16,38 +16,24 @@ export function RepositoryOverview({
   files = false,
   folder,
   part,
-  component,
-  architectureRevision = 0,
+  activePart,
+  architectureError,
   onFiles,
-  onOverview,
 }: {
   revision: number;
   onSelect: (node: GraphNode) => void;
   files?: boolean | undefined;
   folder?: string | undefined;
   part?: string | undefined;
-  component?: string | undefined;
-  architectureRevision?: number;
+  activePart: ArchitecturePartWithChanges | undefined;
+  architectureError: string | undefined;
   onFiles: (folder?: string) => void;
-  onOverview: () => void;
 }) {
   const { data, error } = useResource(
     "/api/graph/repository",
     isRepositoryGraph,
     revision,
   );
-  const architecture = useResource(
-    part
-      ? component
-        ? `/api/architecture?component=${encodeURIComponent(component)}`
-        : "/api/architecture"
-      : null,
-    isArchitectureMap,
-    revision + architectureRevision,
-  );
-  const activePart = part
-    ? architecture.data?.parts.find((entry) => entry.id === part)
-    : undefined;
   const [depth, setDepth] = useState(2);
   const [selection, setSelection] = useState<{
     scope: string;
@@ -98,16 +84,11 @@ export function RepositoryOverview({
         </div>
         <div className="ml-auto flex flex-wrap justify-end gap-1">
           {files ? (
-            <>
-              <Button variant="outline" size="xs" onClick={onOverview}>
-                {component ? "Component map" : "Architecture map"}
+            (folder || part) && (
+              <Button variant="outline" size="xs" onClick={() => onFiles()}>
+                All file dependencies
               </Button>
-              {(folder || part) && (
-                <Button variant="outline" size="xs" onClick={() => onFiles()}>
-                  All file dependencies
-                </Button>
-              )}
-            </>
+            )
           ) : (
             <>
               {[1, 2].map((value) => (
@@ -128,8 +109,8 @@ export function RepositoryOverview({
           )}
         </div>
       </div>
-      {part && architecture.error ? (
-        <p role="alert">Component files unavailable. {architecture.error}</p>
+      {part && architectureError ? (
+        <p role="alert">Component files unavailable. {architectureError}</p>
       ) : error ? (
         <p role="alert">Repository overview unavailable. {error}</p>
       ) : (

@@ -25,7 +25,6 @@ export function GraphPanel({
   onActivity,
   revision = 0,
   events = [],
-  onOverview,
   details,
 }: {
   details?: ReactNode;
@@ -37,7 +36,6 @@ export function GraphPanel({
   onActivity: (node: GraphNode) => void;
   revision?: number;
   events?: ChangeEvent[];
-  onOverview: () => void;
 }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -199,9 +197,6 @@ export function GraphPanel({
             onClick={() => setDepth((value) => value + 1)}
           >
             Expand
-          </Button>
-          <Button variant="outline" size="xs" onClick={onOverview}>
-            Repository overview
           </Button>
         </div>
       </div>

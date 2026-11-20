@@ -41,20 +41,23 @@ function subscribe(listener: () => void) {
   window.addEventListener("hashchange", listener);
   return () => window.removeEventListener("hashchange", listener);
 }
+export function navigationHref(next: Navigation): string {
+  const query = new URLSearchParams({ view: next.view });
+  if (next.nodeId) query.set("node", next.nodeId);
+  if (next.rootId) query.set("root", next.rootId);
+  if (next.featureId) query.set("feature", next.featureId);
+  if (next.changeId) query.set("change", next.changeId);
+  if (next.files) query.set("files", "1");
+  if (next.folder) query.set("folder", next.folder);
+  if (next.part) query.set("part", next.part);
+  if (next.component) query.set("component", next.component);
+  if (next.source) query.set("source", "1");
+  return `#${query}`;
+}
 export function useNavigation() {
   const hash = useSyncExternalStore(subscribe, () => window.location.hash);
   const navigate = (next: Navigation) => {
-    const query = new URLSearchParams({ view: next.view });
-    if (next.nodeId) query.set("node", next.nodeId);
-    if (next.rootId) query.set("root", next.rootId);
-    if (next.featureId) query.set("feature", next.featureId);
-    if (next.changeId) query.set("change", next.changeId);
-    if (next.files) query.set("files", "1");
-    if (next.folder) query.set("folder", next.folder);
-    if (next.part) query.set("part", next.part);
-    if (next.component) query.set("component", next.component);
-    if (next.source) query.set("source", "1");
-    window.location.hash = query.toString();
+    window.location.hash = navigationHref(next);
   };
   return { navigation: parseNavigation(hash), navigate };
 }
