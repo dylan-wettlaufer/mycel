@@ -31,4 +31,12 @@ export const migrations: readonly Migration[] = [
     name: "multiline structural edge locations",
     sql: "ALTER TABLE edges ADD COLUMN source_end_lines TEXT;",
   },
+  {
+    version: 7,
+    name: "recorded relationship evidence",
+    sql: `ALTER TABLE change_events ADD COLUMN relationship TEXT
+      CHECK(relationship IS NULL OR json_valid(relationship));
+      CREATE INDEX relationship_events_by_project
+        ON change_events(project_id, timestamp, id) WHERE relationship IS NOT NULL;`,
+  },
 ];

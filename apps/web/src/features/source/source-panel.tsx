@@ -10,16 +10,22 @@ export function SourcePanel({
   node,
   revision = 0,
   workspace,
+  expectedRevision,
 }: {
   node: Pick<GraphNode, "path" | "range">;
   revision?: number;
   workspace?: SourceWorkspaceOptions;
+  expectedRevision?: number;
 }) {
   const { data, error } = useResource(
-    `/api/files/content?path=${encodeURIComponent(node.path)}`,
+    `/api/files/content?path=${encodeURIComponent(node.path)}${expectedRevision === undefined ? "" : `&revision=${expectedRevision}`}`,
     isFileContent,
-    revision,
+    expectedRevision === undefined ? revision : 0,
   );
+  const source =
+    expectedRevision === undefined || data?.revision === expectedRevision
+      ? data
+      : undefined;
   return (
     <section
       className={
@@ -35,7 +41,7 @@ export function SourcePanel({
             {node.path}:{node.range.startLine}
           </h3>
           <p className="text-xs text-muted-foreground">
-            Read only · indexed revision {data?.revision ?? "…"}
+            Read only · indexed revision {source?.revision ?? "…"}
           </p>
         </div>
       )}
@@ -43,17 +49,17 @@ export function SourcePanel({
         <p role="alert" className="p-4">
           Source unavailable. {error}
         </p>
-      ) : !data ? (
+      ) : !source ? (
         <p className="p-4">Loading source…</p>
       ) : (
         <Suspense fallback={<p className="p-4">Loading editor…</p>}>
           <MonacoView
-            content={data.content}
-            path={data.path}
+            content={source.content}
+            path={source.path}
             range={workspace ? undefined : node.range}
             workspace={
               workspace?.sourceConnections &&
-              workspace.sourceConnections.revision !== data.revision
+              workspace.sourceConnections.revision !== source.revision
                 ? { ...workspace, sourceConnections: undefined }
                 : workspace
             }

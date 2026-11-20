@@ -4,6 +4,23 @@ import type { ProjectId } from "./project.js";
 export type ChangeAction = "created" | "modified" | "deleted";
 /** Decimal string representation of a database-wide monotonically increasing id. */
 export type ChangeId = string;
+export interface RelationshipEndpoint {
+  id: string;
+  path: string;
+  qualifiedName: string;
+}
+
+/** Evidence from the indexed revision in which this relationship existed. */
+export interface RecordedRelationship {
+  kind: "IMPORTS" | "CALLS";
+  source: RelationshipEndpoint;
+  target: RelationshipEndpoint;
+  startLine: number;
+  endLine: number;
+  approximate?: boolean;
+  features: { id: string; name: string }[];
+}
+
 export interface ChangeEvent {
   id: ChangeId;
   projectId: ProjectId;
@@ -16,6 +33,7 @@ export interface ChangeEvent {
   afterRevision: Revision | null;
   before: GraphNode | GraphEdge | null;
   after: GraphNode | GraphEdge | null;
+  relationship?: RecordedRelationship;
   sessionId?: string;
   attribution?: {
     status: "confirmed" | "inferred" | "unknown";

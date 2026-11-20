@@ -73,15 +73,19 @@ CLI and compiled dashboard must remain in the checkout together.
   code patterns. Open a feature to explore its supported behavior traces and
   source evidence. See [feature discovery](docs/FEATURE_DISCOVERY.md) and
   [behavior tracing](docs/BEHAVIOUR_TRACING.md).
-- **Graph**, the current landing view, groups indexed files by folder and
-  shows directed import counts. Select a folder and choose **Open files**,
-  then select a file and choose **Open file** to inspect symbols and source.
+- **Graph**, the landing view, maps architecture parts and their resolved
+  imports and calls. Open a connection to inspect its evidence. Mycel keeps
+  open evidence aligned with the indexed source as you save edits. The map
+  surfaces recent relationship additions and removals, including small links.
+  Use **Open files** to inspect file dependencies, symbols, and source.
   Use **Only connections** to narrow the graph or **Focus selection** to
   frame a node and its neighbors.
-- **Explorer** searches indexed files and symbols. **Activity** shows
-  committed changes and source diffs, including retained source for deleted
-  nodes. Graph and change selections can be reopened through browser history
-  or hash links.
+- **Explorer** searches indexed files and symbols. **Activity** opens on
+  recorded call and import changes, including changes from uncommitted
+  saves. Open a change for the exact recorded source, diff, and any affected
+  feature Mycel can trace. **All changes** includes file and symbol history.
+  Graph and change selections can be reopened through browser history or
+  hash links.
 
 The Hono backend serves the dashboard and project-scoped graph, captured source,
 history, and SSE APIs. Mycel starts watching during the initial index and

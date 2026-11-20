@@ -474,6 +474,13 @@ function GraphLegend({
             Highlighted dependencies
           </span>
           <span>
+            <i
+              className="graph-legend-arrow graph-legend-relationship-change"
+              aria-hidden
+            />
+            Recent relationship change
+          </span>
+          <span>
             <i className="graph-legend-swatch graph-swatch-new" aria-hidden />
             New in window
           </span>

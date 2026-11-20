@@ -21,7 +21,11 @@ export {
 export type { CrossFileLink, CrossFileLinksSnapshot } from "./queries.js";
 export { commitChangeSet, currentRevision, readGraphState } from "./history.js";
 export type { EntityChange, ChangeSet } from "./history.js";
-export { listChanges, parseChangeId } from "./history.js";
+export {
+  listChanges,
+  listRecentRelationships,
+  parseChangeId,
+} from "./history.js";
 export { getEventsAfter } from "./history.js";
 export { getDiff } from "./history.js";
 export { pruneHistory } from "./history.js";

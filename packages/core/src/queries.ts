@@ -58,6 +58,7 @@ export interface GraphQueries {
   getStats?(): import("@mycel/shared").GraphStats;
   getFileContent?(
     path: string,
+    revision?: number,
   ): import("@mycel/shared").FileContent | undefined;
   searchSymbols(query: SearchQuery): SearchResult;
   getNodeDetails(id: NodeId, query?: NodeDetailsQuery): NodeDetails | undefined;
@@ -89,7 +90,8 @@ export function createGraphQueries(
     getFileSymbols: (id) => getFileSymbols(database, projectId, id),
     getRepositoryGraph: () => getRepositoryGraph(database, projectId),
     getStats: () => getGraphStats(database, projectId),
-    getFileContent: (path) => getFileContent(database, projectId, path),
+    getFileContent: (path, revision) =>
+      getFileContent(database, projectId, path, revision),
     searchSymbols: ({ q, limit }) =>
       searchSymbols(database, projectId, q, limit),
     getNodeDetails: (id, { limit } = {}) =>

@@ -6,6 +6,7 @@ export interface Navigation {
   rootId?: string;
   featureId?: string;
   changeId?: string;
+  relationships?: boolean;
   source?: boolean;
   files?: boolean;
   folder?: string;
@@ -15,6 +16,7 @@ export interface Navigation {
 export function parseNavigation(hash: string): Navigation {
   const query = new URLSearchParams(hash.replace(/^#/, ""));
   const view = query.get("view");
+  const relationships = query.get("relationships");
   return {
     view:
       view === "Dashboard" ||
@@ -31,6 +33,9 @@ export function parseNavigation(hash: string): Navigation {
       ? { changeId: query.get("change")! }
       : {}),
     ...(query.get("files") === "1" ? { files: true } : {}),
+    ...(relationships === "1" || relationships === "0"
+      ? { relationships: relationships === "1" }
+      : {}),
     ...(query.get("folder") ? { folder: query.get("folder")! } : {}),
     ...(query.get("part") ? { part: query.get("part")! } : {}),
     ...(query.get("component") ? { component: query.get("component")! } : {}),
@@ -48,6 +53,8 @@ export function navigationHref(next: Navigation): string {
   if (next.featureId) query.set("feature", next.featureId);
   if (next.changeId) query.set("change", next.changeId);
   if (next.files) query.set("files", "1");
+  if (next.relationships !== undefined)
+    query.set("relationships", next.relationships ? "1" : "0");
   if (next.folder) query.set("folder", next.folder);
   if (next.part) query.set("part", next.part);
   if (next.component) query.set("component", next.component);

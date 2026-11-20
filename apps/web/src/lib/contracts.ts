@@ -132,6 +132,10 @@ export function isChangeEvent(
     ["node", "edge"].includes(String(value.entityType)) &&
     (value.before === null || isEntity(value.before)) &&
     (value.after === null || isEntity(value.after)) &&
+    (value.relationship === undefined ||
+      (value.entityType === "edge" &&
+        (value.action === "created" || value.action === "deleted") &&
+        isRecordedRelationship(value.relationship))) &&
     (value.beforeRevision === null ||
       typeof value.beforeRevision === "number") &&
     (value.afterRevision === null || typeof value.afterRevision === "number")
@@ -228,6 +232,35 @@ function isStringArray(value: unknown): value is string[] {
   );
 }
 
+function isRecordedRelationship(value: unknown): boolean {
+  const isEndpoint = (endpoint: unknown) =>
+    isRecord(endpoint) &&
+    typeof endpoint.id === "string" &&
+    typeof endpoint.path === "string" &&
+    typeof endpoint.qualifiedName === "string";
+  return (
+    isRecord(value) &&
+    (value.kind === "IMPORTS" || value.kind === "CALLS") &&
+    isEndpoint(value.source) &&
+    isEndpoint(value.target) &&
+    typeof value.startLine === "number" &&
+    Number.isSafeInteger(value.startLine) &&
+    value.startLine > 0 &&
+    typeof value.endLine === "number" &&
+    Number.isSafeInteger(value.endLine) &&
+    value.endLine >= value.startLine &&
+    (value.approximate === undefined ||
+      typeof value.approximate === "boolean") &&
+    Array.isArray(value.features) &&
+    value.features.every(
+      (feature) =>
+        isRecord(feature) &&
+        typeof feature.id === "string" &&
+        typeof feature.name === "string",
+    )
+  );
+}
+
 function isSourceLineArray(value: unknown): value is number[] {
   return (
     Array.isArray(value) &&
@@ -261,6 +294,21 @@ export function isArchitectureMap(
         typeof value.component.name !== "string")) ||
     !Array.isArray(value.parts) ||
     !Array.isArray(value.connections) ||
+    (value.relationshipChanges !== undefined &&
+      (!Array.isArray(value.relationshipChanges) ||
+        !value.relationshipChanges.every(
+          (change) =>
+            isRecord(change) &&
+            typeof change.id === "string" &&
+            /^\d+$/.test(change.id) &&
+            typeof change.edgeId === "string" &&
+            (change.action === "created" || change.action === "deleted") &&
+            typeof change.sourcePartId === "string" &&
+            typeof change.targetPartId === "string" &&
+            typeof change.sourcePartName === "string" &&
+            typeof change.targetPartName === "string" &&
+            isRecordedRelationship(change.relationship),
+        ))) ||
     !isRecord(value.changes) ||
     !isStringArray(value.unassignedFiles) ||
     !Array.isArray(value.tieWarnings)
@@ -327,6 +375,7 @@ export function isArchitectureMap(
         (item) =>
           isRecord(item) &&
           ["import", "call"].includes(String(item.kind)) &&
+          (item.edgeId === undefined || typeof item.edgeId === "string") &&
           typeof item.file === "string" &&
           typeof item.line === "number" &&
           (item.additionalLines === undefined ||
@@ -339,6 +388,8 @@ export function isArchitectureMap(
       ) &&
       isRecord(connection.change) &&
       architectureChangeStatuses.has(String(connection.change.status)) &&
+      (connection.change.relationshipChangeIds === undefined ||
+        isStringArray(connection.change.relationshipChangeIds)) &&
       typeof connection.change.uncommitted === "boolean",
   );
 }

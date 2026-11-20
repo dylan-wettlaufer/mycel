@@ -26,6 +26,7 @@ export interface NodeDetailsQuery {
 
 export interface FileContentQuery {
   path: string;
+  revision?: Revision;
 }
 
 /** Identifies the committed graph snapshot used to answer a query. */

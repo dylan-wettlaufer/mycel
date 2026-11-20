@@ -46,6 +46,7 @@ export function App() {
     rootId,
     featureId,
     changeId,
+    relationships,
     source,
     files,
     component,
@@ -58,7 +59,8 @@ export function App() {
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
   const architecture = useResource(
-    view === "Graph" && ((!nodeId && !files) || component || part)
+    (view === "Graph" && ((!nodeId && !files) || component || part)) ||
+      (view === "Activity" && !nodeId)
       ? `/api/architecture?${new URLSearchParams({
           window: architectureWindow,
           ...(component ? { component } : {}),
@@ -92,6 +94,9 @@ export function App() {
     isChangeEvent,
   );
   const selectedEvent = localEvent ?? record.data;
+  const relationshipView =
+    !nodeId &&
+    (relationships ?? (!changeId || Boolean(selectedEvent?.relationship)));
   const rootNode = root.data?.node;
   const nodeDetails = scopeId === nodeId ? root.data : selected.data;
   const node = nodeDetails?.node;
@@ -153,7 +158,9 @@ export function App() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate({ view: "Activity" })}
+                onClick={() =>
+                  navigate({ view: "Activity", relationships: false })
+                }
               >
                 Show all activity
               </Button>
@@ -166,6 +173,15 @@ export function App() {
             {...activity}
             events={nodeId ? nodeEvents : activity.events}
             selectedEvent={selectedEvent}
+            architecture={architecture.data}
+            relationshipView={relationshipView}
+            {...(!nodeId && {
+              onFilter: (enabled: boolean) =>
+                navigate({
+                  view: "Activity",
+                  relationships: enabled,
+                }),
+            })}
             onSelectEvent={(id) =>
               navigate({ ...navigation, changeId: id, source: false })
             }

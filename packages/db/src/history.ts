@@ -3,11 +3,13 @@ import type {
   ChangeEvent,
   GraphEdge,
   GraphNode,
+  RecordedRelationship,
 } from "@mycel/shared";
 import type { SqliteDatabase } from "./database.js";
 import type { ProjectGraph } from "./graph.js";
 import { applyProjectGraph } from "./graph.js";
 import { getNode } from "./queries.js";
+import { getCallFeatures } from "./behaviour.js";
 
 type Entity = Omit<GraphNode, "revision"> | Omit<GraphEdge, "revision">;
 export interface EntityChange {
@@ -61,13 +63,14 @@ interface EventRow {
   after: string | null;
   sessionId: string | null;
   attribution: string | null;
+  relationship: string | null;
 }
 const eventColumns = `id, project_id AS projectId, timestamp, entity_type AS entityType,
   entity_id AS entityId, action, path, before_revision AS beforeRevision,
   after_revision AS afterRevision, before_entity AS before, after_entity AS after,
-  session_id AS sessionId, attribution`;
+  session_id AS sessionId, attribution, relationship`;
 function toEvent(row: EventRow): ChangeEvent {
-  const { sessionId, attribution, ...rest } = row;
+  const { sessionId, attribution, relationship, ...rest } = row;
   return {
     ...rest,
     id: String(row.id),
@@ -75,8 +78,69 @@ function toEvent(row: EventRow): ChangeEvent {
     after: row.after === null ? null : JSON.parse(row.after),
     ...(sessionId === null ? {} : { sessionId }),
     ...(attribution === null ? {} : { attribution: JSON.parse(attribution) }),
+    ...(relationship === null
+      ? {}
+      : { relationship: JSON.parse(relationship) }),
   };
 }
+
+function recordRelationships(
+  db: SqliteDatabase,
+  projectId: string,
+  changes: readonly EntityChange[],
+  side: "before" | "after",
+) {
+  const records = new Map<string, RecordedRelationship>();
+  const cache = new Map<string, RecordedRelationship["features"]>();
+  const sites = db.prepare<
+    [string, string],
+    { lines: string | null; ends: string | null }
+  >(
+    `SELECT source_lines AS lines, source_end_lines AS ends
+      FROM edges WHERE project_id = ? AND id = ?`,
+  );
+  for (const change of changes) {
+    if (change.action !== (side === "before" ? "deleted" : "created")) continue;
+    const edge = change[side];
+    if (!edge || !("sourceId" in edge) || edge.kind === "CONTAINS") continue;
+    const source = getNode(db, projectId, edge.sourceId);
+    const target = getNode(db, projectId, edge.targetId);
+    if (!source || !target) continue;
+    const row = sites.get(projectId, edge.id);
+    const firstLine = row?.lines
+      ? (JSON.parse(row.lines) as number[])[0]
+      : undefined;
+    const startLine = firstLine ?? source.range.startLine;
+    const ends = row?.ends
+      ? (JSON.parse(row.ends) as Record<number, number>)
+      : {};
+    const relationship = {
+      kind: edge.kind,
+      source: {
+        id: source.id,
+        path: source.path,
+        qualifiedName: source.qualifiedName,
+      },
+      target: {
+        id: target.id,
+        path: target.path,
+        qualifiedName: target.qualifiedName,
+      },
+      startLine,
+      endLine: ends[startLine] ?? startLine,
+      ...(firstLine === undefined ? { approximate: true } : {}),
+    };
+    records.set(change.entityId, {
+      ...relationship,
+      features:
+        edge.kind === "CALLS"
+          ? getCallFeatures(db, projectId, relationship, cache)
+          : [],
+    });
+  }
+  return records;
+}
+
 /** Nested graph writes use SQLite savepoints; all history rolls back on any failure. */
 export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
   return db
@@ -90,7 +154,16 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           .get(set.sessionId, projectId)
       )
         throw new Error("Session does not belong to project");
+      const removed =
+        previous > 0
+          ? recordRelationships(db, projectId, set.changes, "before")
+          : undefined;
       const revision = applyProjectGraph(db, set.graph);
+      // The initial index records inventory. Later revisions record additions and removals.
+      const added =
+        previous > 0
+          ? recordRelationships(db, projectId, set.changes, "after")
+          : undefined;
       const snapshot = db.prepare(
         "INSERT INTO snapshots (project_id, path, revision, content) VALUES (?, ?, ?, ?)",
       );
@@ -98,8 +171,8 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
         snapshot.run(projectId, path, revision, content);
       const timestamp = new Date().toISOString();
       const insert = db.prepare(`INSERT INTO change_events
-      (project_id, timestamp, entity_type, entity_id, action, path, before_revision, after_revision, before_entity, after_entity, session_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (project_id, timestamp, entity_type, entity_id, action, path, before_revision, after_revision, before_entity, after_entity, session_id, relationship)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const events = set.changes.map((change) => {
         const beforeRevision = change.before === null ? null : previous;
         const afterRevision = change.after === null ? null : revision;
@@ -111,6 +184,8 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           change.after === null
             ? null
             : { ...change.after, revision: afterRevision! };
+        const relationship =
+          removed?.get(change.entityId) ?? added?.get(change.entityId);
         const result = insert.run(
           projectId,
           timestamp,
@@ -123,6 +198,7 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           before === null ? null : JSON.stringify(before),
           after === null ? null : JSON.stringify(after),
           set.sessionId ?? null,
+          relationship ? JSON.stringify(relationship) : null,
         );
         const event: ChangeEvent = {
           id: String(result.lastInsertRowid),
@@ -136,6 +212,7 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           afterRevision,
           before,
           after,
+          ...(relationship ? { relationship } : {}),
           ...(set.sessionId ? { sessionId: set.sessionId } : {}),
         };
         return event;
@@ -143,6 +220,24 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
       return { revision, events };
     })
     .immediate();
+}
+
+/** Most recent recorded action per relationship, newest first. */
+export function listRecentRelationships(
+  db: SqliteDatabase,
+  projectId: string,
+  since: string,
+): ChangeEvent[] {
+  return db
+    .prepare<[string, string], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE id IN (
+        SELECT MAX(id) FROM change_events
+        WHERE project_id = ? AND relationship IS NOT NULL AND timestamp >= ?
+        GROUP BY entity_id
+      ) ORDER BY timestamp DESC, json_extract(relationship, '$.kind') = 'CALLS' DESC, id DESC LIMIT 200`,
+    )
+    .all(projectId, since)
+    .map(toEvent);
 }
 
 export function parseChangeId(id: string): number {

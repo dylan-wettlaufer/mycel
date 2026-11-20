@@ -43,9 +43,12 @@ function focusArchitectureEdge(
 ): Edge {
   const highlighted = active || hovered;
   const showLabel = hovered || selected;
+  const changed = Boolean(edge.data?.relationshipChanged);
   const color = highlighted
     ? "var(--architecture-relationship)"
-    : "var(--architecture-edge)";
+    : changed
+      ? "var(--success)"
+      : "var(--architecture-edge)";
   const marker = {
     type: MarkerType.ArrowClosed,
     color,
@@ -66,7 +69,7 @@ function focusArchitectureEdge(
     style: {
       ...edge.style,
       stroke: color,
-      strokeWidth: showLabel ? 2 : active ? 1.65 : 1.25,
+      strokeWidth: showLabel || changed ? 2 : active ? 1.65 : 1.25,
     },
     labelStyle: {
       fill: "var(--architecture-canvas)",
@@ -149,6 +152,7 @@ export function focusGraph(
       .filter(
         (edge) =>
           !edge.data?.foundation ||
+          edge.data?.relationshipChanged ||
           edge.id === selectedEdge?.id ||
           edge.source === traceId ||
           edge.target === traceId,

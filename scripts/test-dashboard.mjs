@@ -602,6 +602,7 @@ try {
   await page.goBack();
   await sourceContains("value * 3", "Recorded source");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
+  await page.getByRole("button", { name: "All changes", exact: true }).click();
   await phase("delete", () => unlink(join(root, "obsolete.ts")));
   await page
     .getByRole("button", { name: /deleted obsolete.ts/ })
@@ -635,6 +636,7 @@ try {
   await expect(page.getByRole("status").first()).toHaveText("Connected");
   await expect(page.getByLabel("Live connection")).toHaveText("Live updates");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
+  await page.getByRole("button", { name: "All changes", exact: true }).click();
   await phase("reconnect", () =>
     writeFile(
       join(root, "math.ts"),

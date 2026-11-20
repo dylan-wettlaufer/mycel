@@ -64,6 +64,7 @@ interface DisplayConnection {
   status: ArchitectureConnectionWithChanges["change"]["status"];
   uncommitted: boolean;
   foundation: boolean;
+  relationshipChanged: boolean;
 }
 
 export function formatLinkSummary(
@@ -127,12 +128,15 @@ function displayConnections(
 ): { displays: DisplayConnection[]; hiddenMinorCount: number } {
   const revealed = new Set(revealConnectionIds);
   const minor = map.connections.filter(
-    (connection) => connection.count <= minorConnectionMaxCount,
+    (connection) =>
+      connection.count <= minorConnectionMaxCount &&
+      !connection.change.relationshipChangeIds?.length,
   );
   const visible = map.connections.filter(
     (connection) =>
       showMinor ||
       connection.count > minorConnectionMaxCount ||
+      Boolean(connection.change.relationshipChangeIds?.length) ||
       revealed.has(connection.id),
   );
   const byPair = new Map<string, ArchitectureConnectionWithChanges>();
@@ -167,6 +171,9 @@ function displayConnections(
           ? "changed"
           : "unchanged",
       uncommitted: pair.some((entry) => entry.change.uncommitted),
+      relationshipChanged: pair.some(
+        (entry) => entry.change.relationshipChangeIds?.length,
+      ),
       foundation:
         foundation.has(primary.sourcePartId) ||
         foundation.has(primary.targetPartId),
@@ -185,7 +192,10 @@ function connectionDescription(
     connection.change.status === "unchanged"
       ? ""
       : ` (${connection.change.status}${connection.change.uncommitted ? ", uncommitted" : ""})`;
-  return `${connection.sourcePartId} → ${connection.targetPartId}: ${formatLinkSummary(connection)}${change}`;
+  const recorded = connection.change.relationshipChangeIds?.length
+    ? " · recent relationship change"
+    : "";
+  return `${connection.sourcePartId} → ${connection.targetPartId}: ${formatLinkSummary(connection)}${change}${recorded}`;
 }
 
 /** Keep roles in left-to-right columns, including when dependencies point back. */
@@ -270,6 +280,7 @@ export function layoutArchitectureMap(
         connectionId: connection.id,
         connectionIds: connection.connections.map((entry) => entry.id),
         changeStatus: connection.status,
+        relationshipChanged: connection.relationshipChanged,
         uncommitted: connection.uncommitted,
         architecture: true,
         bidirectional: connection.connections.length > 1,

@@ -1,4 +1,5 @@
 import type { Revision } from "./graph.js";
+import type { ChangeId, RecordedRelationship } from "./history.js";
 import type { ProjectId } from "./project.js";
 
 export type ArchitecturePartKind =
@@ -87,6 +88,8 @@ export type ArchitectureEvidenceKind = "import" | "call";
 /** One resolved import or call backing a connection between two parts. */
 export interface ArchitectureConnectionEvidence {
   kind: ArchitectureEvidenceKind;
+  /** Structural relationship identity, independent of source line numbers. */
+  edgeId?: string;
   /** Repository-relative path of the importing or calling file. */
   file: string;
   /** 1-based source line in `file`. */
@@ -169,6 +172,19 @@ export interface ArchitectureConnectionChange {
   status: ArchitectureChangeStatus;
   /** True when any backing evidence endpoint has uncommitted working-tree changes. */
   uncommitted: boolean;
+  /** IDs of recorded relationship changes backing the live connection. */
+  relationshipChangeIds?: ChangeId[];
+}
+
+export interface ArchitectureRelationshipChange {
+  id: ChangeId;
+  edgeId: string;
+  action: "created" | "deleted";
+  sourcePartId: string;
+  targetPartId: string;
+  sourcePartName: string;
+  targetPartName: string;
+  relationship: RecordedRelationship;
 }
 
 export interface ArchitecturePartWithChanges extends AssignedArchitecturePart {
@@ -197,6 +213,8 @@ export interface ArchitectureMap {
   parts: ArchitecturePartWithChanges[];
   /** Directed cross-part connections with evidence and git change status. */
   connections: ArchitectureConnectionWithChanges[];
+  /** Latest indexed relationship changes from the past seven days. */
+  relationshipChanges?: ArchitectureRelationshipChange[];
   /** Git change metadata for the selected window. */
   changes: ArchitectureGitChanges;
   /** Files not matched by any declared part (assigned to fallback parts). */

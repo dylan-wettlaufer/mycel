@@ -14,13 +14,18 @@ import { isFeatureList } from "@/features/semantic/feature-contracts";
 import { useResource } from "@/hooks/use-resource";
 import { isRepositoryGraph } from "@/lib/contracts";
 import { ArchitectureDetails } from "./architecture-details";
+import { RelationshipChangeLinks } from "./relationship-changes";
+import { relationshipTitle } from "@/features/activity/relationship-change";
+import { navigationHref } from "@/hooks/use-navigation";
 import {
   componentCanvasMap,
   layoutArchitectureMap,
   minorConnectionMaxCount,
 } from "./architecture-layout";
 
-type Selection = { kind: "part" | "connection"; id: string };
+type Selection =
+  | { kind: "part"; id: string }
+  | { kind: "connection"; id: string; sourceName: string; targetName: string };
 
 interface MapViewState {
   selection: Selection | null;
@@ -179,6 +184,12 @@ export function ArchitectureMapView({
     selection?.kind === "connection"
       ? map?.connections.find((connection) => connection.id === selection.id)
       : undefined;
+  const missingConnection =
+    selection?.kind === "connection" && !selectedConnection
+      ? selection
+      : undefined;
+  const recentChanges = map?.relationshipChanges ?? [];
+  const featuredChange = recentChanges[0];
   const previewedIds =
     selectedPartId &&
     connectionPreview?.scope === scope &&
@@ -215,6 +226,13 @@ export function ArchitectureMapView({
     : null;
 
   const select = (kind: "part" | "connection", id: string) => {
+    const connection =
+      kind === "connection"
+        ? map?.connections.find((item) => item.id === id)
+        : undefined;
+    if (kind === "connection" && !connection) return;
+    const name = (partId: string) =>
+      map?.parts.find((part) => part.id === partId)?.name ?? partId;
     setConnectionPreview(null);
     const nextFocus =
       kind === "part" && responsibilities.some((part) => part.id === id)
@@ -223,7 +241,14 @@ export function ArchitectureMapView({
     setViews((previous) => ({
       ...previous,
       [scope]: {
-        selection: { kind, id },
+        selection: connection
+          ? {
+              kind: "connection",
+              id,
+              sourceName: name(connection.sourcePartId),
+              targetName: name(connection.targetPartId),
+            }
+          : { kind: "part", id },
         ...(nextFocus ? { focusId: nextFocus } : {}),
       },
     }));
@@ -376,11 +401,45 @@ export function ArchitectureMapView({
         </div>
       ) : null}
 
+      {map?.relationshipChanges !== undefined && (
+        <details className="shrink-0 rounded-md border bg-card px-3 py-2">
+          <summary className="cursor-pointer rounded-sm text-xs focus-visible:outline-2 focus-visible:outline-ring">
+            <span className="font-medium">Recent relationship changes</span>{" "}
+            <span className="ml-2 text-muted-foreground" aria-live="polite">
+              {featuredChange
+                ? relationshipTitle(
+                    featuredChange.relationship,
+                    featuredChange.action,
+                    featuredChange,
+                  )
+                : "No relationship changes in the last 7 days"}
+            </span>
+          </summary>
+          <div className="mt-2 max-h-44 overflow-y-auto">
+            {recentChanges.length > 0 ? (
+              <RelationshipChangeLinks changes={recentChanges.slice(0, 12)} />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Changes appear here when a save adds or removes a resolved call
+                or import between architecture parts.
+              </p>
+            )}
+            <Button asChild variant="link" size="sm" className="px-0">
+              <a
+                href={navigationHref({ view: "Activity", relationships: true })}
+              >
+                View relationship activity
+              </a>
+            </Button>
+          </div>
+        </details>
+      )}
+
       {mapError ? (
         <p role="alert">Architecture map unavailable. {mapError}</p>
       ) : (
         map &&
-        (map.parts.length === 0 ? (
+        (map.parts.length === 0 && !missingConnection ? (
           <p className="text-sm text-muted-foreground">
             No architecture parts found yet.
           </p>
@@ -405,11 +464,15 @@ export function ArchitectureMapView({
               else if (part.files.length > 0) onOpenPartFiles(part);
             }}
             sidePanel={
-              map.component || selectedPart || selectedConnection ? (
+              map.component ||
+              selectedPart ||
+              selectedConnection ||
+              missingConnection ? (
                 <ArchitectureDetails
                   map={map}
                   selectedPart={selectedPart}
                   selectedConnection={selectedConnection}
+                  missingConnection={missingConnection}
                   matchingFeatures={matchingFeatures}
                   onSelectPart={(id) => select("part", id)}
                   onSelectConnection={(id) => select("connection", id)}
@@ -424,7 +487,6 @@ export function ArchitectureMapView({
                   onOpenPartFiles={onOpenPartFiles}
                   onOpenComponent={openComponent}
                   onOpenFile={openFileByPath}
-                  revision={revision}
                   onOpenFeature={onOpenFeature}
                 />
               ) : undefined

@@ -521,6 +521,10 @@
 .graph-legend-dashed {
   border-top-style: dashed;
 }
+.graph-legend-relationship-change,
+.graph-legend-relationship-change::after {
+  border-color: var(--success);
+}
 .graph-legend-uncertain {
   color: var(--warning);
   border-top-style: dotted;

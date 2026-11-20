@@ -57,7 +57,20 @@ export function createApp({
       return context.json({ error: "Invalid repository-relative path" }, 400);
     if (!graph?.getFileContent)
       return context.json({ error: "Source queries unavailable" }, 503);
-    const file = graph.getFileContent(path);
+    const revisions = context.req.queries("revision");
+    const requested = revisions?.[0];
+    if (
+      revisions &&
+      (revisions.length !== 1 ||
+        !requested ||
+        !/^[1-9]\d*$/.test(requested) ||
+        !Number.isSafeInteger(Number(requested)))
+    )
+      return context.json({ error: "Invalid indexed revision" }, 400);
+    const file = graph.getFileContent(
+      path,
+      requested === undefined ? undefined : Number(requested),
+    );
     return file
       ? context.json(file)
       : context.json({ error: "Indexed file not found" }, 404);

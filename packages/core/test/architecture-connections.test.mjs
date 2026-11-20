@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { openDatabase } from "@mycel/db";
+import { getCrossFileLinks, openDatabase } from "@mycel/db";
 import {
   assignFilesToParts,
   buildFallbackArchitecture,
@@ -199,8 +199,17 @@ test("combines imports and calls, preserves bidirectional edges, and ignores int
   );
 
   const webToServer = connections.find((edge) => edge.id === "web->server");
+  const webLinks = getCrossFileLinks(database, indexed.projectId).links.filter(
+    ({ sourcePath, targetPath }) =>
+      sourcePath === "apps/web/src/page.ts" &&
+      targetPath === "packages/server/src/index.ts",
+  );
+  assert.equal(webLinks.length, 2);
+  const edgeId = (kind) => webLinks.find((link) => link.kind === kind).edgeId;
+  assert.notEqual(edgeId("IMPORTS"), edgeId("CALLS"));
   assert.deepEqual(webToServer.evidence, [
     {
+      edgeId: edgeId("IMPORTS"),
       kind: "import",
       file: "apps/web/src/page.ts",
       line: 2,
@@ -209,6 +218,7 @@ test("combines imports and calls, preserves bidirectional edges, and ignores int
       targetFile: "packages/server/src/index.ts",
     },
     {
+      edgeId: edgeId("CALLS"),
       kind: "call",
       file: "apps/web/src/page.ts",
       line: 8,

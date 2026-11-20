@@ -4,6 +4,7 @@ import type {
   BehaviourTrace,
   BehaviourTraceQuery,
   FeatureBehaviour,
+  RecordedRelationship,
   SemanticEntity,
 } from "@mycel/shared";
 import type { SqliteDatabase } from "./database.js";
@@ -46,6 +47,73 @@ export function getBehaviourEntries(
 }
 
 const featureEntryLimit = 8;
+
+/** Find feature entry points that reach this exact recorded call. */
+export function getCallFeatures(
+  db: SqliteDatabase,
+  projectId: string,
+  {
+    source,
+    target,
+    startLine,
+    approximate,
+  }: Omit<RecordedRelationship, "features">,
+  cache: Map<string, RecordedRelationship["features"]>,
+): RecordedRelationship["features"] {
+  if (approximate) return [];
+  const callers = db
+    .prepare<[string, string, string, string, number], { id: string }>(
+      `SELECT DISTINCT e.source_id AS id
+    FROM semantic_sources site
+    JOIN semantic_relationships e ON e.project_id = site.project_id AND e.id = site.relationship_id
+    JOIN semantic_entities caller ON caller.project_id = e.project_id AND caller.id = e.source_id
+    JOIN semantic_entities callee ON callee.project_id = e.project_id AND callee.id = e.target_id
+    WHERE site.project_id = ? AND e.kind = 'CALLS'
+      AND json_extract(e.provenance, '$.kind') = 'deterministic'
+      AND json_extract(e.provenance, '$.extractor') = 'behaviour-bindings'
+      AND json_extract(caller.attributes, '$.callableNodeId') = ?
+      AND json_extract(callee.attributes, '$.callableNodeId') = ?
+      AND site.path = ? AND site.start_line = ?`,
+    )
+    .all(projectId, source.id, target.id, source.path, startLine);
+  const features = new Map<string, string>();
+  for (const { id } of callers) {
+    let matches = cache.get(id);
+    if (!matches) {
+      const trace = traceBehaviour(db, projectId, id, {
+        direction: "reverse",
+        maxPaths: 100,
+      });
+      const events =
+        trace?.entities
+          .filter(({ attributes }) => attributes.traceRole === "ui_event")
+          .map(({ id }) => id) ?? [];
+      matches = events.length
+        ? db
+            .prepare<[string, string], { id: string; name: string }>(
+              `SELECT DISTINCT feature.id, feature.name
+            FROM semantic_sources entry
+            JOIN semantic_sources member_source ON member_source.project_id = entry.project_id
+              AND member_source.node_id = entry.node_id
+            JOIN nodes symbol ON symbol.project_id = entry.project_id
+              AND symbol.id = entry.node_id AND symbol.kind = 'function'
+            JOIN semantic_entities member ON member.project_id = member_source.project_id
+              AND member.id = member_source.entity_id AND member.kind IN ('component', 'page')
+            JOIN semantic_relationships membership ON membership.project_id = member.project_id
+              AND membership.source_id = member.id AND membership.kind = 'IMPLEMENTS'
+            JOIN semantic_entities feature ON feature.project_id = membership.project_id
+              AND feature.id = membership.target_id AND feature.kind = 'feature'
+            WHERE entry.project_id = ? AND entry.entity_id IN (SELECT value FROM json_each(?))
+            ORDER BY feature.name, feature.id LIMIT 20`,
+            )
+            .all(projectId, JSON.stringify(events))
+        : [];
+      cache.set(id, matches);
+    }
+    for (const match of matches) features.set(match.id, match.name);
+  }
+  return [...features].map(([id, name]) => ({ id, name }));
+}
 
 /** Match events to member declarations by structural symbol within one revision. */
 export function getFeatureBehaviour(

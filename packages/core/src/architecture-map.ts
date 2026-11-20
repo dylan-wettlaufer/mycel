@@ -7,6 +7,7 @@ import {
   currentRevision,
   getCrossFileLinks,
   getRepositoryGraph,
+  listRecentRelationships,
 } from "@mycel/db";
 import type { SqliteDatabase } from "@mycel/db";
 import type {
@@ -14,6 +15,7 @@ import type {
   ArchitectureFile,
   ArchitectureIssue,
   ArchitectureMap,
+  ArchitectureRelationshipChange,
   ArchitectureSource,
   ArchitectureUpdateEvent,
   ArchitectureUpdateReason,
@@ -169,6 +171,13 @@ export async function buildArchitectureMap(
   const repository = getRepositoryGraph(options.database, options.projectId);
   const linksSnapshot = getCrossFileLinks(options.database, options.projectId);
   const filePaths = repository.files.map((file) => file.path);
+  const recent = listRecentRelationships(
+    options.database,
+    options.projectId,
+    new Date(
+      (options.now ?? new Date()).getTime() - 7 * 86_400_000,
+    ).toISOString(),
+  );
 
   const [loaded, gitChanges] = await Promise.all([
     loadProjectArchitecture(options.projectRoot, {
@@ -212,19 +221,77 @@ export async function buildArchitectureMap(
     parent ? assignment.fileToPart : undefined,
   );
 
-  const connections =
-    evidenceLimit === undefined
-      ? annotated.connections
-      : annotated.connections.map((connection) => {
-          const truncated = connection.evidence.length > evidenceLimit;
-          return {
-            ...connection,
-            evidence: truncated
-              ? connection.evidence.slice(0, evidenceLimit)
-              : connection.evidence,
-            truncated,
-          };
-        });
+  const indexedPaths = new Set(filePaths);
+  const historicalPaths = recent
+    .flatMap(({ relationship }) =>
+      relationship ? [relationship.source.path, relationship.target.path] : [],
+    )
+    .filter((path) => !indexedPaths.has(path));
+  const historicalTop = historicalPaths.length
+    ? assignFilesToParts(
+        loaded.architecture,
+        [...filePaths, ...historicalPaths],
+        { fallback: loaded.fallback },
+      )
+    : topLevel;
+  const historicalParent =
+    parent && historicalTop.parts.find(({ id }) => id === parent.id);
+  const owners =
+    historicalParent && historicalTop !== topLevel
+      ? assignComponentFiles(historicalTop, historicalParent, indexedPaths)
+      : parent
+        ? assignment
+        : historicalTop;
+  const partsById = new Map(
+    [...owners.parts, ...assignment.parts].map((part) => [part.id, part.name]),
+  );
+  const partForPath = (path: string) =>
+    assignment.fileToPart[path] ?? owners.fileToPart[path];
+  const relationshipChanges: ArchitectureRelationshipChange[] = [];
+  const changesByConnection = new Map<string, string[]>();
+  for (const { id, entityId, action, relationship } of recent) {
+    if (!relationship || (action !== "created" && action !== "deleted"))
+      continue;
+    const sourcePartId = partForPath(relationship.source.path);
+    const targetPartId = partForPath(relationship.target.path);
+    if (
+      !sourcePartId ||
+      !targetPartId ||
+      sourcePartId === targetPartId ||
+      (parent && !inside(sourcePartId) && !inside(targetPartId))
+    )
+      continue;
+    relationshipChanges.push({
+      id,
+      edgeId: entityId,
+      action,
+      relationship,
+      sourcePartId,
+      targetPartId,
+      sourcePartName: partsById.get(sourcePartId) ?? sourcePartId,
+      targetPartName: partsById.get(targetPartId) ?? targetPartId,
+    });
+    const key = `${sourcePartId}->${targetPartId}`;
+    const ids = changesByConnection.get(key) ?? [];
+    ids.push(id);
+    changesByConnection.set(key, ids);
+  }
+  const connections = annotated.connections.map((connection) => {
+    const ids = changesByConnection.get(connection.id);
+    const truncated =
+      evidenceLimit !== undefined && connection.evidence.length > evidenceLimit;
+    return {
+      ...connection,
+      evidence: truncated
+        ? connection.evidence.slice(0, evidenceLimit)
+        : connection.evidence,
+      truncated,
+      change: {
+        ...connection.change,
+        ...(ids ? { relationshipChangeIds: ids } : {}),
+      },
+    };
+  });
 
   const connected = new Set(
     connections.flatMap(({ sourcePartId, targetPartId }) => [
@@ -245,6 +312,7 @@ export async function buildArchitectureMap(
           )
       : annotated.parts,
     connections,
+    relationshipChanges,
     changes: gitChanges,
     unassignedFiles: assignment.unassignedFiles,
     tieWarnings: assignment.tieWarnings,

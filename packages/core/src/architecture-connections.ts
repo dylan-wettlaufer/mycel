@@ -87,6 +87,7 @@ export function extractCrossFileLinks(graph: GraphLinkSource): CrossFileLink[] {
     const [firstLine, ...additionalLines] = lines;
     const typeOnlyImportLines = lines.filter((line) => sites?.get(line));
     const link: CrossFileLink = {
+      ...(edge.id === undefined ? {} : { edgeId: edge.id }),
       kind: edge.kind,
       sourcePath: source.path,
       sourceLine: firstLine ?? source.range.startLine,
@@ -154,6 +155,7 @@ export function computeArchitectureConnections(
     }
 
     const item: ArchitectureConnectionEvidence = {
+      ...(link.edgeId === undefined ? {} : { edgeId: link.edgeId }),
       kind: link.kind === "IMPORTS" ? "import" : "call",
       file: link.sourcePath,
       line: link.sourceLine,

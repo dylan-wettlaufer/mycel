@@ -14,14 +14,18 @@ import type {
   ArchitectureConnectionWithChanges,
   ArchitectureMap,
   ArchitecturePartWithChanges,
+  ArchitectureRelationshipChange,
   SemanticEntity,
 } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SourcePanel } from "@/features/source/source-panel";
+import { lineRange } from "@/features/activity/relationship-change";
+import { RelationshipChangeLinks } from "./relationship-changes";
 import { formatLinkSummary } from "./architecture-layout";
 import {
   describeChangePeriod,
+  evidenceIdentity,
   groupConnectionEvidence,
   groupPartConnections,
   groupPartFiles,
@@ -36,6 +40,8 @@ interface ArchitectureDetailsProps {
   map: ArchitectureMap;
   selectedPart: ArchitecturePartWithChanges | undefined;
   selectedConnection: ArchitectureConnectionWithChanges | undefined;
+  missingConnection?:
+    { id: string; sourceName: string; targetName: string } | undefined;
   matchingFeatures: SemanticEntity[];
   onSelectPart: (partId: string) => void;
   onSelectConnection: (connectionId: string) => void;
@@ -45,7 +51,6 @@ interface ArchitectureDetailsProps {
   onOpenComponent: (part: ArchitecturePartWithChanges) => void;
   onOpenFile: (path: string) => void;
   onOpenFeature: (featureId: string) => void;
-  revision: number;
 }
 
 function Inspector({
@@ -85,8 +90,11 @@ function Inspector({
 }
 
 function linkChangeText(connections: ArchitectureConnectionWithChanges[]) {
+  if (connections.some(({ change }) => change.relationshipChangeIds?.length)) {
+    return "Recent relationship change";
+  }
   if (connections.some(({ change }) => change.status === "new")) {
-    return "New link in this period";
+    return "New files at one end";
   }
   if (connections.some(({ change }) => change.status === "changed")) {
     return "Files changed at one end";
@@ -96,6 +104,7 @@ function linkChangeText(connections: ArchitectureConnectionWithChanges[]) {
 export function ArchitectureDetails(props: ArchitectureDetailsProps) {
   const { map, selectedPart, selectedConnection, onClear } = props;
   const partNames = new Map(map.parts.map(({ id, name }) => [id, name]));
+  const recentChanges = map.relationshipChanges ?? [];
   const componentDetails = map.component ? (
     <ComponentDetails
       map={map}
@@ -118,10 +127,39 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         onSelectPart={props.onSelectPart}
         onSelectConnection={props.onSelectConnection}
         onOpenFile={props.onOpenFile}
-        revision={props.revision}
+        revision={map.revision}
+        changes={recentChanges.filter(({ id }) =>
+          selectedConnection.change.relationshipChangeIds?.includes(id),
+        )}
         onClear={onClear}
         componentDetails={componentDetails}
       />
+    );
+  }
+  if (props.missingConnection) {
+    const { id, sourceName, targetName } = props.missingConnection;
+    const removals = recentChanges.filter(
+      (change) =>
+        change.action === "deleted" &&
+        `${change.sourcePartId}->${change.targetPartId}` === id,
+    );
+    return (
+      <Inspector
+        onClear={onClear}
+        header={
+          <h3 className="pr-8 text-base font-semibold">
+            {sourceName} → {targetName}
+          </h3>
+        }
+      >
+        <section className="space-y-2 p-4" aria-live="polite">
+          <h4 className="text-sm font-semibold">Connection removed</h4>
+          <p className="text-xs text-muted-foreground">
+            This connection is no longer in the current architecture map.
+          </p>
+          <RelationshipChangeLinks changes={removals} />
+        </section>
+      </Inspector>
     );
   }
   if (!selectedPart) {
@@ -437,11 +475,15 @@ function ConnectionGroup({
                     <span className="min-w-0 break-words">
                       {partNames.get(row.partId) ?? row.partId}
                     </span>
-                    {links.some(({ change }) => change.status === "new") && (
+                    {links.some(
+                      ({ change }) =>
+                        change.status === "new" ||
+                        change.relationshipChangeIds?.length,
+                    ) && (
                       <span
                         className="size-1.5 shrink-0 rounded-full bg-success"
                         role="img"
-                        aria-label="New link in this period"
+                        aria-label={status}
                       />
                     )}
                   </span>
@@ -568,6 +610,7 @@ function ConnectionDetails({
   onSelectConnection,
   onOpenFile,
   revision,
+  changes,
   onClear,
   componentDetails,
 }: {
@@ -578,13 +621,31 @@ function ConnectionDetails({
   onSelectConnection: (id: string) => void;
   onOpenFile: (path: string) => void;
   revision: number;
+  changes: ArchitectureRelationshipChange[];
   onClear: () => void;
   componentDetails?: ReactNode;
 }) {
-  const [source, setSource] = useState<Pick<
-    ArchitectureConnectionEvidence,
-    "file" | "line"
-  > | null>(null);
+  const [source, setSource] = useState<{
+    id: string;
+    index: number;
+    siteCount: number;
+    kind: ArchitectureConnectionEvidence["kind"];
+  } | null>(null);
+  const evidence =
+    source &&
+    connection.evidence.find((item) => evidenceIdentity(item) === source.id);
+  const sites = evidence
+    ? [evidence.line, ...(evidence.additionalLines ?? [])]
+    : [];
+  const line =
+    source && source.siteCount === sites.length
+      ? sites[source.index]
+      : undefined;
+  const removal =
+    source &&
+    changes.find(
+      ({ edgeId, action }) => edgeId === source.id && action === "deleted",
+    );
   const groups = groupConnectionEvidence(connection.evidence);
   const partLink = (id: string) => (
     <button
@@ -637,20 +698,25 @@ function ConnectionDetails({
             <ArrowLeft aria-hidden />
             Back to evidence
           </Button>
-          <SourcePanel
-            revision={revision}
-            node={{
-              path: source.file,
-              range: {
-                start: 0,
-                end: 0,
-                startLine: source.line,
-                startColumn: 1,
-                endLine: source.line + 1,
-                endColumn: 1,
-              },
-            }}
-          />
+          {evidence && line !== undefined ? (
+            <SourcePanel
+              expectedRevision={revision}
+              node={{ path: evidence.file, range: lineRange(line) }}
+            />
+          ) : (
+            <div aria-live="polite">
+              <p className="text-sm">
+                {removal
+                  ? `This ${source.kind} was removed from the live graph.`
+                  : evidence
+                    ? "The source locations changed. Choose a current location from the evidence."
+                    : connection.truncated
+                      ? "This location is outside the available evidence for this connection."
+                      : `This ${source.kind} is no longer part of the connection.`}
+              </p>
+              {removal && <RelationshipChangeLinks changes={[removal]} />}
+            </div>
+          )}
         </div>
       ) : (
         <section aria-label="Connection evidence" className="space-y-2 p-4">
@@ -698,7 +764,7 @@ function ConnectionDetails({
                     <li key={index} className="font-mono text-[11px] break-all">
                       <div className="flex flex-wrap gap-x-2">
                         {[item.line, ...(item.additionalLines ?? [])].map(
-                          (line) => {
+                          (line, siteIndex, itemSites) => {
                             const kind = item.typeOnlyImportLines?.includes(
                               line,
                             )
@@ -717,7 +783,12 @@ function ConnectionDetails({
                                     : label
                                 }
                                 onClick={() =>
-                                  setSource({ file: item.file, line })
+                                  setSource({
+                                    id: evidenceIdentity(item),
+                                    index: siteIndex,
+                                    siteCount: itemSites.length,
+                                    kind: item.kind,
+                                  })
                                 }
                               >
                                 {label}
@@ -737,6 +808,17 @@ function ConnectionDetails({
               </div>
             </details>
           ))}
+        </section>
+      )}
+      {!source && changes.length > 0 && (
+        <section
+          className="space-y-2 border-t p-4"
+          aria-label="Recorded relationship changes"
+        >
+          <h4 className="text-sm font-semibold">
+            Recorded relationship changes
+          </h4>
+          <RelationshipChangeLinks changes={changes} />
         </section>
       )}
       {!source && componentDetails}

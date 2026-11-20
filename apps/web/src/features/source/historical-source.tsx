@@ -3,6 +3,7 @@ import type { ChangeEvent } from "@mycel/shared";
 import { useResource } from "@/hooks/use-resource";
 import { isChangeDiff } from "@/lib/contracts";
 import { eventNode } from "@/features/activity/event-node";
+import { lineRange } from "@/features/activity/relationship-change";
 const MonacoView = lazy(() => import("./monaco-view"));
 export function HistoricalSource({ event }: { event: ChangeEvent }) {
   const { data, error } = useResource(
@@ -11,14 +12,9 @@ export function HistoricalSource({ event }: { event: ChangeEvent }) {
   );
   const content =
     event.action === "deleted" ? data?.beforeContent : data?.afterContent;
-  const range = eventNode(event)?.range ?? {
-    start: 0,
-    end: 0,
-    startLine: 1,
-    startColumn: 1,
-    endLine: 1,
-    endColumn: 1,
-  };
+  const range = event.relationship
+    ? lineRange(event.relationship.startLine, event.relationship.endLine)
+    : (eventNode(event)?.range ?? lineRange(1));
   return (
     <section
       className="overflow-hidden rounded-lg border"

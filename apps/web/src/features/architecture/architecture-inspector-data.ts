@@ -219,3 +219,16 @@ export function groupConnectionEvidence(
   }
   return [...bySource].sort(([a], [b]) => a.localeCompare(b));
 }
+
+export function evidenceIdentity(item: ArchitectureConnectionEvidence): string {
+  return (
+    item.edgeId ??
+    JSON.stringify([
+      item.kind,
+      item.file,
+      item.targetFile,
+      item.sourceSymbol,
+      item.symbol,
+    ])
+  );
+}

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   Diagnostic,
   GraphEdge,
@@ -320,26 +321,43 @@ export function getNodeDetails(
   })();
 }
 
-/** Serve captured source only for a current file in this project and revision. */
+/** Serve captured source for the requested indexed revision, or the live file. */
 export function getFileContent(
   database: SqliteDatabase,
   projectId: ProjectId,
   path: string,
+  atRevision?: number,
 ): import("@mycel/shared").FileContent | undefined {
   return database.transaction(() => {
-    const revision = getRevision(database, projectId);
-    const row = database
-      .prepare<
-        [string, string, number],
-        { content: string; contentHash: string }
-      >(
-        `
+    const revision = atRevision ?? getRevision(database, projectId);
+    const captured =
+      atRevision === undefined
+        ? undefined
+        : database
+            .prepare<[string, string, number], { content: string }>(
+              "SELECT content FROM snapshots WHERE project_id = ? AND path = ? AND revision = ?",
+            )
+            .get(projectId, path, revision);
+    const row =
+      atRevision === undefined
+        ? database
+            .prepare<
+              [string, string, number],
+              { content: string; contentHash: string }
+            >(
+              `
       SELECT s.content, n.content_hash AS contentHash FROM nodes n JOIN snapshots s
       ON s.project_id = n.project_id AND s.path = n.path
       WHERE n.project_id = ? AND n.path = ? AND n.kind = 'file' AND s.revision = ?
     `,
-      )
-      .get(projectId, path, revision);
+            )
+            .get(projectId, path, revision)
+        : captured && {
+            content: captured.content,
+            contentHash: createHash("sha256")
+              .update(captured.content)
+              .digest("hex"),
+          };
     return row
       ? {
           projectId,
@@ -431,6 +449,7 @@ export function getFileSymbols(
 }
 
 export interface CrossFileLink {
+  edgeId?: string;
   kind: "IMPORTS" | "CALLS";
   sourcePath: string;
   sourceLine: number;
@@ -449,6 +468,7 @@ export interface CrossFileLinksSnapshot {
 }
 
 interface CrossFileLinkRow {
+  edgeId: string;
   kind: "IMPORTS" | "CALLS";
   sourcePath: string;
   sourceKind: GraphNode["kind"];
@@ -470,6 +490,7 @@ export function getCrossFileLinks(
     const rows = database
       .prepare<[string], CrossFileLinkRow>(
         `SELECT
+          e.id AS edgeId,
           e.kind AS kind,
           s.path AS sourcePath,
           s.kind AS sourceKind,
@@ -494,6 +515,7 @@ export function getCrossFileLinks(
         ? (JSON.parse(row.sourceLines) as number[])
         : [];
       const link: CrossFileLink = {
+        edgeId: row.edgeId,
         kind: row.kind,
         sourcePath: row.sourcePath,
         sourceLine: firstLine ?? row.sourceLine,
