@@ -102,14 +102,18 @@ async function sourceContains(text, label = "Source code") {
       .locator(".view-lines"),
   ).toContainText(text);
 }
-async function graphFitsScreen() {
+async function graphFitsScreen(stackedDetails = false) {
   await expect
     .poll(() =>
-      page.evaluate(() => {
+      page.evaluate((stackedDetails) => {
         const canvas = globalThis.document.querySelector(".graph-canvas");
         const main = globalThis.document.querySelector("main");
-        if (!canvas || !main) return false;
-        const bounds = canvas.getBoundingClientRect();
+        const bottomPanel = stackedDetails
+          ? globalThis.document.querySelector(
+              'aside[aria-label="Selection details"]',
+            )
+          : canvas;
+        if (!canvas || !main || !bottomPanel) return false;
         const bottom =
           main.getBoundingClientRect().bottom -
           Number.parseFloat(globalThis.getComputedStyle(main).paddingBottom);
@@ -118,32 +122,47 @@ async function graphFitsScreen() {
             globalThis.window.innerHeight &&
           globalThis.document.documentElement.scrollWidth <=
             globalThis.window.innerWidth &&
-          bounds.height > 0 &&
-          Math.abs(bounds.bottom - bottom) <= 1
+          canvas.getBoundingClientRect().height > 0 &&
+          Math.abs(bottomPanel.getBoundingClientRect().bottom - bottom) <= 1
         );
-      }),
+      }, stackedDetails),
     )
     .toBe(true);
 }
 async function selectionFitsScreen() {
-  await graphFitsScreen();
+  const stackedDetails =
+    page.viewportSize().width < 768 &&
+    (await page.getByRole("region", { name: "Architecture map" }).count()) > 0;
+  await graphFitsScreen(stackedDetails);
   const sidebar = await page
     .getByRole("complementary", { name: "Selection details" })
     .boundingBox();
   const canvas = await page.locator(".graph-canvas").boundingBox();
   assert.ok(sidebar && canvas);
-  assert.ok(
-    Math.abs(sidebar.y - canvas.y) <= 1,
-    "details align with the canvas top",
-  );
-  assert.ok(
-    Math.abs(sidebar.y + sidebar.height - canvas.y - canvas.height) <= 1,
-    "details stay within the canvas height",
-  );
-  assert.ok(
-    sidebar.x >= canvas.x + canvas.width,
-    "details take their own space beside the graph",
-  );
+  if (stackedDetails) {
+    assert.ok(
+      sidebar.y >= canvas.y + canvas.height,
+      "the mobile inspector sits below the canvas",
+    );
+    assert.ok(
+      Math.abs(sidebar.x - canvas.x) <= 1 &&
+        Math.abs(sidebar.width - canvas.width) <= 1,
+      "the mobile inspector fills the canvas width",
+    );
+  } else {
+    assert.ok(
+      Math.abs(sidebar.y - canvas.y) <= 1,
+      "details align with the canvas top",
+    );
+    assert.ok(
+      Math.abs(sidebar.y + sidebar.height - canvas.y - canvas.height) <= 1,
+      "details stay within the canvas height",
+    );
+    assert.ok(
+      sidebar.x >= canvas.x + canvas.width,
+      "details take their own space beside the graph",
+    );
+  }
   // The architecture map collapses its legend behind a toggle.
   const legend = await page
     .getByLabel("Graph legend")

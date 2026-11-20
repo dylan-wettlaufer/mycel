@@ -129,6 +129,21 @@ try {
 
   await expect(page.locator(".react-flow__edge")).toHaveCount(0);
 
+  const sidebar = page.getByRole("complementary", {
+    name: "Selection details",
+  });
+  const coreLink = sidebar.getByRole("button", { name: /^core / });
+  await coreLink.hover();
+  const preview = page.locator(".react-flow__edge");
+  await expect(preview).toHaveCount(1);
+  await expect(preview.locator(".react-flow__edge-text")).toHaveText(
+    "1 import · 1 call",
+  );
+  await sidebar
+    .getByRole("heading", { name: "Connections", exact: true })
+    .hover();
+  await expect(preview).toHaveCount(0);
+
   await page
     .getByRole("button", { name: "Show minor connections (2)" })
     .click();
@@ -165,12 +180,26 @@ try {
 
   // 2. Selecting a part shows connections, files, and allows drilling into connection evidence and source.
   await coreCard.click();
-  const sidebar = page.getByRole("complementary", {
-    name: "Selection details",
-  });
   await expect(sidebar).toContainText("Core domain logic.");
-  await expect(sidebar).toContainText("Depends on");
-  await expect(sidebar).toContainText("Used by");
+  await expect(sidebar).toContainText("Library · 1 file");
+  await expect(sidebar).toContainText(
+    "1 of 1 files changed · since branching from main · 1 uncommitted",
+  );
+  await expect(
+    sidebar.getByRole("heading", { name: "Uses", exact: true }),
+  ).toBeVisible();
+  await expect(sidebar.getByLabel("Entry points")).toContainText(
+    "Used by 1 part · 2 links",
+  );
+  const files = sidebar.getByLabel("Part files");
+  await expect(files).toHaveAttribute("open", "");
+  await expect(files).toContainText("packages/core/src");
+  await expect(files.getByRole("button", { name: /index\.ts/ })).toContainText(
+    "edited",
+  );
+  await expect(files.getByRole("button", { name: /index\.ts/ })).toContainText(
+    "uncommitted",
+  );
   await expect(coreCard).toHaveCSS("border-top-color", "rgb(52, 211, 153)");
   await expect(serverCard).toHaveCSS("border-top-color", "rgb(147, 197, 253)");
   await expect(dbCard).toHaveCSS("border-top-color", "rgb(147, 197, 253)");
@@ -186,6 +215,7 @@ try {
   const evidence = page.getByLabel("Connection evidence");
   await expect(evidence).toContainText("packages/core/src/index.ts");
   await expect(evidence).toContainText("readRows");
+  await expect(evidence.locator("details")).toHaveCount(1);
 
   // Click an evidence item to drill straight into source.
   await evidence

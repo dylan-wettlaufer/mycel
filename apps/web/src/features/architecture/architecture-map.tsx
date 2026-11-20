@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Sparkles } from "lucide-react";
+import type { Edge } from "@xyflow/react";
 import type {
   ArchitectureChangeWindow,
   ArchitecturePartWithChanges,
@@ -70,6 +71,20 @@ function findMatchingFeatures(
   });
 }
 
+/** A merged two-way line carries both connection IDs. */
+function findDisplayEdgeId(
+  edges: readonly Edge[],
+  connectionId: string,
+): string | null {
+  return (
+    edges.find(
+      (edge) =>
+        Array.isArray(edge.data?.connectionIds) &&
+        edge.data.connectionIds.includes(connectionId),
+    )?.id ?? null
+  );
+}
+
 export function ArchitectureMapView({
   revision,
   architectureRevision,
@@ -109,13 +124,10 @@ export function ArchitectureMapView({
   );
 
   const map = mapResource.data;
-  const layout = useMemo(
-    () =>
-      map
-        ? layoutArchitectureMap(map, { showMinor })
-        : { nodes: [], edges: [], hiddenMinorCount: 0 },
-    [map, showMinor],
-  );
+  const [connectionPreview, setConnectionPreview] = useState<{
+    partId: string;
+    ids: string[];
+  } | null>(null);
 
   const selectedPart =
     selection?.kind === "part"
@@ -135,14 +147,40 @@ export function ArchitectureMapView({
     selection?.kind === "connection"
       ? map?.connections.find((connection) => connection.id === selection.id)
       : undefined;
-  // A merged two-way line uses one connection's id for both directions.
-  const selectedEdgeId = selectedConnection
-    ? (layout.edges.find(
-        (edge) =>
-          Array.isArray(edge.data?.connectionIds) &&
-          edge.data.connectionIds.includes(selectedConnection.id),
-      )?.id ?? null)
+  const previewedIds =
+    selectedPartId && connectionPreview?.partId === selectedPartId
+      ? connectionPreview.ids
+      : undefined;
+  const selectedConnectionId = selectedConnection?.id;
+  const baseLayout = useMemo(
+    () =>
+      map
+        ? layoutArchitectureMap(map, { showMinor })
+        : { nodes: [], edges: [], hiddenMinorCount: 0 },
+    [map, showMinor],
+  );
+  const layout = useMemo(() => {
+    const ids = selectedConnectionId ? [selectedConnectionId] : previewedIds;
+    if (!map || !ids?.some((id) => !findDisplayEdgeId(baseLayout.edges, id))) {
+      return baseLayout;
+    }
+    return layoutArchitectureMap(map, { showMinor, revealConnectionIds: ids });
+  }, [baseLayout, map, previewedIds, selectedConnectionId, showMinor]);
+  const selectedEdgeId = selectedConnectionId
+    ? findDisplayEdgeId(layout.edges, selectedConnectionId)
     : null;
+  const previewEdgeId = previewedIds?.[0]
+    ? findDisplayEdgeId(layout.edges, previewedIds[0])
+    : null;
+
+  const select = (kind: "part" | "connection", id: string) => {
+    setConnectionPreview(null);
+    setSelection({ kind, id });
+  };
+  const clearSelection = () => {
+    setConnectionPreview(null);
+    setSelection(null);
+  };
 
   const matchingFeatures = useMemo(
     () => findMatchingFeatures(selectedPart, featuresResource.data?.features),
@@ -278,9 +316,10 @@ export function ArchitectureMapView({
             selectedId={selectedPartId}
             selectedNeighborIds={selectedNeighborIds}
             selectedEdgeId={selectedEdgeId}
-            onSelect={(id) => setSelection({ kind: "part", id })}
-            onEdgeSelect={(id) => setSelection({ kind: "connection", id })}
-            onClear={() => setSelection(null)}
+            previewEdgeId={previewEdgeId}
+            onSelect={(id) => select("part", id)}
+            onEdgeSelect={(id) => select("connection", id)}
+            onClear={clearSelection}
             onOpen={(id) => {
               const part = map.parts.find((item) => item.id === id);
               if (part && part.files.length > 0) onOpenPartFiles(part);
@@ -292,11 +331,16 @@ export function ArchitectureMapView({
                   selectedPart={selectedPart}
                   selectedConnection={selectedConnection}
                   matchingFeatures={matchingFeatures}
-                  onSelectPart={(id) => setSelection({ kind: "part", id })}
-                  onSelectConnection={(id) =>
-                    setSelection({ kind: "connection", id })
+                  onSelectPart={(id) => select("part", id)}
+                  onSelectConnection={(id) => select("connection", id)}
+                  onPreviewConnections={(ids) =>
+                    setConnectionPreview(
+                      selectedPartId && ids.length
+                        ? { partId: selectedPartId, ids }
+                        : null,
+                    )
                   }
-                  onClear={() => setSelection(null)}
+                  onClear={clearSelection}
                   onOpenPartFiles={onOpenPartFiles}
                   onOpenFile={openFileByPath}
                   onOpenFeature={onOpenFeature}

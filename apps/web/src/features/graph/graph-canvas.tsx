@@ -100,6 +100,7 @@ export function GraphCanvas({
   edges,
   selectedId,
   selectedEdgeId = null,
+  previewEdgeId = null,
   selectedNeighborIds,
   onSelect,
   onEdgeSelect,
@@ -116,6 +117,7 @@ export function GraphCanvas({
   edges: Edge[];
   selectedId: string | null;
   selectedEdgeId?: string | null;
+  previewEdgeId?: string | null;
   selectedNeighborIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onEdgeSelect?: ((id: string) => void) | undefined;
@@ -184,7 +186,7 @@ export function GraphCanvas({
         selectedId,
         onlyConnections,
         selectedEdgeId,
-        hoveredEdgeId,
+        previewEdgeId ?? hoveredEdgeId,
         previewId,
         selectedNeighborIds,
       ),
@@ -196,6 +198,7 @@ export function GraphCanvas({
       onlyConnections,
       selectedEdgeId,
       hoveredEdgeId,
+      previewEdgeId,
       selectedNeighborIds,
     ],
   );
@@ -243,6 +246,7 @@ export function GraphCanvas({
         behaviour
           ? "flex-col lg:flex-row lg:overflow-hidden"
           : "overflow-hidden",
+        mode === "architecture" && sidePanel && "flex-col md:flex-row",
       )}
     >
       <div

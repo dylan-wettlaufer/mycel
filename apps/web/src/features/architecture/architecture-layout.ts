@@ -23,6 +23,7 @@ export const minorConnectionMaxCount = 2;
 
 export interface ArchitectureLayoutOptions {
   showMinor?: boolean;
+  revealConnectionIds?: readonly string[];
 }
 
 /** One drawn line: a connection, or two opposite connections merged. */
@@ -93,10 +94,17 @@ export function findFoundationParts(map: ArchitectureMap): Set<string> {
 function displayConnections(
   map: ArchitectureMap,
   foundation: ReadonlySet<string>,
-  showMinor: boolean,
+  { showMinor = false, revealConnectionIds }: ArchitectureLayoutOptions,
 ): { displays: DisplayConnection[]; hiddenMinorCount: number } {
+  const revealed = new Set(revealConnectionIds);
+  const minor = map.connections.filter(
+    (connection) => connection.count <= minorConnectionMaxCount,
+  );
   const visible = map.connections.filter(
-    (connection) => showMinor || connection.count > minorConnectionMaxCount,
+    (connection) =>
+      showMinor ||
+      connection.count > minorConnectionMaxCount ||
+      revealed.has(connection.id),
   );
   const byPair = new Map<string, ArchitectureConnectionWithChanges>();
   for (const connection of visible) {
@@ -137,7 +145,7 @@ function displayConnections(
   }
   return {
     displays,
-    hiddenMinorCount: map.connections.length - visible.length,
+    hiddenMinorCount: showMinor ? 0 : minor.length,
   };
 }
 
@@ -160,7 +168,7 @@ export function layoutArchitectureMap(
   const { displays, hiddenMinorCount } = displayConnections(
     fullMap,
     foundation,
-    options.showMinor ?? false,
+    options,
   );
   const columns = roleLayers
     .map((kinds, index) =>
