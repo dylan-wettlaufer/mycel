@@ -36,21 +36,22 @@ const ArchitectureMapView = lazy(() =>
 export function App() {
   const { navigation, navigate } = useNavigation();
   const { view, nodeId, rootId, featureId, changeId, source } = navigation;
+  const scopeId = rootId ?? nodeId;
   const [architectureWindow, setArchitectureWindow] =
     useState<ArchitectureChangeWindow>("branch");
   const activity = useActivity();
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
   const selected = useResource(
-    nodeId && view === "Graph"
+    nodeId && nodeId !== scopeId && view === "Graph"
       ? `/api/graph/nodes/${encodeURIComponent(nodeId)}`
       : null,
     isNodeDetails,
     activity.revision,
   );
   const root = useResource(
-    rootId && rootId !== nodeId && view === "Graph"
-      ? `/api/graph/nodes/${encodeURIComponent(rootId)}`
+    scopeId && nodeId && view === "Graph"
+      ? `/api/graph/nodes/${encodeURIComponent(scopeId)}`
       : null,
     isNodeDetails,
     activity.revision,
@@ -63,8 +64,14 @@ export function App() {
     isChangeEvent,
   );
   const selectedEvent = localEvent ?? record.data;
-  const node = selected.data?.node;
-  const rootNode = rootId && rootId !== nodeId ? root.data?.node : node;
+  const rootNode = root.data?.node;
+  const node = scopeId === nodeId ? rootNode : selected.data?.node;
+  const selectNode = (next: GraphNode) =>
+    navigate({ ...navigation, rootId: scopeId ?? next.id, nodeId: next.id });
+  const scopeNode = (next: GraphNode) =>
+    navigate({ ...navigation, rootId: next.id });
+  const showNodeActivity = (next: GraphNode) =>
+    navigate({ view: "Activity", nodeId: next.id });
   const openNode = (next: GraphNode) =>
     navigate({ view: "Graph", nodeId: next.id, rootId: next.id });
   const returnToArchitecture = () =>
@@ -235,7 +242,7 @@ export function App() {
             Show node history
           </Button>
         </section>
-      ) : !node || !rootNode ? (
+      ) : !rootNode || (!node && rootNode.kind !== "file") ? (
         <p>Loading node…</p>
       ) : (
         <Suspense fallback={<p>Loading graph…</p>}>
@@ -243,51 +250,53 @@ export function App() {
             key={rootNode.id}
             onOverview={returnToArchitecture}
             root={rootNode}
+            selectedId={nodeId}
             selected={node}
-            onSelect={(next) => navigate({ ...navigation, nodeId: next.id })}
+            onSelect={selectNode}
+            onScope={scopeNode}
+            onActivity={showNodeActivity}
             revision={activity.revision}
             events={activity.events}
             details={
-              <div className="space-y-3">
-                {source && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate({ ...navigation, source: false })}
-                    >
-                      Close source
-                    </Button>
-                    <SourcePanel node={node} revision={activity.revision} />
-                  </>
-                )}
-                <NodeDetailsPanel
-                  node={node}
-                  onSelect={(next) =>
-                    navigate({ ...navigation, nodeId: next.id })
-                  }
-                  onScope={(next) =>
-                    navigate({ ...navigation, rootId: next.id })
-                  }
-                  onSource={() => navigate({ ...navigation, source: true })}
-                  revision={activity.revision}
-                />
-                {node.kind === "file" && (
-                  <FileSymbols
-                    file={node}
+              rootNode.kind !== "file" &&
+              node && (
+                <div className="space-y-3">
+                  {source && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          navigate({ ...navigation, source: false })
+                        }
+                      >
+                        Close source
+                      </Button>
+                      <SourcePanel node={node} revision={activity.revision} />
+                    </>
+                  )}
+                  <NodeDetailsPanel
+                    node={node}
+                    onSelect={selectNode}
+                    onScope={scopeNode}
+                    onSource={() => navigate({ ...navigation, source: true })}
                     revision={activity.revision}
-                    onSelect={openNode}
                   />
-                )}
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    navigate({ view: "Activity", nodeId: node.id })
-                  }
-                >
-                  Show node activity
-                </Button>
-              </div>
+                  {node.kind === "file" && (
+                    <FileSymbols
+                      file={node}
+                      revision={activity.revision}
+                      onSelect={openNode}
+                    />
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => showNodeActivity(node)}
+                  >
+                    Show node activity
+                  </Button>
+                </div>
+              )
             }
           />
         </Suspense>

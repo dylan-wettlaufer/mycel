@@ -23,9 +23,13 @@ const control = join(directory, "control");
 await mkdir(root, { recursive: true });
 await mkdir(control, { recursive: true });
 execFileSync("git", ["init", "-q", root]);
+const mathPreamble =
+  `// WRAP_START ${"example ".repeat(135)} WRAP_TAIL\n` +
+  "// Example\n".repeat(100);
 await writeFile(
   join(root, "math.ts"),
-  "export function double(value: number) {\n  return value * 2;\n}\n",
+  mathPreamble +
+    "export function double(value: number) {\n  return value * 2;\n}\n",
 );
 await writeFile(
   join(root, "main.ts"),
@@ -378,19 +382,119 @@ try {
   );
   await selectionFitsScreen();
   await page.getByRole("button", { name: "Open file", exact: true }).click();
-  await page
+  const fileViewer = page.getByRole("complementary", { name: "File viewer" });
+  const fileSource = fileViewer.getByRole("region", { name: "Source code" });
+  const graphScope = page
+    .getByRole("region", { name: "Scoped graph" })
+    .locator("h2");
+  const canvas = page.locator(".graph-canvas");
+  const viewport = canvas.locator(".react-flow__viewport");
+  const wrap = fileViewer.getByRole("button", { name: "Wrap lines" });
+  const longLine = fileSource
+    .locator(".view-line")
+    .filter({ hasText: "WRAP_TAIL" });
+  const graphNode = (name) => canvas.getByRole("group", { name });
+  await expect(graphScope).toHaveText("math.ts");
+  await expect(
+    fileViewer.getByRole("heading", { name: "math.ts" }),
+  ).toBeVisible();
+  await expect(wrap).toHaveAttribute("aria-pressed", "true");
+  await expect(longLine).toBeVisible();
+  await expect(longLine).not.toContainText("WRAP_START");
+  await wrap.click();
+  await expect(longLine).toContainText("WRAP_START");
+  await wrap.click();
+  await expect(fileSource.locator(".source-declaration-highlight")).toHaveCount(
+    0,
+  );
+  await expect(fileViewer.getByLabel("Node details")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Readable zoom" }).click();
+  await expect(viewport).toHaveCSS("transform", /^matrix\(0\.8,/);
+  const graphPosition = await viewport.getAttribute("style");
+  const splitBounds = await fileViewer.boundingBox();
+  const editorBounds = await fileSource.locator(".monaco-editor").boundingBox();
+  assert.ok(splitBounds && editorBounds);
+  assert.ok(editorBounds.height > 480);
+  assert.ok(
+    Math.abs(
+      editorBounds.y + editorBounds.height - splitBounds.y - splitBounds.height,
+    ) <= 2,
+  );
+  await fileViewer.getByRole("button", { name: "Focus source" }).click();
+  await expect(canvas).toBeHidden();
+  const focusBounds = await fileViewer.boundingBox();
+  assert.ok(focusBounds && focusBounds.width > splitBounds.width);
+  await fileViewer.getByRole("button", { name: "Show graph" }).click();
+  await expect(canvas).toBeVisible();
+  await expect(viewport).toHaveAttribute("style", graphPosition);
+  await page.getByRole("button", { name: "Fit all" }).click();
+  await graphNodesFitCanvas();
+
+  await graphNode(/^file main\.ts,/).click();
+  await sourceContains("double(3)");
+  await expect(graphScope).toHaveText("math.ts");
+  await expect(
+    fileViewer.getByRole("heading", { name: "main.ts" }),
+  ).toBeVisible();
+  await graphNode(/^file math\.ts,/).click();
+  await expect(
+    fileViewer.getByRole("heading", { name: "math.ts" }),
+  ).toBeVisible();
+  await fileViewer.getByRole("tab", { name: "Details" }).click();
+  await expect(fileViewer.getByLabel("Node details")).toBeVisible();
+  await expect(fileViewer.getByLabel("Selected connections")).toBeVisible();
+  await fileViewer
     .getByLabel("File symbols")
     .getByRole("button", { name: /double.*function/ })
     .click();
-  await expect(page.getByLabel("Node details")).toContainText("double");
-  await selectionFitsScreen();
-  await dragWithoutFlicker(
-    page.locator(".react-flow__node").filter({ hasText: "double" }),
+  await expect(fileViewer.getByRole("tab", { name: "Source" })).toHaveAttribute(
+    "aria-selected",
+    "true",
   );
+  await expect(graphScope).toHaveText("math.ts");
+  await expect(graphNode(/^function double,/)).toHaveClass(/graph-selected/);
+  await expect(
+    fileViewer.getByText("math.ts:102", { exact: true }),
+  ).toBeVisible();
+  await sourceContains("value * 2");
+  await expect(
+    fileSource.locator(".source-declaration-highlight").first(),
+  ).toBeVisible();
+  await dragWithoutFlicker(graphNode(/^function double,/));
   await page.screenshot({
-    path: join(directory, "graph-sidebar.png"),
+    path: join(directory, "file-workspace.png"),
     fullPage: true,
   });
+  const desktopViewport = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(async () => {
+      const graphBounds = await canvas.boundingBox();
+      const sourceBounds = await fileViewer.boundingBox();
+      return Boolean(
+        graphBounds &&
+        sourceBounds &&
+        sourceBounds.y >= graphBounds.y + graphBounds.height &&
+        Math.abs(sourceBounds.width - graphBounds.width) <= 1,
+      );
+    })
+    .toBe(true);
+  await graphNodesFitCanvas();
+  await fileSource.hover();
+  await page.mouse.wheel(0, -3000);
+  await expect(fileSource.locator(".source-declaration-highlight")).toHaveCount(
+    0,
+  );
+  await graphNode(/^function double,/).click();
+  await expect(
+    fileSource.locator(".source-declaration-highlight").first(),
+  ).toBeVisible();
+  await page.screenshot({
+    path: join(directory, "file-workspace-mobile.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize(desktopViewport);
   await page.getByRole("button", { name: "Explorer", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Search files and symbols" })
@@ -484,6 +588,12 @@ try {
   );
   await page.getByRole("button", { name: "Show node history" }).click();
   await expect(page.getByLabel("Historical node")).toContainText("obsolete");
+  await expect(
+    page
+      .getByRole("region", { name: "Recorded source diff" })
+      .locator(".line-delete")
+      .first(),
+  ).toBeVisible();
   await closeServer();
   await expect(page.getByRole("status").first()).toHaveText("Disconnected");
   await expect(page.getByLabel("Live connection")).toHaveText(

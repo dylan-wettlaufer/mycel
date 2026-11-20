@@ -113,6 +113,7 @@ export function GraphCanvas({
   details,
   sidePanel,
   hideConnectionFilter = false,
+  hideSelectionDetails = false,
 }: {
   nodes: Node[];
   edges: Edge[];
@@ -131,6 +132,7 @@ export function GraphCanvas({
   details?: ReactNode;
   sidePanel?: ReactNode;
   hideConnectionFilter?: boolean;
+  hideSelectionDetails?: boolean;
 }) {
   const [onlyConnections, setOnlyConnections] = useState(false);
   const [nodeState, setNodeState] = useState<NodeState>(() => ({
@@ -221,12 +223,13 @@ export function GraphCanvas({
           ),
         };
       });
-      if (behaviour) {
+      if (behaviour || hideSelectionDetails) {
         const selection = changes.find(
           (change) => change.type === "select" && change.selected,
         );
         if (selection?.type === "select") onSelect(selection.id);
         else if (
+          behaviour &&
           changes.some(
             (change) => change.type === "select" && change.id === selectedId,
           )
@@ -234,7 +237,7 @@ export function GraphCanvas({
           onClear();
       }
     },
-    [behaviour, nodes, onClear, onSelect, selectedId],
+    [behaviour, hideSelectionDetails, nodes, onClear, onSelect, selectedId],
   );
   const connections = useMemo(
     () => graphConnections(nodes, edges, selectedId),
@@ -290,7 +293,11 @@ export function GraphCanvas({
         >
           <Panel position="top-right">
             <div
-              className={cn("graph-reading-controls", behaviour && "flex-row!")}
+              className={cn(
+                "graph-reading-controls",
+                hideSelectionDetails && "graph-reading-controls-compact",
+                behaviour && "flex-row!",
+              )}
               aria-label="Graph reading controls"
             >
               <Button
@@ -364,7 +371,7 @@ export function GraphCanvas({
             />
           )}
           <Panel position="top-left" className="max-w-[calc(100%-64px)]">
-            {behaviour || mode === "architecture" ? (
+            {behaviour || mode === "architecture" || hideSelectionDetails ? (
               <Collapsible.Root className="group">
                 <Collapsible.Trigger asChild>
                   <Button variant="outline" size="sm">
@@ -388,7 +395,7 @@ export function GraphCanvas({
         </ReactFlow>
       </div>
       {sidePanel}
-      {!sidePanel && selected && (
+      {!sidePanel && !hideSelectionDetails && selected && (
         <aside
           aria-label="Selection details"
           className={cn(
@@ -422,27 +429,11 @@ export function GraphCanvas({
             <div className="space-y-5 p-4">
               {details}
               {!behaviour && (
-                <section
-                  aria-label="Selected connections"
-                  className="space-y-5"
-                >
-                  <Connections
-                    title={
-                      mode === "symbols" ? "Points to selection" : "Used by"
-                    }
-                    nodes={connections.incoming}
-                    onSelect={onSelect}
-                    direction="incoming"
-                  />
-                  <Connections
-                    title={
-                      mode === "symbols" ? "Selection points to" : "Depends on"
-                    }
-                    nodes={connections.outgoing}
-                    onSelect={onSelect}
-                    direction="outgoing"
-                  />
-                </section>
+                <SelectionConnections
+                  connections={connections}
+                  onSelect={onSelect}
+                  symbols={mode === "symbols"}
+                />
               )}
             </div>
           </ScrollArea>
@@ -536,6 +527,33 @@ function GraphLegend({
       )}
       {mode === "behaviour" && <span>Drag or scroll to pan</span>}
     </div>
+  );
+}
+
+export function SelectionConnections({
+  connections,
+  onSelect,
+  symbols,
+}: {
+  connections: ReturnType<typeof graphConnections>;
+  onSelect: (id: string) => void;
+  symbols: boolean;
+}) {
+  return (
+    <section aria-label="Selected connections" className="space-y-5">
+      <Connections
+        title={symbols ? "Points to selection" : "Used by"}
+        nodes={connections.incoming}
+        onSelect={onSelect}
+        direction="incoming"
+      />
+      <Connections
+        title={symbols ? "Selection points to" : "Depends on"}
+        nodes={connections.outgoing}
+        onSelect={onSelect}
+        direction="outgoing"
+      />
+    </section>
   );
 }
 

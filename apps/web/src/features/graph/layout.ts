@@ -6,11 +6,16 @@ export function layoutNeighborhood(
   graph: Neighborhood,
   selectedId: string,
   recent: Map<string, ChangeAction> = new Map(),
+  compact = false,
 ): { nodes: Node[]; edges: Edge[] } {
   const layout = new dagre.graphlib.Graph({
     multigraph: true,
   }).setDefaultEdgeLabel(() => ({}));
-  layout.setGraph({ rankdir: "LR", nodesep: 100, ranksep: 180 });
+  layout.setGraph({
+    rankdir: "LR",
+    nodesep: compact ? 56 : 100,
+    ranksep: compact ? 88 : 180,
+  });
   for (const node of graph.nodes)
     layout.setNode(node.id, { width: 240, height: 100 });
   for (const edge of graph.edges)

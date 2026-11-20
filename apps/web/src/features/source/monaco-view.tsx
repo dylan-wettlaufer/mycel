@@ -29,17 +29,19 @@ export const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions =
     padding: { top: 12 },
   };
 
-export default function MonacoView({
-  content,
-  path,
-  range,
-}: {
-  content: string;
-  path: string;
-  range: SourceRange;
-}) {
-  const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const select = (instance: monaco.editor.IStandaloneCodeEditor) => {
+export interface SourceWorkspaceOptions {
+  wrapped: boolean;
+  declarationLine: number | undefined;
+  locationKey: string;
+}
+
+function revealLocation(
+  instance: monaco.editor.IStandaloneCodeEditor,
+  decorations: monaco.editor.IEditorDecorationsCollection,
+  range: SourceRange | undefined,
+  declarationLine: number | undefined,
+) {
+  if (range) {
     instance.setSelection({
       startLineNumber: range.startLine,
       startColumn: range.startColumn,
@@ -47,31 +49,77 @@ export default function MonacoView({
       endColumn: range.endColumn,
     });
     instance.revealLineInCenter(range.startLine);
-  };
+    return;
+  }
+  if (declarationLine === undefined) {
+    decorations.clear();
+    return;
+  }
+  const line = Math.max(
+    1,
+    Math.min(declarationLine, instance.getModel()?.getLineCount() ?? 1),
+  );
+  decorations.set([
+    {
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        isWholeLine: true,
+        className: "source-declaration-highlight",
+      },
+    },
+  ]);
+  instance.revealLineInCenterIfOutsideViewport(line);
+}
+
+export default function MonacoView({
+  content,
+  path,
+  range,
+  workspace,
+}: {
+  content: string;
+  path: string;
+  range?: SourceRange | undefined;
+  workspace?: SourceWorkspaceOptions | undefined;
+}) {
+  const editor = useRef<{
+    instance: monaco.editor.IStandaloneCodeEditor;
+    decorations: monaco.editor.IEditorDecorationsCollection;
+  } | null>(null);
+  const declarationLine = workspace?.declarationLine;
+  const locationKey = workspace?.locationKey;
   useEffect(() => {
-    const instance = editor.current;
-    if (instance) {
-      instance.setSelection({
-        startLineNumber: range.startLine,
-        startColumn: range.startColumn,
-        endLineNumber: range.endLine,
-        endColumn: range.endColumn,
-      });
-      instance.revealLineInCenter(range.startLine);
-    }
-  }, [range, content]);
+    const current = editor.current;
+    if (current)
+      revealLocation(
+        current.instance,
+        current.decorations,
+        range,
+        declarationLine,
+      );
+  }, [range, declarationLine, locationKey, path, content]);
   const onMount: OnMount = (instance) => {
-    editor.current = instance;
-    select(instance);
+    const decorations = instance.createDecorationsCollection();
+    editor.current = { instance, decorations };
+    revealLocation(instance, decorations, range, declarationLine);
   };
   return (
     <Editor
-      height="480px"
+      height={workspace ? "100%" : "480px"}
       path={path}
       language="typescript"
       value={content}
       theme="mycel"
-      options={editorOptions}
+      options={
+        workspace
+          ? {
+              ...editorOptions,
+              ariaLabel: `Source for ${path}`,
+              wordWrap: workspace.wrapped ? "on" : "off",
+              renderLineHighlight: "none",
+            }
+          : editorOptions
+      }
       onMount={onMount}
     />
   );

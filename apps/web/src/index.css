@@ -471,6 +471,11 @@
 .graph-canvas {
   container-type: inline-size;
 }
+@container (min-width: 260px) {
+  .graph-reading-controls-compact {
+    flex-direction: row;
+  }
+}
 @container (min-width: 400px) {
   .graph-reading-controls {
     flex-direction: row;
@@ -478,6 +483,9 @@
 }
 .graph-canvas .react-flow__panel {
   margin: 10px;
+}
+.source-declaration-highlight {
+  background-color: color-mix(in oklch, var(--primary) 16%, transparent);
 }
 .graph-legend > span {
   display: inline-flex;

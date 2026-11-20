@@ -1,16 +1,21 @@
-import { GraphCanvas } from "./graph-canvas";
+import { GraphCanvas, SelectionConnections } from "./graph-canvas";
 import { recentChanges } from "@/features/activity/event-node";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
 import { isNeighborhood } from "@/lib/contracts";
+import { FileWorkspace } from "./file-workspace";
+import { graphConnections } from "./graph-focus";
 import { layoutNeighborhood } from "./layout";
 
 export function GraphPanel({
   root,
+  selectedId,
   selected,
   onSelect,
+  onScope,
+  onActivity,
   revision = 0,
   events = [],
   onOverview,
@@ -18,8 +23,11 @@ export function GraphPanel({
 }: {
   details?: ReactNode;
   root: GraphNode;
-  selected: GraphNode;
+  selectedId: string;
+  selected: GraphNode | undefined;
   onSelect: (node: GraphNode) => void;
+  onScope: (node: GraphNode) => void;
+  onActivity: (node: GraphNode) => void;
   revision?: number;
   events?: ChangeEvent[];
   onOverview: () => void;
@@ -30,7 +38,10 @@ export function GraphPanel({
     return () => clearInterval(timer);
   }, []);
   const [clearedFor, setClearedFor] = useState<string | null>(null);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
+  const [sourceReveal, setSourceReveal] = useState(0);
   const [depth, setDepth] = useState(1);
+  const fileView = root.kind === "file";
   const { data, error } = useResource(
     `/api/graph/nodes/${encodeURIComponent(root.id)}/neighborhood?depth=${depth}&limit=100`,
     isNeighborhood,
@@ -39,9 +50,58 @@ export function GraphPanel({
   const layout = useMemo(
     () =>
       data
-        ? layoutNeighborhood(data, selected.id, recentChanges(events, now))
+        ? layoutNeighborhood(
+            data,
+            selectedId,
+            recentChanges(events, now),
+            fileView,
+          )
         : { nodes: [], edges: [] },
-    [data, selected.id, events, now],
+    [data, selectedId, events, now, fileView],
+  );
+  const selectedInGraph = data?.nodes.find((node) => node.id === selectedId);
+  const reading = selected ?? selectedInGraph;
+  const file =
+    reading?.kind === "file"
+      ? reading
+      : data?.nodes.find(
+          (node) => node.kind === "file" && node.path === reading?.path,
+        );
+  const graphSelection = fileView
+    ? (selectedInGraph?.id ?? file?.id ?? null)
+    : clearedFor === selectedId
+      ? null
+      : selectedId;
+  const select = (node: GraphNode) => {
+    setClearedFor(null);
+    setDetailsFor(null);
+    if (fileView && node.kind !== "file" && node.id === selectedId) {
+      setSourceReveal((reveal) => reveal + 1);
+    }
+    onSelect(node);
+  };
+  const selectFromGraph = (id: string) => {
+    const node = data?.nodes.find((node) => node.id === id);
+    if (node) select(node);
+  };
+  const graph = error ? (
+    <p role="alert">Graph unavailable. {error}</p>
+  ) : !data ? (
+    <p>Loading graph…</p>
+  ) : (
+    <GraphCanvas
+      key={depth}
+      nodes={layout.nodes}
+      edges={layout.edges}
+      selectedId={graphSelection}
+      mode="symbols"
+      details={details}
+      hideSelectionDetails={fileView}
+      onClear={() => {
+        if (!fileView) setClearedFor(selectedId);
+      }}
+      onSelect={selectFromGraph}
+    />
   );
   return (
     <section
@@ -54,6 +114,7 @@ export function GraphPanel({
             {root.name}
           </h2>
           <p className="text-xs text-muted-foreground">
+            {fileView && "Graph scope · "}
             {data ? `${data.nodes.length} nodes` : "Loading…"}
           </p>
         </div>
@@ -82,33 +143,38 @@ export function GraphPanel({
           </Button>
         </div>
       </div>
-      {error ? (
-        <p role="alert">Graph unavailable. {error}</p>
-      ) : !data ? (
-        <p>Loading graph…</p>
+      {data?.truncated && (
+        <p className="text-sm text-warning">
+          Neighborhood limited to 100 nodes. Use Focus neighborhood to explore a
+          different scope.
+        </p>
+      )}
+      {fileView ? (
+        <FileWorkspace
+          node={reading}
+          file={file}
+          graph={graph}
+          connections={
+            <SelectionConnections
+              connections={graphConnections(
+                layout.nodes,
+                layout.edges,
+                reading?.id ?? null,
+              )}
+              onSelect={selectFromGraph}
+              symbols
+            />
+          }
+          revision={revision}
+          sourceReveal={sourceReveal}
+          detailsOpen={detailsFor === selectedId}
+          onDetailsChange={(open) => setDetailsFor(open ? selectedId : null)}
+          onSelect={select}
+          onScope={onScope}
+          onActivity={onActivity}
+        />
       ) : (
-        <>
-          {data.truncated && (
-            <p className="text-sm text-warning">
-              Neighborhood limited to 100 nodes. Select a node to explore a
-              different scope.
-            </p>
-          )}
-          <GraphCanvas
-            key={`${root.id}:${depth}`}
-            nodes={layout.nodes}
-            edges={layout.edges}
-            selectedId={clearedFor === selected.id ? null : selected.id}
-            mode="symbols"
-            details={details}
-            onClear={() => setClearedFor(selected.id)}
-            onSelect={(id) => {
-              setClearedFor(null);
-              const node = data.nodes.find((node) => node.id === id);
-              if (node) onSelect(node);
-            }}
-          />
-        </>
+        graph
       )}
     </section>
   );
