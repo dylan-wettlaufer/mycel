@@ -84,7 +84,13 @@ export function AppShell({
                   : "text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground",
               )}
             >
-              <Icon className="size-4" aria-hidden />
+              <Icon
+                className={cn(
+                  "size-4",
+                  label === view && "text-sidebar-primary",
+                )}
+                aria-hidden
+              />
               {label}
             </Button>
           ))}

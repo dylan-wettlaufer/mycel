@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --emerald: #34d399;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -72,21 +73,21 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.2925 0.0101 229.2462);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.7029 0.1676 156.3137);
+  --primary: var(--emerald);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.3006 0.01 229.2278);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.2844 0.0101 229.2661);
   --muted-foreground: oklch(0.808 0 0);
-  --accent: oklch(0.34 0.045 157);
+  --accent: color-mix(in srgb, var(--emerald) 16%, var(--background));
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.671 0.18 24);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.7029 0.1676 156.3137);
+  --success: var(--emerald);
   --warning: oklch(0.79 0.12 49);
   --border: oklch(0.3439 0.0097 229.1468);
   --input: oklch(0.3006 0.01 229.2278);
-  --ring: oklch(0.9509 0.0563 158.5947);
+  --ring: color-mix(in srgb, var(--emerald) 65%, var(--foreground));
   --chart-1: oklch(0.81 0.1 252);
   --chart-2: oklch(0.62 0.19 260);
   --chart-3: oklch(0.55 0.22 263);
@@ -94,12 +95,12 @@
   --chart-5: oklch(0.42 0.18 266);
   --sidebar: oklch(0.2023 0.0061 236.8873);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.7029 0.1676 156.3137);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(0.205 0 0);
-  --sidebar-accent: oklch(0.34 0.045 157);
+  --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.3439 0.0097 229.1468);
-  --sidebar-ring: oklch(0.9509 0.0563 158.5947);
+  --sidebar-ring: var(--ring);
   --font-sans: "Geist Variable", Geist, ui-sans-serif, sans-serif, system-ui;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono:
@@ -604,7 +605,7 @@
   --architecture-canvas: #17191c;
   --architecture-card: #24272b;
   --architecture-border: #34383e;
-  --architecture-selection: #34d399;
+  --architecture-selection: var(--emerald);
   --architecture-relationship: #93c5fd;
   --architecture-edge: #65717e;
   --architecture-status-new: #b7c0cb;
