@@ -2,6 +2,7 @@ import type {
   ArchitectureConnectionEvidence,
   ArchitectureConnectionWithChanges,
   ArchitectureGitChanges,
+  ArchitecturePartWithChanges,
 } from "@mycel/shared";
 
 export interface PartConnectionRow {
@@ -16,8 +17,15 @@ export function groupPartConnections(
   connections: readonly ArchitectureConnectionWithChanges[],
 ) {
   const byPart = new Map<string, PartConnectionRow>();
+  const mapTotals = new Map<string, number>();
+  let strongest = 0;
   for (const connection of connections) {
     const { sourcePartId, targetPartId, count } = connection;
+    // A reciprocal row combines both directions, so use pair totals for the map scale too.
+    const pairId = [sourcePartId, targetPartId].sort().join("\0");
+    const total = (mapTotals.get(pairId) ?? 0) + count;
+    mapTotals.set(pairId, total);
+    strongest = Math.max(strongest, total);
     if (sourcePartId !== partId && targetPartId !== partId) continue;
     const outgoing = sourcePartId === partId;
     const otherId = outgoing ? targetPartId : sourcePartId;
@@ -33,37 +41,57 @@ export function groupPartConnections(
     twoWay: rows.filter((row) => row.uses && row.usedBy),
     uses: rows.filter((row) => row.uses && !row.usedBy),
     usedBy: rows.filter((row) => row.usedBy && !row.uses),
-    strongest: rows[0]?.count ?? 0,
+    strongest,
   };
 }
 
-export function rankEntryPoints(
-  partId: string,
+const smallPartFileLimit = 8;
+
+export function entryPointsForPart(
+  part: Pick<ArchitecturePartWithChanges, "id" | "files">,
   connections: readonly ArchitectureConnectionWithChanges[],
 ) {
   const byFile = new Map<
     string,
-    { path: string; sources: Set<string>; links: number }
+    { path: string; callers: Map<string, Set<string>>; links: number }
   >();
   for (const { targetPartId, sourcePartId, evidence } of connections) {
-    if (targetPartId !== partId) continue;
-    for (const { targetFile } of evidence) {
+    if (targetPartId !== part.id) continue;
+    for (const { targetFile, kind, symbol } of evidence) {
       const entry = byFile.get(targetFile) ?? {
         path: targetFile,
-        sources: new Set(),
+        callers: new Map(),
         links: 0,
       };
-      entry.sources.add(sourcePartId);
+      const symbols = entry.callers.get(sourcePartId) ?? new Set<string>();
+      if (kind === "call" && symbol) symbols.add(symbol);
+      entry.callers.set(sourcePartId, symbols);
       entry.links++;
       byFile.set(targetFile, entry);
     }
   }
-  return [...byFile.values()]
-    .map(({ path, sources, links }) => ({ path, parts: sources.size, links }))
+  const entries = [...byFile.values()];
+  if (
+    part.files.length <= smallPartFileLimit &&
+    entries.every(({ links }) => links === 1)
+  ) {
+    return [];
+  }
+  return entries
     .sort(
       (a, b) =>
-        b.links - a.links || b.parts - a.parts || a.path.localeCompare(b.path),
-    );
+        b.links - a.links ||
+        b.callers.size - a.callers.size ||
+        a.path.localeCompare(b.path),
+    )
+    .map(({ path, callers, links }) => ({
+      path,
+      links,
+      callers: [...callers].map(([partId, symbols]) => ({
+        partId,
+        symbols: [...symbols].sort(),
+      })),
+    }));
 }
 
 export function describeChangePeriod(changes: ArchitectureGitChanges) {

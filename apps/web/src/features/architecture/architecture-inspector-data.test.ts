@@ -7,7 +7,7 @@ import {
   groupConnectionEvidence,
   groupPartConnections,
   groupPartFiles,
-  rankEntryPoints,
+  entryPointsForPart,
 } from "./architecture-inspector-data";
 
 function connection(
@@ -33,7 +33,7 @@ function connection(
   };
 }
 
-test("groups reciprocal relationships once and ranks each group by link count", () => {
+test("groups reciprocal relationships once, ranks each group and scales against the whole map", () => {
   const apiUsesDb = connection("api", "db", Array(3).fill("db.ts"));
   const dbUsesApi = connection("db", "api", ["api.ts"]);
   const grouped = groupPartConnections("api", [
@@ -42,26 +42,67 @@ test("groups reciprocal relationships once and ranks each group by link count", 
     dbUsesApi,
     connection("api", "large", Array(5).fill("large.ts")),
     connection("cli", "api", ["api.ts"]),
+    connection("jobs", "queue", Array(6).fill("queue.ts")),
+    connection("queue", "jobs", Array(4).fill("jobs.ts")),
   ]);
   expect(grouped.twoWay).toEqual([
     { partId: "db", uses: apiUsesDb, usedBy: dbUsesApi, count: 4 },
   ]);
   expect(grouped.uses.map(({ partId }) => partId)).toEqual(["large", "small"]);
   expect(grouped.usedBy.map(({ partId }) => partId)).toEqual(["cli"]);
-  expect(grouped.strongest).toBe(5);
+  expect(grouped.strongest).toBe(10);
 });
 
-test("ranks entry points from incoming evidence and counts unique using parts", () => {
+test("ranks entry points and associates deduplicated call symbols with their callers", () => {
+  const apiUsesDb = connection("api", "db", [
+    "store.ts",
+    "store.ts",
+    "migration.ts",
+  ]);
+  apiUsesDb.evidence = apiUsesDb.evidence.map((item) =>
+    item.targetFile === "store.ts"
+      ? { ...item, kind: "call", symbol: "startServer" }
+      : item,
+  );
   expect(
-    rankEntryPoints("db", [
-      connection("api", "db", ["store.ts", "store.ts", "migration.ts"]),
+    entryPointsForPart({ id: "db", files: ["store.ts", "migration.ts"] }, [
+      apiUsesDb,
       connection("jobs", "db", ["store.ts"]),
       connection("db", "cache", ["ignored.ts"]),
     ]),
   ).toEqual([
-    { path: "store.ts", parts: 2, links: 3 },
-    { path: "migration.ts", parts: 1, links: 1 },
+    {
+      path: "store.ts",
+      links: 3,
+      callers: [
+        { partId: "api", symbols: ["startServer"] },
+        { partId: "jobs", symbols: [] },
+      ],
+    },
+    {
+      path: "migration.ts",
+      links: 1,
+      callers: [{ partId: "api", symbols: [] }],
+    },
   ]);
+});
+
+test("omits single-link entry points for small parts only", () => {
+  const links = [connection("api", "db", ["store.ts", "migration.ts"])];
+  const files = [
+    "store.ts",
+    "migration.ts",
+    "index.ts",
+    "schema.ts",
+    "seed.ts",
+    "query.ts",
+    "client.ts",
+    "types.ts",
+  ];
+  expect(entryPointsForPart({ id: "db", files }, links)).toEqual([]);
+  expect(
+    entryPointsForPart({ id: "db", files: [...files, "config.ts"] }, links),
+  ).toHaveLength(2);
 });
 
 test("puts changed folders and files first and preserves both file status and uncommitted state", () => {

@@ -23,7 +23,7 @@ import {
   groupConnectionEvidence,
   groupPartConnections,
   groupPartFiles,
-  rankEntryPoints,
+  entryPointsForPart,
   splitFilePath,
   type PartConnectionRow,
 } from "./architecture-inspector-data";
@@ -113,7 +113,8 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
     selectedPart.id,
     map.connections,
   );
-  const entries = rankEntryPoints(selectedPart.id, map.connections).slice(0, 5);
+  const hasConnections = twoWay.length + uses.length + usedBy.length > 0;
+  const entries = entryPointsForPart(selectedPart, map.connections).slice(0, 5);
   const { files, change } = selectedPart;
   const changed = change.addedFiles + change.modifiedFiles;
   const changeLine = map.changes.available
@@ -176,7 +177,7 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         className="space-y-3 border-b p-4"
       >
         <h4 className="text-sm font-semibold">Connections</h4>
-        {strongest === 0 && (
+        {!hasConnections && (
           <p className="text-xs text-muted-foreground">
             No connections to other parts.
           </p>
@@ -214,27 +215,41 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         <section aria-label="Entry points" className="space-y-1 border-b p-4">
           <h4 className="mb-1 text-sm font-semibold">Entry points</h4>
           <ul>
-            {entries.map(({ path, parts, links }) => (
+            {entries.map(({ path, callers }) => (
               <li key={path}>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-auto w-full justify-start px-2 py-1.5 text-left"
+                  className="h-auto w-full items-start justify-start whitespace-normal px-2 py-1.5 text-left"
                   title={path}
                   onClick={() => props.onOpenFile(path)}
                 >
                   <FileCode2
-                    className="size-3.5 text-muted-foreground"
+                    className="mt-0.5 size-3.5 text-muted-foreground"
                     aria-hidden
                   />
                   <span className="min-w-0">
                     <span className="block truncate font-mono text-xs">
                       {splitFilePath(path).name}
                     </span>
-                    <span className="block text-xs text-muted-foreground">
-                      Used by {parts} {parts === 1 ? "part" : "parts"} · {links}{" "}
-                      {links === 1 ? "link" : "links"}
-                    </span>
+                    {callers.map(({ partId, symbols }) => (
+                      <span
+                        key={partId}
+                        className="block break-words text-xs font-normal text-muted-foreground"
+                      >
+                        Used by {partNames.get(partId) ?? partId}
+                        {symbols.length > 0 && (
+                          <>
+                            {" · "}
+                            <code className="font-mono">
+                              {symbols
+                                .map((symbol) => `${symbol}()`)
+                                .join(", ")}
+                            </code>
+                          </>
+                        )}
+                      </span>
+                    ))}
                   </span>
                 </Button>
               </li>
@@ -291,7 +306,7 @@ function ConnectionGroup({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-auto w-full flex-col items-start gap-1 whitespace-normal px-2 py-1.5 text-left"
+                className="h-auto w-full justify-between gap-3 whitespace-normal px-2 py-1.5 text-left"
                 onClick={() => onSelect(primary.id)}
                 onMouseEnter={preview}
                 onMouseLeave={() => onPreview([])}
@@ -299,37 +314,39 @@ function ConnectionGroup({
                 onBlur={() => onPreview([])}
                 title={status}
               >
-                <span className="flex w-full items-center gap-1.5">
-                  <span className="min-w-0 break-words">
-                    {partNames.get(row.partId) ?? row.partId}
-                  </span>
-                  {links.some(({ change }) => change.status === "new") && (
-                    <span
-                      className="size-1.5 shrink-0 rounded-full bg-success"
-                      role="img"
-                      aria-label="New link in this period"
-                    />
-                  )}
-                </span>
-                <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
-                  {row.uses && row.usedBy ? (
-                    <>
-                      <ArrowLeftRight
-                        className="size-3 text-[var(--architecture-relationship)]"
-                        aria-hidden
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="flex w-full items-center gap-1.5">
+                    <span className="min-w-0 break-words">
+                      {partNames.get(row.partId) ?? row.partId}
+                    </span>
+                    {links.some(({ change }) => change.status === "new") && (
+                      <span
+                        className="size-1.5 shrink-0 rounded-full bg-success"
+                        role="img"
+                        aria-label="New link in this period"
                       />
-                      {`uses ${row.uses.count} · used by ${row.usedBy.count}`}
-                    </>
-                  ) : (
-                    formatLinkSummary(primary)
-                  )}
+                    )}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                    {row.uses && row.usedBy ? (
+                      <>
+                        <ArrowLeftRight
+                          className="size-3 text-[var(--architecture-relationship)]"
+                          aria-hidden
+                        />
+                        {`uses ${row.uses.count} · used by ${row.usedBy.count}`}
+                      </>
+                    ) : (
+                      formatLinkSummary(primary)
+                    )}
+                  </span>
                 </span>
                 <span
-                  className="mt-0.5 h-px w-full overflow-hidden rounded-full bg-border"
+                  className="h-[3px] w-12 shrink-0 overflow-hidden rounded-full bg-border"
                   aria-hidden
                 >
                   <span
-                    className="block h-full bg-[var(--architecture-relationship)]/65"
+                    className="block h-full rounded-full bg-[var(--architecture-relationship)]/65"
                     style={{ width: `${(row.count / strongest) * 100}%` }}
                   />
                 </span>

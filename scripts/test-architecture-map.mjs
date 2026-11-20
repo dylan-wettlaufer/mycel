@@ -132,6 +132,7 @@ try {
   const sidebar = page.getByRole("complementary", {
     name: "Selection details",
   });
+  await expect(sidebar).not.toContainText("No connections to other parts.");
   const coreLink = sidebar.getByRole("button", { name: /^core / });
   await coreLink.hover();
   const preview = page.locator(".react-flow__edge");
@@ -189,7 +190,7 @@ try {
     sidebar.getByRole("heading", { name: "Uses", exact: true }),
   ).toBeVisible();
   await expect(sidebar.getByLabel("Entry points")).toContainText(
-    "Used by 1 part · 2 links",
+    "Used by server · queryCore()",
   );
   const files = sidebar.getByLabel("Part files");
   await expect(files).toHaveAttribute("open", "");
