@@ -15,6 +15,8 @@ export interface ProjectGraph {
   project: Project;
   nodes: readonly Omit<GraphNode, "revision">[];
   edges: readonly Omit<GraphEdge, "revision">[];
+  /** Indexed source locations for structural links, keyed by edge id. */
+  edgeSourceLines?: ReadonlyMap<string, ReadonlySet<number>>;
   diagnostics: readonly Diagnostic[];
   semantic?: SemanticExtraction;
 }
@@ -206,18 +208,27 @@ function writeProjectGraph(
         insertNode.run({ ...fields, ...rangeParameters(range), revision });
       }
       const insertEdge =
-        database.prepare(`INSERT INTO edges (project_id, id, source_id, target_id, kind, revision)
-      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision)
+        database.prepare(`INSERT INTO edges (project_id, id, source_id, target_id, kind, revision, source_lines)
+      VALUES (@projectId, @id, @sourceId, @targetId, @kind, @revision, @sourceLines)
       ${
         incremental
           ? `ON CONFLICT(project_id, id) DO UPDATE SET
         source_id = excluded.source_id, target_id = excluded.target_id,
-        kind = excluded.kind, revision = excluded.revision
-        WHERE (edges.source_id, edges.target_id, edges.kind)
-        IS NOT (excluded.source_id, excluded.target_id, excluded.kind)`
+        kind = excluded.kind, revision = excluded.revision, source_lines = excluded.source_lines
+        WHERE (edges.source_id, edges.target_id, edges.kind, edges.source_lines)
+        IS NOT (excluded.source_id, excluded.target_id, excluded.kind, excluded.source_lines)`
           : ""
       }`);
-      for (const edge of graph.edges) insertEdge.run({ ...edge, revision });
+      for (const edge of graph.edges) {
+        const lines = graph.edgeSourceLines?.get(edge.id);
+        insertEdge.run({
+          ...edge,
+          revision,
+          sourceLines: lines?.size
+            ? JSON.stringify([...lines].sort((a, b) => a - b))
+            : null,
+        });
+      }
       const insertDiagnostic = database.prepare(`INSERT INTO diagnostics (
       project_id, path, start_offset, end_offset, start_line, start_column, end_line, end_column,
       severity, source, code, message, revision

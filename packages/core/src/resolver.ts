@@ -54,14 +54,23 @@ export function resolveRelationships(
     resolution?.resolve(from, specifier) ??
     resolveRelativeModule(from, specifier, paths);
   const edges = new Map<string, Omit<GraphEdge, "revision">>();
+  const edgeSourceLines = new Map<string, Set<number>>();
   const diagnostics: Diagnostic[] = [];
   const nodeId = (localId: string) =>
     `node:${hashIdentity([project.id, localId])}`;
-  function edge(kind: "IMPORTS" | "CALLS", source: string, target: string) {
+  function edge(
+    kind: "IMPORTS" | "CALLS",
+    source: string,
+    target: string,
+    line: number,
+  ) {
     const sourceId = nodeId(source);
     const targetId = nodeId(target);
     const id = `edge:${hashIdentity([project.id, kind, sourceId, targetId])}`;
     edges.set(id, { id, projectId: project.id, kind, sourceId, targetId });
+    const lines = edgeSourceLines.get(id);
+    if (lines) lines.add(line);
+    else edgeSourceLines.set(id, new Set([line]));
   }
   function diagnostic(
     path: string,
@@ -231,7 +240,12 @@ export function resolveRelationships(
       const specifier = item.specifier!;
       const dependency = resolveModule(path, specifier, paths);
       if (dependency)
-        edge("IMPORTS", file.fileId, files.get(dependency)!.fileId);
+        edge(
+          "IMPORTS",
+          file.fileId,
+          files.get(dependency)!.fileId,
+          item.range.startLine,
+        );
       else if (
         specifier.startsWith(".") ||
         resolution?.isLocal(path, specifier)
@@ -245,8 +259,14 @@ export function resolveRelationships(
     }
     for (const call of file.calls) {
       const target = callTarget(path, call.callee, call.callerId);
-      if (target) edge("CALLS", call.callerId ?? file.fileId, target.symbol.id);
+      if (target)
+        edge(
+          "CALLS",
+          call.callerId ?? file.fileId,
+          target.symbol.id,
+          call.calleeRange.startLine,
+        );
     }
   }
-  return { edges: [...edges.values()], diagnostics };
+  return { edges: [...edges.values()], diagnostics, edgeSourceLines };
 }

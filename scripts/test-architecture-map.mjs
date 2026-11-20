@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -244,6 +244,16 @@ try {
 
   // 3. Writing `.mycel/architecture.json` updates the map live via SSE and clears fallback banner.
   await writeFiles(root, {
+    "packages/core/src/input.ts": "export function readInput() { return 1; }\n",
+    "packages/core/src/index.ts": [
+      'import { readRows } from "@acme/db";',
+      'import { readInput } from "./input";',
+      "export function queryCore() {",
+      "  readInput();",
+      "  return readRows();",
+      "}",
+      "",
+    ].join("\n"),
     ".mycel/architecture.json": {
       version: 1,
       source: "agent",
@@ -261,6 +271,20 @@ try {
           purpose: "Coordinates application queries.",
           kind: "library",
           paths: ["packages/core/**"],
+          subcomponents: [
+            {
+              id: "query",
+              name: "Run queries",
+              purpose: "Coordinates input and storage.",
+              paths: ["packages/core/src/index.ts"],
+            },
+            {
+              id: "input",
+              name: "Read input",
+              purpose: "Reads query input.",
+              paths: ["packages/core/src/input.ts"],
+            },
+          ],
         },
         {
           id: "storage",
@@ -281,12 +305,96 @@ try {
     page.locator(".react-flow__node-part").filter({ hasText: "Domain engine" }),
   ).toBeVisible();
 
-  // 4. Drill down from part card into its file dependencies.
+  // 4. Open the component, follow a boundary call to its line, and retain context.
+  const engineCard = page
+    .locator(".react-flow__node-part")
+    .filter({ hasText: "Domain engine" });
+  await engineCard.dblclick();
+  const componentHeading = page.getByRole("heading", {
+    name: "Domain engine",
+    exact: true,
+  });
+  await expect(componentHeading).toBeVisible();
+  const queryCard = page
+    .locator(".react-flow__node-part")
+    .filter({ hasText: "Run queries" });
+  const inputCard = page
+    .locator(".react-flow__node-part")
+    .filter({ hasText: "Read input" });
+  await expect(inputCard).toBeVisible();
+  await expect(page.getByTestId("rf__node-storage")).toContainText(
+    "External component",
+  );
+  await queryCard.click();
+  await expect(sidebar).toContainText("Coordinates input and storage.");
+  await expect(sidebar.getByLabel("Entry points")).toContainText("queryCore()");
+  await sidebar.getByRole("button", { name: /Storage/ }).click();
+  await evidence
+    .getByRole("button", { name: "Line 5 · call · readRows" })
+    .click();
+  const source = page.getByRole("region", { name: "Source code" });
+  await expect(source).toContainText("packages/core/src/index.ts:5");
+  await expect(source.locator(".view-lines")).toContainText(
+    "return readRows();",
+  );
+  await expect(componentHeading).toBeVisible();
+  await sidebar.getByRole("button", { name: "Back to evidence" }).click();
+  await expect(evidence).toContainText("readRows");
+
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "define responsibilities"]);
+  await expect(inputCard).not.toHaveClass(/arch-part-uncommitted/);
+  const querySource = await readFile(
+    join(root, "packages/core/src/index.ts"),
+    "utf8",
+  );
+  await writeFiles(root, {
+    "packages/core/src/input.ts": "export function readInput() { return 2; }\n",
+    "packages/core/src/index.ts": `\n${querySource}`,
+  });
+  await expect(inputCard).toHaveClass(/arch-part-uncommitted/);
+  await expect(inputCard).toHaveClass(/arch-part-changed/);
+  await expect(
+    evidence.getByRole("button", { name: "Line 6 · call · readRows" }),
+  ).toBeVisible();
+
+  await page.goBack();
+  await expect(
+    sidebar.getByRole("heading", { name: "Domain engine", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Uncommitted", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await sidebar
+    .getByRole("button", { name: "Open component", exact: true })
+    .click();
+  await expect(componentHeading).toBeVisible();
+  await inputCard.click();
+  await sidebar
+    .getByRole("button", { name: "Open files", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "File dependencies", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Component map", exact: true })
+    .click();
+  await expect(
+    sidebar.getByRole("heading", { name: "Read input", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Architecture breadcrumb" })
+    .getByRole("button", { name: "Architecture map" })
+    .click();
+  await expect(
+    sidebar.getByRole("heading", { name: "Domain engine", exact: true }),
+  ).toBeVisible();
+
+  // 5. A flat component still opens its file dependency graph.
   await page
     .locator(".react-flow__node-part")
-    .filter({ hasText: "Domain engine" })
-    .click();
-  await page.getByRole("button", { name: "Open files", exact: true }).click();
+    .filter({ hasText: "API layer" })
+    .dblclick();
   await expect(
     page.getByRole("heading", { name: "File dependencies", exact: true }),
   ).toBeVisible();

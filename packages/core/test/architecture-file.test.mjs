@@ -49,6 +49,29 @@ test("accepts a minimal file without optional metadata", () => {
   assert.equal("source" in result.file, false);
 });
 
+test("accepts one level of subcomponents and rejects duplicate siblings and nested definitions", () => {
+  const child = {
+    id: "resolution",
+    name: "Dependency resolution",
+    purpose: "Connects imports to their targets.",
+    paths: ["packages/core/src/resolver.ts"],
+  };
+  const nested = withPart({ subcomponents: [child] });
+  assert.deepEqual(parse(nested), { ok: true, file: nested });
+  assert.deepEqual(
+    issuePaths(parse(withPart({ subcomponents: [child, child] }))),
+    ["parts.0.subcomponents.1.id"],
+  );
+  assert.deepEqual(
+    issuePaths(
+      parse(
+        withPart({ subcomponents: [{ ...child, subcomponents: [child] }] }),
+      ),
+    ),
+    ["parts.0.subcomponents.0"],
+  );
+});
+
 test("reports malformed JSON as a file-level issue", () => {
   const result = parseArchitectureFile("{ version: 1");
   assert.deepEqual(issuePaths(result), [""]);

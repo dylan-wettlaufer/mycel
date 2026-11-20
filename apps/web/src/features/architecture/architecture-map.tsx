@@ -88,6 +88,12 @@ function findDisplayEdgeId(
 export function ArchitectureMapView({
   revision,
   architectureRevision,
+  component,
+  initialPart,
+  windowMode,
+  onWindowChange,
+  onOpenComponent,
+  onCloseComponent,
   onSelectFile,
   onOpenPartFiles,
   onAllFiles,
@@ -95,20 +101,33 @@ export function ArchitectureMapView({
 }: {
   revision: number;
   architectureRevision: number;
+  component?: string | undefined;
+  initialPart?: string | undefined;
+  windowMode: ArchitectureChangeWindow;
+  onWindowChange: (window: ArchitectureChangeWindow) => void;
+  onOpenComponent: (id: string) => void;
+  onCloseComponent: () => void;
   onSelectFile: (node: GraphNode) => void;
   onOpenPartFiles: (part: ArchitecturePartWithChanges) => void;
   onAllFiles: () => void;
   onOpenFeature: (featureId: string) => void;
 }) {
-  const [windowMode, setWindowMode] =
-    useState<ArchitectureChangeWindow>("branch");
-  const [selection, setSelection] = useState<
-    { kind: "part"; id: string } | { kind: "connection"; id: string } | null
-  >(null);
+  const scope = component ? `component:${component}` : "overview";
+  const [selections, setSelections] = useState<
+    Record<string, { kind: "part" | "connection"; id: string } | null>
+  >({});
+  const selection = Object.hasOwn(selections, scope)
+    ? selections[scope]
+    : initialPart
+      ? { kind: "part" as const, id: initialPart }
+      : null;
   const [showMinor, setShowMinor] = useState(false);
 
   const mapResource = useResource(
-    `/api/architecture?window=${encodeURIComponent(windowMode)}`,
+    `/api/architecture?${new URLSearchParams({
+      window: windowMode,
+      ...(component ? { component } : {}),
+    })}`,
     isArchitectureMap,
     revision + architectureRevision,
   );
@@ -125,6 +144,7 @@ export function ArchitectureMapView({
 
   const map = mapResource.data;
   const [connectionPreview, setConnectionPreview] = useState<{
+    scope: string;
     partId: string;
     ids: string[];
   } | null>(null);
@@ -148,7 +168,9 @@ export function ArchitectureMapView({
       ? map?.connections.find((connection) => connection.id === selection.id)
       : undefined;
   const previewedIds =
-    selectedPartId && connectionPreview?.partId === selectedPartId
+    selectedPartId &&
+    connectionPreview?.scope === scope &&
+    connectionPreview.partId === selectedPartId
       ? connectionPreview.ids
       : undefined;
   const selectedConnectionId = selectedConnection?.id;
@@ -175,11 +197,16 @@ export function ArchitectureMapView({
 
   const select = (kind: "part" | "connection", id: string) => {
     setConnectionPreview(null);
-    setSelection({ kind, id });
+    setSelections((previous) => ({ ...previous, [scope]: { kind, id } }));
   };
   const clearSelection = () => {
     setConnectionPreview(null);
-    setSelection(null);
+    setSelections((previous) => ({ ...previous, [scope]: null }));
+  };
+  const openComponent = (part: ArchitecturePartWithChanges) => {
+    setConnectionPreview(null);
+    setSelections({ overview: { kind: "part", id: part.id } });
+    onOpenComponent(part.id);
   };
 
   const matchingFeatures = useMemo(
@@ -207,7 +234,22 @@ export function ArchitectureMapView({
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">Architecture map</h2>
+          {component && (
+            <nav aria-label="Architecture breadcrumb">
+              <Button
+                variant="link"
+                size="xs"
+                className="h-auto p-0"
+                onClick={onCloseComponent}
+              >
+                Architecture map
+              </Button>
+            </nav>
+          )}
+          <h2 className="text-lg font-semibold">
+            {map?.component?.name ??
+              (component ? "Component map" : "Architecture map")}
+          </h2>
           <p className="truncate text-xs text-muted-foreground">
             {map
               ? `${map.parts.length} ${map.parts.length === 1 ? "part" : "parts"} · ${map.connections.length} ${map.connections.length === 1 ? "connection" : "connections"} · ${describeWindow(map)}`
@@ -227,13 +269,13 @@ export function ArchitectureMapView({
                 variant={windowMode === option.value ? "secondary" : "outline"}
                 size="xs"
                 aria-pressed={windowMode === option.value}
-                onClick={() => setWindowMode(option.value)}
+                onClick={() => onWindowChange(option.value)}
               >
                 {option.label}
               </Button>
             ))}
           </div>
-          {(showMinor || layout.hiddenMinorCount > 0) && (
+          {!component && (showMinor || layout.hiddenMinorCount > 0) && (
             <Button
               variant={showMinor ? "secondary" : "outline"}
               size="xs"
@@ -246,9 +288,11 @@ export function ArchitectureMapView({
                 : `Show minor connections (${layout.hiddenMinorCount})`}
             </Button>
           )}
-          <Button variant="outline" size="xs" onClick={onAllFiles}>
-            All file dependencies
-          </Button>
+          {!component && (
+            <Button variant="outline" size="xs" onClick={onAllFiles}>
+              All file dependencies
+            </Button>
+          )}
         </div>
       </div>
 
@@ -281,7 +325,7 @@ export function ArchitectureMapView({
             descriptions.
           </p>
         </div>
-      ) : map && map.unassignedFiles.length > 0 ? (
+      ) : map && !component && map.unassignedFiles.length > 0 ? (
         <div
           role="status"
           aria-label="Unassigned files notice"
@@ -309,7 +353,7 @@ export function ArchitectureMapView({
           </p>
         ) : (
           <GraphCanvas
-            key={`${map.source}:${map.parts.map((part) => part.id).join(",")}`}
+            key={`${scope}:${map.source}:${map.parts.map((part) => part.id).join(",")}`}
             mode="architecture"
             nodes={layout.nodes}
             edges={layout.edges}
@@ -322,7 +366,9 @@ export function ArchitectureMapView({
             onClear={clearSelection}
             onOpen={(id) => {
               const part = map.parts.find((item) => item.id === id);
-              if (part && part.files.length > 0) onOpenPartFiles(part);
+              if (!part) return;
+              if (!component && part.subcomponents?.length) openComponent(part);
+              else if (part.files.length > 0) onOpenPartFiles(part);
             }}
             sidePanel={
               selectedPart || selectedConnection ? (
@@ -336,13 +382,15 @@ export function ArchitectureMapView({
                   onPreviewConnections={(ids) =>
                     setConnectionPreview(
                       selectedPartId && ids.length
-                        ? { partId: selectedPartId, ids }
+                        ? { scope, partId: selectedPartId, ids }
                         : null,
                     )
                   }
                   onClear={clearSelection}
                   onOpenPartFiles={onOpenPartFiles}
+                  onOpenComponent={openComponent}
                   onOpenFile={openFileByPath}
+                  revision={revision}
                   onOpenFeature={onOpenFeature}
                 />
               ) : undefined

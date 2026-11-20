@@ -16,4 +16,9 @@ export const migrations: readonly Migration[] = [
     sql: historySchema,
   },
   { version: 3, name: "semantic application graph", sql: semanticSchema },
+  {
+    version: 4,
+    name: "structural edge source lines",
+    sql: "ALTER TABLE edges ADD COLUMN source_lines TEXT;",
+  },
 ];

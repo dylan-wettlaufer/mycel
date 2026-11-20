@@ -17,6 +17,61 @@ export interface AssignFilesOptions {
   fallback?: ArchitectureFile;
 }
 
+/** Project a parent's ownership into children while retaining external owners. */
+export function assignComponentFiles(
+  assignment: ArchitectureAssignment,
+  parent: AssignedArchitecturePart,
+  indexedPaths: ReadonlySet<string>,
+): ArchitectureAssignment {
+  const children: ArchitecturePart[] = (parent.subcomponents ?? []).map(
+    (child) => ({
+      ...child,
+      id: `${parent.id}:${child.id}`,
+      kind: parent.kind,
+    }),
+  );
+  const local = assignFilesToParts(
+    { version: 1, parts: children },
+    parent.files,
+  );
+  const unassigned = new Set(local.unassignedFiles);
+  const otherId = `${parent.id}::other`;
+  const fileToPart = Object.fromEntries(
+    Object.entries(assignment.fileToPart).map(([path, owner]) => [
+      path,
+      owner === parent.id
+        ? unassigned.has(path)
+          ? otherId
+          : local.fileToPart[path]!
+        : owner,
+    ]),
+  );
+  const declaredIds = new Set(children.map(({ id }) => id));
+  const parts = local.parts.filter(({ id }) => declaredIds.has(id));
+  if (unassigned.size > 0) {
+    parts.push({
+      id: otherId,
+      name: "Other files",
+      purpose: "Files in this component without a named responsibility.",
+      kind: parent.kind,
+      paths: [],
+      files: local.unassignedFiles,
+    });
+  }
+  parts.push(...assignment.parts.filter(({ id }) => id !== parent.id));
+  return {
+    parts: parts.map((entry) => ({
+      ...entry,
+      files: entry.files.filter((path) => indexedPaths.has(path)),
+    })),
+    fileToPart,
+    unassignedFiles: local.unassignedFiles.filter((path) =>
+      indexedPaths.has(path),
+    ),
+    tieWarnings: local.tieWarnings.filter(({ path }) => indexedPaths.has(path)),
+  };
+}
+
 interface PatternSpecificity {
   literalSegments: number;
   length: number;

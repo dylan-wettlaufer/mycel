@@ -421,6 +421,7 @@ export function applyGitChangesToArchitecture(
   assignment: ArchitectureAssignment,
   connections: readonly ArchitectureConnection[],
   gitChanges: ArchitectureGitChanges,
+  deletedFileOwners?: Readonly<Record<string, string>>,
 ): {
   parts: ArchitecturePartWithChanges[];
   connections: ArchitectureConnectionWithChanges[];
@@ -432,14 +433,18 @@ export function applyGitChangesToArchitecture(
   // Map deleted files back to existing parts so deletions mark a part as changed.
   const deletedByPart = new Map<string, string[]>();
   if (gitChanges.deletedFiles.length > 0 && assignment.parts.length > 0) {
-    const deletedAssignment = assignFilesToParts(
-      { version: 1, parts: assignment.parts },
-      gitChanges.deletedFiles,
-    );
-    const unassignedDeleted = new Set(deletedAssignment.unassignedFiles);
+    const deletedAssignment = deletedFileOwners
+      ? undefined
+      : assignFilesToParts(
+          { version: 1, parts: assignment.parts },
+          gitChanges.deletedFiles,
+        );
+    const unassignedDeleted = new Set(deletedAssignment?.unassignedFiles);
     for (const deletedFile of gitChanges.deletedFiles) {
       if (unassignedDeleted.has(deletedFile)) continue;
-      const partId = deletedAssignment.fileToPart[deletedFile];
+      const partId = (deletedFileOwners ?? deletedAssignment?.fileToPart)?.[
+        deletedFile
+      ];
       if (!partId) continue;
       let list = deletedByPart.get(partId);
       if (!list) {

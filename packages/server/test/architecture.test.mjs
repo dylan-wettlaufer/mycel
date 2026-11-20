@@ -150,6 +150,9 @@ test("architecture route validates parameters and handles unavailable and failin
     "evidenceLimit=501",
     "evidenceLimit=abc",
     "evidenceLimit=10&evidenceLimit=20",
+    "component=",
+    "component=engine&component=api",
+    "component=engine:child",
   ]) {
     assert.equal(
       (await app.request(`/api/architecture?${query}`)).status,
@@ -326,4 +329,132 @@ test("GET /api/architecture serves fallback, agent file, invalid file fallback, 
   const coreAfterCommit = afterCommit.parts.find((part) => part.id === "core");
   assert.equal(coreAfterCommit.change.status, "changed");
   assert.equal(coreAfterCommit.change.uncommitted, false);
+});
+
+test("component scope keeps ownership, boundary evidence, and git changes", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "mycel-component-api-"));
+  const root = join(dir, "repo");
+  await mkdir(root);
+  await git(root, ["init", "-b", "main"]);
+  await writeFiles(root, {
+    "engine/run.ts":
+      'import { read } from "./capture/read";\nimport { save } from "./storage/save";\nexport function run() { return save(read()); }\n',
+    "engine/capture/read.ts": "export function read() { return 1; }\n",
+    "engine/capture/legacy.ts": "export const legacy = 1;\n",
+    "engine/legacy/entry.ts":
+      'import { run } from "../run";\nexport const entry = run();\n',
+    "engine/misc.ts":
+      'import { run } from "./run";\nexport const entry = run();\n',
+    "engine/storage/save.ts":
+      'import { log } from "../../logger/log";\nexport function save(value: number) { return log(value); }\n',
+    "logger/log.ts": "export function log(value: number) { return value; }\n",
+    ".mycel/architecture.json": {
+      version: 1,
+      parts: [
+        {
+          id: "engine",
+          name: "Engine",
+          kind: "library",
+          purpose: "Coordinates work.",
+          paths: ["engine/**"],
+          subcomponents: [
+            {
+              id: "updates",
+              name: "Index updates",
+              purpose: "Runs updates.",
+              paths: [
+                "engine/*.ts",
+                "engine/storage/**",
+                "engine/capture/*.ts",
+              ],
+            },
+            {
+              id: "capture",
+              name: "Source capture",
+              purpose: "Reads source.",
+              paths: ["engine/capture/read.ts", "engine/capture/legacy.ts"],
+            },
+          ],
+        },
+        {
+          id: "storage",
+          name: "Storage",
+          kind: "data",
+          purpose: "Persists records.",
+          paths: ["engine/storage/**", "engine/misc.ts"],
+        },
+        {
+          id: "logger",
+          name: "Logger",
+          kind: "library",
+          purpose: "Logs records.",
+          paths: ["logger/**"],
+        },
+      ],
+    },
+  });
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "initial"]);
+  await rm(join(root, "engine/capture/legacy.ts"));
+  const server = await startIndexedServer(0, {
+    project: { name: "component", root },
+    databasePath: join(dir, "graph.sqlite"),
+  });
+  t.after(async () => {
+    server.closeAllConnections();
+    await closeServer(server);
+    await rm(dir, { recursive: true, force: true });
+  });
+  const url = `http://127.0.0.1:${server.address().port}/api/architecture`;
+  const response = await fetch(`${url}?component=engine&window=uncommitted`);
+  assert.equal(response.status, 200);
+  const map = await response.json();
+  assert.deepEqual(map.component, { id: "engine", name: "Engine" });
+  assert.deepEqual(
+    map.parts.map(({ id, files, boundary }) => [id, files, Boolean(boundary)]),
+    [
+      ["engine:updates", ["engine/run.ts"], false],
+      ["engine:capture", ["engine/capture/read.ts"], false],
+      ["engine::other", ["engine/legacy/entry.ts"], false],
+      ["storage", ["engine/misc.ts", "engine/storage/save.ts"], true],
+    ],
+  );
+  assert.equal(map.changes.requestedWindow, "uncommitted");
+  assert.equal(
+    map.parts.find(({ id }) => id === "engine:capture").change.status,
+    "changed",
+  );
+  assert.equal(
+    map.parts.find(({ id }) => id === "engine:capture").change.uncommitted,
+    true,
+  );
+  assert.deepEqual(
+    map.connections.map(({ id }) => id),
+    [
+      "engine::other->engine:updates",
+      "engine:updates->engine:capture",
+      "engine:updates->storage",
+      "storage->engine:updates",
+    ],
+  );
+  const external = map.connections.find(
+    ({ id }) => id === "engine:updates->storage",
+  );
+  assert.equal(external.importCount, 1);
+  assert.equal(external.callCount, 1);
+  assert.ok(
+    external.evidence.some(
+      ({ kind, file, line, symbol }) =>
+        kind === "call" &&
+        file === "engine/run.ts" &&
+        line === 3 &&
+        symbol === "save",
+    ),
+  );
+  assert.equal((await fetch(`${url}?component=storage`)).status, 404);
+  const top = await (await fetch(url)).json();
+  assert.deepEqual(
+    top.parts.map(({ id }) => id),
+    ["engine", "storage", "logger"],
+  );
 });

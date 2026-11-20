@@ -20,7 +20,10 @@ import type {
   ProjectId,
 } from "@mycel/shared";
 import { architectureFilePath, parseArchitectureFile } from "./architecture.js";
-import { assignFilesToParts } from "./architecture-assign.js";
+import {
+  assignComponentFiles,
+  assignFilesToParts,
+} from "./architecture-assign.js";
 import { computeArchitectureConnections } from "./architecture-connections.js";
 import { buildFallbackArchitecture } from "./architecture-fallback.js";
 import type { FallbackArchitectureOptions } from "./architecture-fallback.js";
@@ -42,6 +45,8 @@ export interface LoadedProjectArchitecture {
 }
 
 export interface ArchitectureMapQueryOptions {
+  /** Scope the map to a top-level component with named subcomponents. */
+  componentId?: string;
   /** Recent-change window. Defaults to `"branch"`. */
   window?: ArchitectureChangeWindow;
   /** Optional cap on evidence entries per connection; counts stay exact. */
@@ -176,19 +181,35 @@ export async function buildArchitectureMap(
     }),
   ]);
 
-  const assignment = assignFilesToParts(loaded.architecture, filePaths, {
-    fallback: loaded.fallback,
-  });
+  const topLevel = assignFilesToParts(
+    loaded.architecture,
+    options.componentId
+      ? [...filePaths, ...gitChanges.deletedFiles]
+      : filePaths,
+    { fallback: loaded.fallback },
+  );
+  const parent = topLevel.parts.find(
+    ({ id, subcomponents }) =>
+      id === options.componentId && subcomponents?.length,
+  );
+  const assignment = parent
+    ? assignComponentFiles(topLevel, parent, new Set(filePaths))
+    : topLevel;
+  const inside = (id: string) =>
+    parent !== undefined && id.startsWith(`${parent.id}:`);
 
   // Compute full connections before applying git status so evidence caps cannot hide changes.
   const fullConnections = computeArchitectureConnections(
     assignment,
     linksSnapshot.links,
+  ).filter(
+    (edge) => !parent || inside(edge.sourcePartId) || inside(edge.targetPartId),
   );
   const annotated = applyGitChangesToArchitecture(
     assignment,
     fullConnections,
     gitChanges,
+    parent ? assignment.fileToPart : undefined,
   );
 
   const connections =
@@ -205,11 +226,24 @@ export async function buildArchitectureMap(
           };
         });
 
+  const connected = new Set(
+    connections.flatMap(({ sourcePartId, targetPartId }) => [
+      sourcePartId,
+      targetPartId,
+    ]),
+  );
   const map: ArchitectureMap = {
     projectId: options.projectId,
     revision: linksSnapshot.revision,
     source: loaded.source,
-    parts: annotated.parts,
+    ...(parent ? { component: { id: parent.id, name: parent.name } } : {}),
+    parts: parent
+      ? annotated.parts
+          .filter(({ id }) => inside(id) || connected.has(id))
+          .map((entry) =>
+            inside(entry.id) ? entry : { ...entry, boundary: true },
+          )
+      : annotated.parts,
     connections,
     changes: gitChanges,
     unassignedFiles: assignment.unassignedFiles,

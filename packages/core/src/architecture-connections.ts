@@ -25,7 +25,9 @@ export interface GraphLinkSource {
     GraphNode,
     "id" | "kind" | "path" | "qualifiedName" | "range"
   >[];
-  edges: readonly Pick<GraphEdge, "kind" | "sourceId" | "targetId">[];
+  edges: readonly (Pick<GraphEdge, "kind" | "sourceId" | "targetId"> &
+    Partial<Pick<GraphEdge, "id">>)[];
+  edgeSourceLines?: ReadonlyMap<string, ReadonlySet<number>>;
 }
 
 function compareStrings(a: string, b: string): number {
@@ -67,12 +69,19 @@ export function extractCrossFileLinks(graph: GraphLinkSource): CrossFileLink[] {
     const source = nodesById.get(edge.sourceId);
     const target = nodesById.get(edge.targetId);
     if (!source || !target || source.path === target.path) continue;
+    const lines =
+      edge.id === undefined ? undefined : graph.edgeSourceLines?.get(edge.id);
+    const [firstLine, ...additionalLines] = lines
+      ? [...lines].sort((a, b) => a - b)
+      : [];
     const link: CrossFileLink = {
       kind: edge.kind,
       sourcePath: source.path,
-      sourceLine: source.range.startLine,
+      sourceLine: firstLine ?? source.range.startLine,
       targetPath: target.path,
     };
+    if (additionalLines.length > 0) link.additionalLines = additionalLines;
+    if (firstLine === undefined) link.approximate = true;
     if (source.kind !== "file") link.sourceSymbol = source.qualifiedName;
     if (target.kind !== "file") link.targetSymbol = target.qualifiedName;
     links.push(link);
@@ -138,6 +147,9 @@ export function computeArchitectureConnections(
     };
     if (link.sourceSymbol !== undefined) item.sourceSymbol = link.sourceSymbol;
     if (link.targetSymbol !== undefined) item.symbol = link.targetSymbol;
+    if (link.additionalLines?.length)
+      item.additionalLines = link.additionalLines;
+    if (link.approximate) item.approximate = true;
 
     const key = evidenceKey(item);
     if (group.seen.has(key)) continue;

@@ -50,6 +50,7 @@ export interface PartNodeData extends Record<string, unknown> {
   /** Set for foundation parts, whose incoming lines are hidden until focused. */
   usedBy?: number;
   fallback?: boolean;
+  boundary?: boolean;
   handles?: NodeHandle[];
 }
 
@@ -128,6 +129,7 @@ export const PartNodeView = memo(function PartNodeView({
         <div className="part-node-meta">
           <Icon aria-hidden />
           <span>
+            {data.boundary ? "External component · " : ""}
             {data.fileCount} {data.fileCount === 1 ? "file" : "files"}
           </span>
         </div>

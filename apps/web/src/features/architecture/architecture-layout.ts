@@ -164,23 +164,39 @@ export function layoutArchitectureMap(
   fullMap: ArchitectureMap,
   options: ArchitectureLayoutOptions = {},
 ): { nodes: PartNode[]; edges: Edge[]; hiddenMinorCount: number } {
-  const foundation = findFoundationParts(fullMap);
+  const foundation = fullMap.component
+    ? new Set<string>()
+    : findFoundationParts(fullMap);
   const { displays, hiddenMinorCount } = displayConnections(
     fullMap,
     foundation,
-    options,
+    fullMap.component ? { ...options, showMinor: true } : options,
   );
   const columns = roleLayers
     .map((kinds, index) =>
       fullMap.parts
-        .filter((part) =>
-          foundation.has(part.id)
-            ? index === roleLayers.length - 1
-            : kinds.includes(part.kind),
+        .filter(
+          (part) =>
+            !part.boundary &&
+            (foundation.has(part.id)
+              ? index === roleLayers.length - 1
+              : kinds.includes(part.kind)),
         )
         .map((part) => part.id),
     )
     .filter((column) => column.length > 0);
+  const boundary = fullMap.parts
+    .filter((part) => part.boundary)
+    .map((part) => part.id);
+  if (boundary.length > 0) {
+    const targets = new Set(
+      fullMap.connections.map((edge) => edge.targetPartId),
+    );
+    const callers = boundary.filter((id) => !targets.has(id));
+    const dependencies = boundary.filter((id) => targets.has(id));
+    if (callers.length > 0) columns.unshift(callers);
+    if (dependencies.length > 0) columns.push(dependencies);
+  }
   const links = fullMap.connections.filter(
     (link) =>
       !foundation.has(link.targetPartId) &&
@@ -256,7 +272,7 @@ export function layoutArchitectureMap(
       position,
       className: classes,
       style: partNodeSize,
-      ariaLabel: `${part.name}, ${part.kind}, ${part.files.length} files${part.change.status !== "unchanged" ? `, ${part.change.status}` : ""}${part.change.uncommitted ? ", uncommitted changes" : ""}${users ? `, used by ${users} parts` : ""}`,
+      ariaLabel: `${part.name}, ${part.boundary ? "external component, " : ""}${part.kind}, ${part.files.length} files${part.change.status !== "unchanged" ? `, ${part.change.status}` : ""}${part.change.uncommitted ? ", uncommitted changes" : ""}${users ? `, used by ${users} parts` : ""}`,
       data: {
         label: part.name,
         name: part.name,
@@ -265,6 +281,7 @@ export function layoutArchitectureMap(
         fileCount: part.files.length,
         status: part.change.status,
         uncommitted: part.change.uncommitted,
+        ...(part.boundary ? { boundary: true } : {}),
         ...(users ? { usedBy: users } : {}),
         ...(part.fallback ? { fallback: true } : {}),
         ...(handles ? { handles } : {}),

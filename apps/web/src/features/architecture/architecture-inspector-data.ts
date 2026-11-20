@@ -50,6 +50,7 @@ const smallPartFileLimit = 8;
 export function entryPointsForPart(
   part: Pick<ArchitecturePartWithChanges, "id" | "files">,
   connections: readonly ArchitectureConnectionWithChanges[],
+  showSmallPartEntries = false,
 ) {
   const byFile = new Map<
     string,
@@ -72,6 +73,7 @@ export function entryPointsForPart(
   }
   const entries = [...byFile.values()];
   if (
+    !showSmallPartEntries &&
     part.files.length <= smallPartFileLimit &&
     entries.every(({ links }) => links === 1)
   ) {

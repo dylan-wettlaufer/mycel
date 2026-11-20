@@ -92,7 +92,7 @@ test("migrates an existing structural graph and persists semantic evidence with 
     project.root,
     JSON.stringify(project.indexing),
   );
-  assert.equal(migrateDatabase(db), 3);
+  assert.equal(migrateDatabase(db), migrations.length);
   assert.equal(
     db.prepare("SELECT name FROM projects WHERE id = 'p'").get().name,
     "fixture",

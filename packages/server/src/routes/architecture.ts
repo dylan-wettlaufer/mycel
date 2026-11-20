@@ -66,6 +66,18 @@ export function createArchitectureRoutes(architecture?: ArchitectureQueries) {
     const evidenceLimit = parseEvidenceLimit(
       context.req.queries("evidenceLimit"),
     );
+    const components = context.req.queries("component");
+    const componentId = components?.[0];
+    if (
+      components &&
+      (components.length !== 1 ||
+        !componentId ||
+        !/^[a-z0-9][a-z0-9-]{0,63}$/.test(componentId))
+    ) {
+      throw new HTTPException(400, {
+        message: "component must be a top-level part id",
+      });
+    }
     if (!architecture) {
       return context.json(
         { error: "Architecture queries unavailable" } satisfies ErrorResponse,
@@ -73,9 +85,15 @@ export function createArchitectureRoutes(architecture?: ArchitectureQueries) {
       );
     }
     const map = await architecture.getArchitecture({
+      ...(componentId === undefined ? {} : { componentId }),
       ...(window === undefined ? {} : { window }),
       ...(evidenceLimit === undefined ? {} : { evidenceLimit }),
     });
+    if (componentId && !map.component) {
+      throw new HTTPException(404, {
+        message: "Component breakdown unavailable",
+      });
+    }
     return context.json(map);
   });
 

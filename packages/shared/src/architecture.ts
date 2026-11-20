@@ -6,16 +6,20 @@ export type ArchitecturePartKind =
 
 export type ArchitectureSource = "agent" | "folder-fallback";
 
-/** One logical part of the codebase. Connections are computed by Mycel, never declared. */
-export interface ArchitecturePart {
-  /** Stable lowercase slug, unique within the file. */
+export interface ArchitectureSubcomponent {
+  /** Stable lowercase slug, unique among siblings. */
   id: string;
   name: string;
   /** One line describing what the part is for. */
   purpose: string;
-  kind: ArchitecturePartKind;
   /** Repository-relative globs selecting the part's files or folders. */
   paths: string[];
+}
+
+/** One logical part of the codebase. Connections are computed by Mycel, never declared. */
+export interface ArchitecturePart extends ArchitectureSubcomponent {
+  kind: ArchitecturePartKind;
+  subcomponents?: ArchitectureSubcomponent[];
 }
 
 /** Contents of `.mycel/architecture.json`. */
@@ -84,6 +88,10 @@ export interface ArchitectureConnectionEvidence {
   file: string;
   /** 1-based source line in `file`. */
   line: number;
+  /** Other indexed lines for the same relationship, in source order. */
+  additionalLines?: number[];
+  /** The index only has the enclosing file or declaration location. */
+  approximate?: boolean;
   /** Repository-relative path of the imported or called target file. */
   targetFile: string;
   /** Calling symbol qualified name when `kind` is `"call"` inside a symbol. */
@@ -160,6 +168,8 @@ export interface ArchitectureConnectionChange {
 
 export interface ArchitecturePartWithChanges extends AssignedArchitecturePart {
   change: ArchitecturePartChange;
+  /** A neighboring top-level component shown in a scoped map. */
+  boundary?: boolean;
 }
 
 export interface ArchitectureConnectionWithChanges extends ArchitectureConnection {
@@ -172,6 +182,8 @@ export interface ArchitectureMap {
   revision: Revision;
   /** `"agent"` when loaded from `.mycel/architecture.json`, `"folder-fallback"` otherwise. */
   source: ArchitectureSource;
+  /** Present for a map inside a top-level component. */
+  component?: { id: string; name: string };
   /** Present when `.mycel/architecture.json` supplied a `generatedAt` timestamp. */
   generatedAt?: string;
   /** Validation issues when `.mycel/architecture.json` exists but is invalid. */

@@ -28,7 +28,48 @@
       "name": "Repository indexing",
       "purpose": "Keeps the repository index current.",
       "kind": "library",
-      "paths": ["packages/core/**"]
+      "paths": ["packages/core/**"],
+      "subcomponents": [
+        {
+          "id": "file-watching",
+          "name": "File watching",
+          "purpose": "Detects source changes and queues them for indexing.",
+          "paths": [
+            "packages/core/src/watcher.ts",
+            "packages/core/src/changes.ts"
+          ]
+        },
+        {
+          "id": "source-capture",
+          "name": "Source capture",
+          "purpose": "Discovers and reads source files in the repository.",
+          "paths": [
+            "packages/core/src/discovery.ts",
+            "packages/core/src/files.ts",
+            "packages/core/src/settings.ts"
+          ]
+        },
+        {
+          "id": "dependency-resolution",
+          "name": "Dependency resolution",
+          "purpose": "Resolves modules and builds relationships between files and symbols.",
+          "paths": [
+            "packages/core/src/module-resolution.ts",
+            "packages/core/src/resolver.ts",
+            "packages/core/src/graph.ts"
+          ]
+        },
+        {
+          "id": "index-updates",
+          "name": "Index updates",
+          "purpose": "Runs full and incremental indexing and commits graph revisions.",
+          "paths": [
+            "packages/core/src/indexer.ts",
+            "packages/core/src/live-index.ts",
+            "packages/core/src/history.ts"
+          ]
+        }
+      ]
     },
     {
       "id": "storage",

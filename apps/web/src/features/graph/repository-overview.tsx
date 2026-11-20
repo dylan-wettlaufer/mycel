@@ -16,6 +16,8 @@ export function RepositoryOverview({
   files = false,
   folder,
   part,
+  component,
+  architectureRevision = 0,
   onFiles,
   onOverview,
 }: {
@@ -24,6 +26,8 @@ export function RepositoryOverview({
   files?: boolean | undefined;
   folder?: string | undefined;
   part?: string | undefined;
+  component?: string | undefined;
+  architectureRevision?: number;
   onFiles: (folder?: string) => void;
   onOverview: () => void;
 }) {
@@ -33,9 +37,13 @@ export function RepositoryOverview({
     revision,
   );
   const architecture = useResource(
-    part ? "/api/architecture" : null,
+    part
+      ? component
+        ? `/api/architecture?component=${encodeURIComponent(component)}`
+        : "/api/architecture"
+      : null,
     isArchitectureMap,
-    revision,
+    revision + architectureRevision,
   );
   const activePart = part
     ? architecture.data?.parts.find((entry) => entry.id === part)
@@ -92,7 +100,7 @@ export function RepositoryOverview({
           {files ? (
             <>
               <Button variant="outline" size="xs" onClick={onOverview}>
-                Architecture map
+                {component ? "Component map" : "Architecture map"}
               </Button>
               {(folder || part) && (
                 <Button variant="outline" size="xs" onClick={() => onFiles()}>
@@ -120,7 +128,9 @@ export function RepositoryOverview({
           )}
         </div>
       </div>
-      {error ? (
+      {part && architecture.error ? (
+        <p role="alert">Component files unavailable. {architecture.error}</p>
+      ) : error ? (
         <p role="alert">Repository overview unavailable. {error}</p>
       ) : (
         data &&

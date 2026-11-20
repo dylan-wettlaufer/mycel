@@ -94,5 +94,12 @@ export function buildProjectGraph(
     nodes,
     ...(resolution ? { resolution } : {}),
   });
-  return { project, nodes, edges, diagnostics, semantic };
+  return {
+    project,
+    nodes,
+    edges,
+    diagnostics,
+    semantic,
+    edgeSourceLines: relationships.edgeSourceLines,
+  };
 }

@@ -1,6 +1,6 @@
 import { FileSymbols } from "@/features/details/file-symbols";
-import { lazy, Suspense } from "react";
-import type { GraphNode } from "@mycel/shared";
+import { lazy, Suspense, useState } from "react";
+import type { ArchitectureChangeWindow, GraphNode } from "@mycel/shared";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
@@ -36,6 +36,8 @@ const ArchitectureMapView = lazy(() =>
 export function App() {
   const { navigation, navigate } = useNavigation();
   const { view, nodeId, rootId, featureId, changeId, source } = navigation;
+  const [architectureWindow, setArchitectureWindow] =
+    useState<ArchitectureChangeWindow>("branch");
   const activity = useActivity();
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
@@ -65,6 +67,12 @@ export function App() {
   const rootNode = rootId && rootId !== nodeId ? root.data?.node : node;
   const openNode = (next: GraphNode) =>
     navigate({ view: "Graph", nodeId: next.id, rootId: next.id });
+  const returnToArchitecture = () =>
+    navigate({
+      view: "Graph",
+      ...(navigation.component ? { component: navigation.component } : {}),
+      ...(navigation.part ? { part: navigation.part } : {}),
+    });
   const nodeEvents = activity.events.filter(
     (event) => event.entityType === "node" && event.entityId === nodeId,
   );
@@ -137,6 +145,8 @@ export function App() {
                 files
                 folder={navigation.folder}
                 part={navigation.part}
+                component={navigation.component}
+                architectureRevision={activity.architectureRevision}
                 onFiles={(folder) =>
                   navigate({
                     view: "Graph",
@@ -144,9 +154,17 @@ export function App() {
                     ...(folder ? { folder } : {}),
                   })
                 }
-                onOverview={() => navigate({ view: "Graph" })}
+                onOverview={returnToArchitecture}
                 revision={activity.revision}
-                onSelect={openNode}
+                onSelect={(next) => {
+                  if (navigation.component) {
+                    navigate({
+                      ...navigation,
+                      nodeId: next.id,
+                      rootId: next.id,
+                    });
+                  } else openNode(next);
+                }}
               />
             </Suspense>
           ) : (
@@ -154,12 +172,30 @@ export function App() {
               <ArchitectureMapView
                 revision={activity.revision}
                 architectureRevision={activity.architectureRevision}
+                component={navigation.component}
+                initialPart={navigation.part}
+                windowMode={architectureWindow}
+                onWindowChange={setArchitectureWindow}
+                onOpenComponent={(id) =>
+                  navigate({ view: "Graph", component: id })
+                }
+                onCloseComponent={() =>
+                  navigate({
+                    view: "Graph",
+                    ...(navigation.component
+                      ? { part: navigation.component }
+                      : {}),
+                  })
+                }
                 onSelectFile={(next) =>
                   navigate({
                     view: "Graph",
                     nodeId: next.id,
                     rootId: next.id,
                     source: true,
+                    ...(navigation.component
+                      ? { component: navigation.component }
+                      : {}),
                   })
                 }
                 onOpenPartFiles={(part) =>
@@ -167,6 +203,9 @@ export function App() {
                     view: "Graph",
                     files: true,
                     part: part.id,
+                    ...(navigation.component
+                      ? { component: navigation.component }
+                      : {}),
                   })
                 }
                 onAllFiles={() => navigate({ view: "Graph", files: true })}
@@ -202,7 +241,7 @@ export function App() {
         <Suspense fallback={<p>Loading graph…</p>}>
           <GraphPanel
             key={rootNode.id}
-            onOverview={() => navigate({ view: "Graph" })}
+            onOverview={returnToArchitecture}
             root={rootNode}
             selected={node}
             onSelect={(next) => navigate({ ...navigation, nodeId: next.id })}

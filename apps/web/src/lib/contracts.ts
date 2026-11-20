@@ -236,6 +236,10 @@ export function isArchitectureMap(
     typeof value.projectId !== "string" ||
     typeof value.revision !== "number" ||
     !["agent", "folder-fallback"].includes(String(value.source)) ||
+    (value.component !== undefined &&
+      (!isRecord(value.component) ||
+        typeof value.component.id !== "string" ||
+        typeof value.component.name !== "string")) ||
     !Array.isArray(value.parts) ||
     !Array.isArray(value.connections) ||
     !isRecord(value.changes) ||
@@ -266,6 +270,17 @@ export function isArchitectureMap(
       typeof part.name === "string" &&
       typeof part.purpose === "string" &&
       architecturePartKinds.has(String(part.kind)) &&
+      (part.boundary === undefined || typeof part.boundary === "boolean") &&
+      (part.subcomponents === undefined ||
+        (Array.isArray(part.subcomponents) &&
+          part.subcomponents.every(
+            (child) =>
+              isRecord(child) &&
+              typeof child.id === "string" &&
+              typeof child.name === "string" &&
+              typeof child.purpose === "string" &&
+              isStringArray(child.paths),
+          ))) &&
       isStringArray(part.paths) &&
       isStringArray(part.files) &&
       isRecord(part.change) &&
@@ -294,6 +309,16 @@ export function isArchitectureMap(
           ["import", "call"].includes(String(item.kind)) &&
           typeof item.file === "string" &&
           typeof item.line === "number" &&
+          (item.additionalLines === undefined ||
+            (Array.isArray(item.additionalLines) &&
+              item.additionalLines.every(
+                (line) =>
+                  typeof line === "number" &&
+                  Number.isSafeInteger(line) &&
+                  line > 0,
+              ))) &&
+          (item.approximate === undefined ||
+            typeof item.approximate === "boolean") &&
           typeof item.targetFile === "string",
       ) &&
       isRecord(connection.change) &&

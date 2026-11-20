@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type {
+  ArchitectureConnectionEvidence,
   ArchitectureConnectionWithChanges,
   ArchitectureMap,
   ArchitecturePartWithChanges,
@@ -17,6 +18,7 @@ import type {
 } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SourcePanel } from "@/features/source/source-panel";
 import { formatLinkSummary } from "./architecture-layout";
 import {
   describeChangePeriod,
@@ -39,8 +41,10 @@ interface ArchitectureDetailsProps {
   onPreviewConnections: (connectionIds: string[]) => void;
   onClear: () => void;
   onOpenPartFiles: (part: ArchitecturePartWithChanges) => void;
+  onOpenComponent: (part: ArchitecturePartWithChanges) => void;
   onOpenFile: (path: string) => void;
   onOpenFeature: (featureId: string) => void;
+  revision: number;
 }
 
 function Inspector({
@@ -103,6 +107,7 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         onSelectPart={props.onSelectPart}
         onSelectConnection={props.onSelectConnection}
         onOpenFile={props.onOpenFile}
+        revision={props.revision}
         onClear={onClear}
       />
     );
@@ -114,7 +119,12 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
     map.connections,
   );
   const hasConnections = twoWay.length + uses.length + usedBy.length > 0;
-  const entries = entryPointsForPart(selectedPart, map.connections).slice(0, 5);
+  const isResponsibility = Boolean(map.component && !selectedPart.boundary);
+  const entries = entryPointsForPart(
+    selectedPart,
+    map.connections,
+    isResponsibility,
+  ).slice(0, 5);
   const { files, change } = selectedPart;
   const changed = change.addedFiles + change.modifiedFiles;
   const changeLine = map.changes.available
@@ -140,12 +150,25 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
             {selectedPart.name}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {partKindLabel(selectedPart.kind)} · {files.length}{" "}
-            {files.length === 1 ? "file" : "files"}
+            {selectedPart.boundary
+              ? "External component"
+              : isResponsibility
+                ? "Responsibility"
+                : partKindLabel(selectedPart.kind)}{" "}
+            · {files.length} {files.length === 1 ? "file" : "files"}
           </p>
           <p className="mt-3 text-sm leading-snug">{selectedPart.purpose}</p>
           <p className="mt-2 text-xs text-muted-foreground">{changeLine}</p>
           <div className="mt-3 flex flex-wrap gap-1.5">
+            {!map.component && Boolean(selectedPart.subcomponents?.length) && (
+              <Button
+                size="sm"
+                onClick={() => props.onOpenComponent(selectedPart)}
+              >
+                <Boxes aria-hidden />
+                Open component
+              </Button>
+            )}
             {files.length > 0 && (
               <Button
                 size="sm"
@@ -211,9 +234,14 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
         />
       </section>
 
-      {entries.length > 0 && (
+      {(isResponsibility || entries.length > 0) && (
         <section aria-label="Entry points" className="space-y-1 border-b p-4">
           <h4 className="mb-1 text-sm font-semibold">Entry points</h4>
+          {entries.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No indexed incoming links.
+            </p>
+          )}
           <ul>
             {entries.map(({ path, callers }) => (
               <li key={path}>
@@ -449,6 +477,7 @@ function ConnectionDetails({
   onSelectPart,
   onSelectConnection,
   onOpenFile,
+  revision,
   onClear,
 }: {
   connection: ArchitectureConnectionWithChanges;
@@ -457,8 +486,13 @@ function ConnectionDetails({
   onSelectPart: (id: string) => void;
   onSelectConnection: (id: string) => void;
   onOpenFile: (path: string) => void;
+  revision: number;
   onClear: () => void;
 }) {
+  const [source, setSource] = useState<Pick<
+    ArchitectureConnectionEvidence,
+    "file" | "line"
+  > | null>(null);
   const groups = groupConnectionEvidence(connection.evidence);
   const partLink = (id: string) => (
     <button
@@ -505,64 +539,109 @@ function ConnectionDetails({
         </>
       }
     >
-      <section aria-label="Connection evidence" className="space-y-2 p-4">
-        <h4 className="text-sm font-semibold">
-          Evidence{" "}
-          <span className="font-normal text-muted-foreground">
-            {connection.evidence.length}
-          </span>
-        </h4>
-        {connection.truncated && (
-          <p className="text-xs text-muted-foreground">
-            Showing {connection.evidence.length} of {connection.count} links.
-          </p>
-        )}
-        {groups.map(([file, items]) => (
-          <details
-            key={file}
-            open={groups.length === 1}
-            className="group/evidence rounded-md border"
-          >
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm p-2.5 focus-visible:outline-2 focus-visible:outline-ring">
-              <ChevronRight
-                className="size-3.5 shrink-0 text-muted-foreground group-open/evidence:rotate-90"
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 break-all font-mono text-xs">
-                {file}
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {items.length} {items.length === 1 ? "link" : "links"}
-              </span>
-            </summary>
-            <div className="border-t px-2.5 py-2">
-              <Button
-                variant="ghost"
-                size="xs"
-                aria-label={`Open source ${file}`}
-                onClick={() => onOpenFile(file)}
-              >
-                <FileCode2 aria-hidden />
-                Open source
-              </Button>
-              <ul className="mt-1 space-y-2">
-                {items.map((item, index) => (
-                  <li key={index} className="font-mono text-[11px] break-all">
-                    <span className="text-muted-foreground">
-                      Line {item.line} · {item.kind}
-                    </span>
-                    <p>
-                      {item.kind === "call" && item.symbol
-                        ? `${item.sourceSymbol ? `${item.sourceSymbol} → ` : ""}${item.symbol} (${item.targetFile})`
-                        : `→ ${item.targetFile}`}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </details>
-        ))}
-      </section>
+      {source ? (
+        <div className="space-y-2 p-4">
+          <Button variant="ghost" size="xs" onClick={() => setSource(null)}>
+            <ArrowLeft aria-hidden />
+            Back to evidence
+          </Button>
+          <SourcePanel
+            revision={revision}
+            node={{
+              path: source.file,
+              range: {
+                start: 0,
+                end: 0,
+                startLine: source.line,
+                startColumn: 1,
+                endLine: source.line + 1,
+                endColumn: 1,
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <section aria-label="Connection evidence" className="space-y-2 p-4">
+          <h4 className="text-sm font-semibold">
+            Evidence{" "}
+            <span className="font-normal text-muted-foreground">
+              {connection.evidence.length}
+            </span>
+          </h4>
+          {connection.truncated && (
+            <p className="text-xs text-muted-foreground">
+              Showing {connection.evidence.length} of {connection.count} links.
+            </p>
+          )}
+          {groups.map(([file, items]) => (
+            <details
+              key={file}
+              open={groups.length === 1}
+              className="group/evidence rounded-md border"
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-sm p-2.5 focus-visible:outline-2 focus-visible:outline-ring">
+                <ChevronRight
+                  className="size-3.5 shrink-0 text-muted-foreground group-open/evidence:rotate-90"
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 break-all font-mono text-xs">
+                  {file}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {items.length} {items.length === 1 ? "link" : "links"}
+                </span>
+              </summary>
+              <div className="border-t px-2.5 py-2">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  aria-label={`Open source ${file}`}
+                  onClick={() => onOpenFile(file)}
+                >
+                  <FileCode2 aria-hidden />
+                  Open source
+                </Button>
+                <ul className="mt-1 space-y-2">
+                  {items.map((item, index) => (
+                    <li key={index} className="font-mono text-[11px] break-all">
+                      <div className="flex flex-wrap gap-x-2">
+                        {[item.line, ...(item.additionalLines ?? [])].map(
+                          (line) => {
+                            const label = `${item.approximate ? "Source starts at line" : "Line"} ${line} · ${item.kind}`;
+                            return (
+                              <Button
+                                key={line}
+                                variant="link"
+                                size="xs"
+                                className="h-auto p-0 font-mono"
+                                aria-label={
+                                  item.symbol
+                                    ? `${label} · ${item.symbol}`
+                                    : label
+                                }
+                                onClick={() =>
+                                  setSource({ file: item.file, line })
+                                }
+                              >
+                                {label}
+                              </Button>
+                            );
+                          },
+                        )}
+                      </div>
+                      <p>
+                        {item.kind === "call" && item.symbol
+                          ? `${item.sourceSymbol ? `${item.sourceSymbol} → ` : ""}${item.symbol} (${item.targetFile})`
+                          : `→ ${item.targetFile}`}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          ))}
+        </section>
+      )}
     </Inspector>
   );
 }

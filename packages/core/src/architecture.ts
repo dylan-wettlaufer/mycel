@@ -50,7 +50,7 @@ const glob = z.string().superRefine((value, context) => {
   if (message) context.addIssue({ code: "custom", message });
 });
 
-const part = z.strictObject({
+const subcomponent = z.strictObject({
   id: z
     .string()
     .regex(
@@ -59,9 +59,30 @@ const part = z.strictObject({
     ),
   name: line("Part name", 80),
   purpose: line("Part purpose", 200),
-  kind: z.enum(partKinds),
   paths: z.array(glob).min(1, "Part needs at least one path pattern"),
 });
+
+const part = subcomponent.extend({
+  kind: z.enum(partKinds),
+  subcomponents: z.array(subcomponent).min(1).optional(),
+});
+
+function reportDuplicateIds(
+  entries: readonly { id: string }[],
+  context: z.RefinementCtx,
+  path: (string | number)[],
+) {
+  const seen = new Set<string>();
+  entries.forEach(({ id }, index) => {
+    if (seen.has(id))
+      context.addIssue({
+        code: "custom",
+        path: [...path, index, "id"],
+        message: `Duplicate part id "${id}"`,
+      });
+    seen.add(id);
+  });
+}
 
 const architectureFile = z
   .strictObject({
@@ -74,15 +95,14 @@ const architectureFile = z
       .max(100, "Architecture can have at most 100 parts"),
   })
   .superRefine((file, context) => {
-    const seen = new Set<string>();
+    reportDuplicateIds(file.parts, context, ["parts"]);
     file.parts.forEach((entry, index) => {
-      if (seen.has(entry.id))
-        context.addIssue({
-          code: "custom",
-          path: ["parts", index, "id"],
-          message: `Duplicate part id "${entry.id}"`,
-        });
-      seen.add(entry.id);
+      if (entry.subcomponents)
+        reportDuplicateIds(entry.subcomponents, context, [
+          "parts",
+          index,
+          "subcomponents",
+        ]);
     });
   });
 
@@ -111,8 +131,13 @@ export function parseArchitectureFile(text: string): ArchitectureFileResult {
         message: issue.message,
       })),
     };
-  const { source, generatedAt, ...rest } = result.data;
-  const file: ArchitectureFile = rest;
+  const { source, generatedAt, version, parts } = result.data;
+  const file: ArchitectureFile = {
+    version,
+    parts: parts.map(({ subcomponents, ...entry }) =>
+      subcomponents ? { ...entry, subcomponents } : entry,
+    ),
+  };
   if (source) file.source = source;
   if (generatedAt) file.generatedAt = generatedAt;
   return { ok: true, file };
