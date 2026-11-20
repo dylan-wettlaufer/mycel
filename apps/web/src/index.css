@@ -634,6 +634,9 @@
 .react-flow .react-flow__node-part.graph-selected {
   border-color: var(--architecture-edge);
 }
+.react-flow .react-flow__node-part.graph-related {
+  border-color: var(--architecture-relationship);
+}
 .react-flow .react-flow__node-part.graph-unrelated {
   opacity: 0.75;
 }

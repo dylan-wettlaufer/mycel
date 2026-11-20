@@ -121,6 +121,16 @@ export function ArchitectureMapView({
     selection?.kind === "part"
       ? map?.parts.find((part) => part.id === selection.id)
       : undefined;
+  const selectedPartId = selectedPart?.id ?? null;
+  const selectedNeighborIds = useMemo(() => {
+    const neighbors = new Set<string>();
+    if (selectedPartId === null) return neighbors;
+    for (const { sourcePartId, targetPartId } of map?.connections ?? []) {
+      if (sourcePartId === selectedPartId) neighbors.add(targetPartId);
+      if (targetPartId === selectedPartId) neighbors.add(sourcePartId);
+    }
+    return neighbors;
+  }, [map, selectedPartId]);
   const selectedConnection =
     selection?.kind === "connection"
       ? map?.connections.find((connection) => connection.id === selection.id)
@@ -265,7 +275,8 @@ export function ArchitectureMapView({
             mode="architecture"
             nodes={layout.nodes}
             edges={layout.edges}
-            selectedId={selectedPart?.id ?? null}
+            selectedId={selectedPartId}
+            selectedNeighborIds={selectedNeighborIds}
             selectedEdgeId={selectedEdgeId}
             onSelect={(id) => setSelection({ kind: "part", id })}
             onEdgeSelect={(id) => setSelection({ kind: "connection", id })}

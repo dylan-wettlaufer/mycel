@@ -118,10 +118,29 @@ try {
   await expect(dbCard).toHaveClass(/arch-part-new/);
   // Both one-import connections are minor, so they start hidden.
   await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+  // Server's direct dependency stays readable even when its minor line is hidden.
+  await serverCard.click();
+  await expect(serverCard).toHaveCSS("opacity", "1");
+  await expect(coreCard).toHaveCSS("opacity", "1");
+  await expect(dbCard).toHaveCSS("opacity", "0.75");
+  await expect(serverCard).toHaveCSS("border-top-color", "rgb(52, 211, 153)");
+  await expect(coreCard).toHaveCSS("border-top-color", "rgb(147, 197, 253)");
+  await expect(dbCard).toHaveCSS("border-top-color", "rgb(52, 56, 62)");
+
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+
   await page
     .getByRole("button", { name: "Show minor connections (2)" })
     .click();
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+  const onlyConnections = page.getByRole("button", {
+    name: "Only connections",
+  });
+  await onlyConnections.click();
+  await expect(dbCard).toHaveCount(0);
+  await expect(coreCard).toBeVisible();
+  await onlyConnections.click();
+  await page.getByRole("button", { name: "Clear selection" }).click();
 
   await expect(coreCard).toContainText("1 file");
   const edgeLabels = page.locator(".react-flow__edge-text");
@@ -153,6 +172,9 @@ try {
   await expect(sidebar).toContainText("Depends on");
   await expect(sidebar).toContainText("Used by");
   await expect(coreCard).toHaveCSS("border-top-color", "rgb(52, 211, 153)");
+  await expect(serverCard).toHaveCSS("border-top-color", "rgb(147, 197, 253)");
+  await expect(dbCard).toHaveCSS("border-top-color", "rgb(147, 197, 253)");
+
   for (const edge of await edges.locator(".react-flow__edge-path").all()) {
     await expect(edge).toHaveCSS("stroke", "rgb(147, 197, 253)");
   }

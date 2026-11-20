@@ -87,6 +87,7 @@ export function focusGraph(
   selectedEdgeId: string | null = null,
   hoveredEdgeId: string | null = null,
   previewId: string | null = null,
+  selectedNeighborIds?: ReadonlySet<string>,
 ) {
   const selected = nodes.some((node) => node.id === selectedId)
     ? selectedId
@@ -110,29 +111,32 @@ export function focusGraph(
           !onlyConnections ||
           connections.ids.has(node.id),
       )
-      .map((node) =>
-        backdrop(node)
-          ? node
-          : {
-              ...node,
-              selected: node.id === selected,
-              className: [
-                node.className,
-                node.id === selected ? "graph-selected" : "",
-                (selected && !connections.ids.has(node.id)) ||
-                (edgeEndpoints && !edgeEndpoints.has(node.id))
-                  ? "graph-unrelated"
-                  : "",
-                selected && incoming.has(node.id) ? "graph-incoming" : "",
-                selected && outgoing.has(node.id) ? "graph-outgoing" : "",
-                edgeEndpoints && edgeEndpoints.has(node.id)
-                  ? "graph-selected"
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" "),
-            },
-      ),
+      .map((node) => {
+        if (backdrop(node)) return node;
+        const isSelected = node.id === selected;
+        const isNeighbor =
+          selected !== null &&
+          !isSelected &&
+          (connections.ids.has(node.id) || selectedNeighborIds?.has(node.id));
+        return {
+          ...node,
+          selected: isSelected,
+          className: [
+            node.className,
+            isSelected ? "graph-selected" : "",
+            isNeighbor ? "graph-related" : "",
+            (selected && !isSelected && !isNeighbor) ||
+            (edgeEndpoints && !edgeEndpoints.has(node.id))
+              ? "graph-unrelated"
+              : "",
+            selected && incoming.has(node.id) ? "graph-incoming" : "",
+            selected && outgoing.has(node.id) ? "graph-outgoing" : "",
+            edgeEndpoints && edgeEndpoints.has(node.id) ? "graph-selected" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+        };
+      }),
     edges: edges
       .filter(
         (edge) =>

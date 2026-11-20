@@ -100,6 +100,7 @@ export function GraphCanvas({
   edges,
   selectedId,
   selectedEdgeId = null,
+  selectedNeighborIds,
   onSelect,
   onEdgeSelect,
   onClear,
@@ -115,6 +116,7 @@ export function GraphCanvas({
   edges: Edge[];
   selectedId: string | null;
   selectedEdgeId?: string | null;
+  selectedNeighborIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onEdgeSelect?: ((id: string) => void) | undefined;
   onClear: () => void;
@@ -184,6 +186,7 @@ export function GraphCanvas({
         selectedEdgeId,
         hoveredEdgeId,
         previewId,
+        selectedNeighborIds,
       ),
     [
       nodes,
@@ -193,6 +196,7 @@ export function GraphCanvas({
       onlyConnections,
       selectedEdgeId,
       hoveredEdgeId,
+      selectedNeighborIds,
     ],
   );
   const visibleNodes = useMemo(
