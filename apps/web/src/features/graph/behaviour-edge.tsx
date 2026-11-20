@@ -1,4 +1,5 @@
 import type { BehaviourHop } from "@mycel/shared";
+import type { ArchitectureCurve } from "@/features/architecture/architecture-routing";
 import {
   BaseEdge,
   Position,
@@ -20,9 +21,17 @@ type EdgeData = {
   paths: BehaviourHop[][];
   route: Route;
   description?: string;
-  curved?: boolean;
-  curve?: { source: XYPosition; target: XYPosition; waypoints: XYPosition[] };
 };
+
+type RoutedEdge = Edge<
+  {
+    route?: Route;
+    description?: string;
+    architecture?: boolean;
+    curve?: ArchitectureCurve;
+  },
+  "behaviour"
+>;
 
 export type BehaviourEdge = Edge<EdgeData, "behaviour"> & { data: EdgeData };
 
@@ -54,50 +63,46 @@ function lead(point: XYPosition, position: Position) {
   };
 }
 
-function curveGeometry(props: EdgeProps<BehaviourEdge>) {
+function curveGeometry(props: EdgeProps<RoutedEdge>) {
   const source = { x: props.sourceX, y: props.sourceY };
   const target = { x: props.targetX, y: props.targetY };
   const curve = props.data?.curve;
   if (curve) {
-    const dx = source.x - curve.source.x;
-    const dy = source.y - curve.source.y;
+    // Minor-link toggles and vertical drags may shift ports without changing
+    // which columns the route passes through.
     if (
-      Math.abs(target.x - curve.target.x - dx) <= 8 &&
-      Math.abs(target.y - curve.target.y - dy) <= 8
+      Math.abs(source.x - curve.source.x) <= 8 &&
+      Math.abs(target.x - curve.target.x) <= 8
     ) {
-      const points = [
-        source,
-        ...curve.waypoints.map(({ x, y }) => ({ x: x + dx, y: y + dy })),
-        target,
-      ];
+      const sameColumn = curve.source.x === curve.target.x;
+      const points = sameColumn
+        ? [
+            source,
+            { x: curve.waypoints[0]!.x, y: source.y },
+            { x: curve.waypoints[1]!.x, y: target.y },
+            target,
+          ]
+        : [source, ...curve.waypoints, target];
       let path = `M ${source.x},${source.y}`;
       for (let index = 1; index < points.length; index++) {
         const a = points[index - 1]!;
         const b = points[index]!;
-        const middleY = (a.y + b.y) / 2;
-        path += ` C ${a.x},${middleY} ${b.x},${middleY} ${b.x},${b.y}`;
+        const middleX = (a.x + b.x) / 2;
+        path += ` C ${middleX},${a.y} ${middleX},${b.y} ${b.x},${b.y}`;
       }
       const a = points[Math.floor(points.length / 2) - 1]!;
       const b = points[Math.floor(points.length / 2)]!;
-      return [path, (a.x + b.x) / 2, (a.y + b.y) / 2] as const;
+      return [
+        sameColumn ? roundedPath(points) : path,
+        (a.x + b.x) / 2,
+        (a.y + b.y) / 2,
+      ] as const;
     }
-  }
-  if (
-    props.sourcePosition === Position.Top &&
-    props.targetPosition === Position.Top &&
-    Math.abs(source.y - target.y) < 8
-  ) {
-    const height = Math.min(86, Math.abs(source.x - target.x) / 3);
-    return [
-      `M ${source.x},${source.y} C ${source.x},${source.y - height} ${target.x},${target.y - height} ${target.x},${target.y}`,
-      (source.x + target.x) / 2,
-      (source.y + target.y) / 2 - height * 0.75,
-    ] as const;
   }
   return getBezierPath(props);
 }
 
-export function BehaviourEdgeView(props: EdgeProps<BehaviourEdge>) {
+export function BehaviourEdgeView(props: EdgeProps<RoutedEdge>) {
   const {
     data,
     sourceX,
@@ -108,7 +113,7 @@ export function BehaviourEdgeView(props: EdgeProps<BehaviourEdge>) {
     targetPosition,
   } = props;
   const route = data?.route;
-  const [path, labelX, labelY] = data?.curved
+  const [path, labelX, labelY] = data?.architecture
     ? curveGeometry(props)
     : getSmoothStepPath({ ...props, borderRadius: 12 });
   let geometry = { path, labelX, labelY };

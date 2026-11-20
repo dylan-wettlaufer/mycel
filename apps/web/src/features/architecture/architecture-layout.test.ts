@@ -3,8 +3,13 @@ import type { ArchitectureMap } from "@mycel/shared";
 import {
   findFoundationParts,
   layoutArchitectureMap,
-  partNodeSize,
 } from "./architecture-layout";
+import {
+  partNodeSize,
+  placeArchitectureColumns,
+  routeArchitectureLinks,
+  type ArchitectureCurve,
+} from "./architecture-routing";
 
 const sampleMap: ArchitectureMap = {
   projectId: "project:demo",
@@ -200,8 +205,8 @@ describe("layoutArchitectureMap", () => {
 
     expect(core.type).toBe("part");
     expect(core.data.fileCount).toBe(2);
-    expect(web.position.y).toBeLessThan(core.position.y);
-    expect(core.position.y).toBeLessThan(db.position.y);
+    expect(web.position.x).toBeLessThan(core.position.x);
+    expect(core.position.x).toBeLessThan(db.position.x);
     expect(core.className).toContain("arch-part-changed");
     expect(core.className).toContain("arch-part-uncommitted");
     expect(db.className).toContain("arch-part-new");
@@ -269,10 +274,10 @@ describe("layoutArchitectureMap", () => {
     for (const node of nodes) {
       if (node.id === "shared") continue;
       expect(node.data.usedBy).toBeUndefined();
-      if (node.id === "db") expect(shared.position.y).toBe(node.position.y);
+      if (node.id === "db") expect(shared.position.x).toBe(node.position.x);
       else
-        expect(shared.position.y).toBeGreaterThan(
-          node.position.y + partNodeSize.height,
+        expect(shared.position.x).toBeGreaterThan(
+          node.position.x + partNodeSize.width,
         );
     }
 
@@ -294,43 +299,100 @@ describe("layoutArchitectureMap", () => {
     expect(sharedTargetHandles).toHaveLength(6);
   });
 
-  test("anchors direct curves vertically and detours through gaps on skipped rows", () => {
+  test("orders related cards to straighten links between role columns", () => {
     const { nodes, edges } = layoutArchitectureMap({
-      ...multiColumnMap,
-      connections: [
-        ...multiColumnMap.connections,
-        mkConn("cli", "db"),
-        mkConn("db", "cli", 1),
+      ...sampleMap,
+      parts: [
+        mkPart("web", "app"),
+        mkPart("cli", "cli"),
+        mkPart("api", "service"),
+        mkPart("daemon", "service"),
       ],
+      connections: [mkConn("web", "daemon"), mkConn("cli", "api")],
     });
     const byId = new Map(nodes.map((node) => [node.id, node]));
-    const direct = edges.find((edge) => edge.id === "cli->server")!;
-    expect(direct.data?.curved).toBe(true);
-    expect(direct.data?.curve).toBeUndefined();
-    expect(byId.get("cli")?.data.handles).toContainEqual(
-      expect.objectContaining({ id: direct.sourceHandle, position: "bottom" }),
-    );
-    expect(byId.get("server")?.data.handles).toContainEqual(
-      expect.objectContaining({ id: direct.targetHandle, position: "top" }),
-    );
-
-    const skip = edges.find((edge) => edge.id === "cli->db")!;
-    const curve = skip.data?.curve as { waypoints: { x: number; y: number }[] };
-    expect(curve.waypoints).toHaveLength(4);
-    for (const [index, id] of ["server", "core"].entries()) {
-      const position = byId.get(id)!.position;
-      const [entry, exit] = curve.waypoints.slice(index * 2, index * 2 + 2);
-      expect(entry!.x).toBe(exit!.x);
-      expect(entry!.y).toBeLessThan(position.y);
-      expect(exit!.y).toBeGreaterThan(position.y + partNodeSize.height);
-      for (const node of nodes.filter(
-        (item) => item.position.y === position.y,
-      )) {
-        expect(
-          entry!.x < node.position.x ||
-            entry!.x > node.position.x + partNodeSize.width,
-        ).toBe(true);
-      }
+    for (const edge of edges) {
+      const source = byId.get(edge.source)!;
+      const target = byId.get(edge.target)!;
+      expect(source.position.y).toBe(target.position.y);
+      expect(source.data.handles).toContainEqual(
+        expect.objectContaining({ id: edge.sourceHandle, position: "right" }),
+      );
+      expect(target.data.handles).toContainEqual(
+        expect.objectContaining({ id: edge.targetHandle, position: "left" }),
+      );
+      expect(edge.data?.curve).toBeUndefined();
     }
+  });
+
+  test("gives links through the same card column separate tracks clear of cards", () => {
+    const { nodes, edges } = layoutArchitectureMap({
+      ...sampleMap,
+      parts: [
+        mkPart("cli", "cli"),
+        mkPart("server", "service"),
+        mkPart("one", "library"),
+        mkPart("two", "library"),
+        mkPart("db", "data"),
+      ],
+      connections: [
+        mkConn("cli", "db"),
+        mkConn("one", "cli"),
+        mkConn("cli", "two"),
+      ],
+    });
+    const server = nodes.find((node) => node.id === "server")!;
+    const tracks = edges.map((edge) => {
+      const curve = edge.data?.curve as ArchitectureCurve;
+      const [a, b] = curve.waypoints;
+      expect(a!.y).toBe(b!.y);
+      expect(Math.min(a!.x, b!.x)).toBeLessThan(server.position.x);
+      expect(Math.max(a!.x, b!.x)).toBeGreaterThan(
+        server.position.x + partNodeSize.width,
+      );
+      expect(
+        a!.y < server.position.y ||
+          a!.y > server.position.y + partNodeSize.height,
+      ).toBe(true);
+      return a!.y;
+    });
+    expect(new Set(tracks).size).toBe(edges.length);
+  });
+
+  test("picks the clear side of a column that also avoids crossing a direct link", () => {
+    const columns = [["launcher", "web"], ["api"], ["indexer", "architecture"]];
+    const positions = placeArchitectureColumns(columns, []);
+    const { routes } = routeArchitectureLinks(columns, positions, [
+      mkConn("api", "indexer"),
+      mkConn("launcher", "architecture"),
+    ]);
+
+    const track = routes[1]!.curve!.waypoints[0]!;
+    expect(track.y).toBeGreaterThan(
+      positions.get("api")!.y + partNodeSize.height,
+    );
+  });
+
+  test("takes a side route past intervening cards in the same column", () => {
+    const ids = ["a", "b", "c", "d"];
+    const { nodes, edges } = layoutArchitectureMap({
+      ...sampleMap,
+      parts: ids.map((id) => mkPart(id)),
+      connections: [
+        mkConn("a", "b"),
+        mkConn("b", "c"),
+        mkConn("c", "d"),
+        mkConn("a", "d"),
+      ],
+    });
+    const edge = edges.find((item) => item.id === "a->d")!;
+    const card = nodes.find((node) => node.id === "b")!;
+    const curve = edge.data?.curve as ArchitectureCurve;
+    expect(curve.waypoints).toHaveLength(2);
+    expect(curve.waypoints[0]!.x).toBe(curve.waypoints[1]!.x);
+    const lane = curve.waypoints[0]!.x;
+    expect(
+      lane < card.position.x || lane > card.position.x + partNodeSize.width,
+    ).toBe(true);
   });
 });

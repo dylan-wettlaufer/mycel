@@ -1,16 +1,16 @@
-import { Position, type Edge, type XYPosition } from "@xyflow/react";
+import type { Edge } from "@xyflow/react";
 import type {
   ArchitectureConnectionWithChanges,
   ArchitectureMap,
   ArchitecturePartKind,
 } from "@mycel/shared";
-import type { NodeHandle } from "@/features/graph/graph-node";
+import {
+  partNodeSize,
+  placeArchitectureColumns,
+  routeArchitectureLinks,
+} from "./architecture-routing";
 import type { PartNode } from "./part-node";
 
-export const partNodeSize = { width: 312, height: 116 };
-
-const columnGap = 48;
-const layerGap = 104;
 const roleLayers: ArchitecturePartKind[][] = [
   ["app", "cli"],
   ["service", "integration"],
@@ -62,7 +62,7 @@ function displayLabel(display: DisplayConnection): string {
 
 /**
  * Parts that most other parts use and that depend on no other part, such as
- * shared contracts. They sit in the bottom row and their lines appear on focus.
+ * shared contracts. They sit in the rightmost column and their lines appear on focus.
  */
 export function findFoundationParts(map: ArchitectureMap): Set<string> {
   const others = map.parts.length - 1;
@@ -151,14 +151,7 @@ function connectionDescription(
   return `${connection.sourcePartId} → ${connection.targetPartId}: ${formatLinkSummary(connection)}${change}`;
 }
 
-function distributedOffset(index: number, total: number): number {
-  if (total <= 1) return 50;
-  const span = Math.min(76, 24 * (total - 1));
-  const start = 50 - span / 2;
-  return Math.round(start + (span * index) / (total - 1));
-}
-
-/** Keep role rows fixed even when a dependency points up the map. */
+/** Keep roles in left-to-right columns, including when dependencies point back. */
 export function layoutArchitectureMap(
   fullMap: ArchitectureMap,
   options: ArchitectureLayoutOptions = {},
@@ -169,27 +162,34 @@ export function layoutArchitectureMap(
     foundation,
     options.showMinor ?? false,
   );
-  const rows = roleLayers
+  const columns = roleLayers
     .map((kinds, index) =>
-      fullMap.parts.filter((part) =>
-        foundation.has(part.id)
-          ? index === roleLayers.length - 1
-          : kinds.includes(part.kind),
-      ),
+      fullMap.parts
+        .filter((part) =>
+          foundation.has(part.id)
+            ? index === roleLayers.length - 1
+            : kinds.includes(part.kind),
+        )
+        .map((part) => part.id),
     )
-    .filter((row) => row.length > 0);
-  const positions = new Map<string, XYPosition>();
-  const widestRow = Math.max(0, ...rows.map((row) => row.length));
-  const columnStep = partNodeSize.width + columnGap;
-  const rowStep = partNodeSize.height + layerGap;
-  rows.forEach((row, rowIndex) => {
-    row.forEach((part, column) => {
-      positions.set(part.id, {
-        x: ((widestRow - row.length) / 2 + column) * columnStep,
-        y: rowIndex * rowStep,
-      });
-    });
-  });
+    .filter((column) => column.length > 0);
+  const links = fullMap.connections.filter(
+    (link) =>
+      !foundation.has(link.targetPartId) &&
+      link.count > minorConnectionMaxCount,
+  );
+  const positions = placeArchitectureColumns(
+    columns,
+    links.length ? links : fullMap.connections,
+  );
+  const routingOrder = [...displays].sort(
+    (a, b) => Number(a.foundation) - Number(b.foundation),
+  );
+  const { handlesByPart, routes } = routeArchitectureLinks(
+    columns,
+    positions,
+    routingOrder,
+  );
 
   const usedBy = new Map<string, Set<string>>();
   for (const { sourcePartId, targetPartId } of fullMap.connections) {
@@ -199,75 +199,8 @@ export function layoutArchitectureMap(
     usedBy.set(targetPartId, sources);
   }
 
-  const plans = displays.map((connection) => {
-    const source = positions.get(connection.sourcePartId)!;
-    const target = positions.get(connection.targetPartId)!;
-    const sameRow = target.y === source.y;
-    const adjacent = sameRow && Math.abs(target.x - source.x) === columnStep;
-    const downward = target.y > source.y;
-    return {
-      connection,
-      source,
-      target,
-      sourceSide: adjacent
-        ? target.x > source.x
-          ? Position.Right
-          : Position.Left
-        : downward
-          ? Position.Bottom
-          : Position.Top,
-      targetSide: adjacent
-        ? target.x > source.x
-          ? Position.Left
-          : Position.Right
-        : downward || sameRow
-          ? Position.Top
-          : Position.Bottom,
-    };
-  });
-
-  const handlesByPart = new Map<string, NodeHandle[]>();
-  const groups = new Map<string, { id: string; opposite: XYPosition }[]>();
-  for (const { connection, source, target, sourceSide, targetSide } of plans) {
-    for (const [partId, type, position, opposite] of [
-      [connection.sourcePartId, "source", sourceSide, target],
-      [connection.targetPartId, "target", targetSide, source],
-    ] as const) {
-      const group = groups.get(`${partId}:${position}`) ?? [];
-      group.push({ id: `${connection.id}:${type}`, opposite });
-      groups.set(`${partId}:${position}`, group);
-    }
-  }
-  const offsets = new Map<string, number>();
-  for (const group of groups.values()) {
-    group.sort(
-      (a, b) => a.opposite.x - b.opposite.x || a.opposite.y - b.opposite.y,
-    );
-    group.forEach(({ id }, index) =>
-      offsets.set(id, distributedOffset(index, group.length)),
-    );
-  }
-
-  function registerHandle(
-    partId: string,
-    type: NodeHandle["type"],
-    position: Position,
-    edgeId: string,
-  ) {
-    const id = `${edgeId}:${type}`;
-    const offset = offsets.get(id)!;
-    const handles = handlesByPart.get(partId) ?? [];
-    handles.push({ id, type, position, offset });
-    handlesByPart.set(partId, handles);
-    return id;
-  }
-
-  function toEdge(
-    connection: DisplayConnection,
-    sourceHandle: string,
-    targetHandle: string,
-    curve?: { source: XYPosition; target: XYPosition; waypoints: XYPosition[] },
-  ): Edge {
+  const edges: Edge[] = routingOrder.map((connection, index) => {
+    const { sourceHandle, targetHandle, curve } = routes[index]!;
     return {
       id: connection.id,
       type: "behaviour",
@@ -278,7 +211,6 @@ export function layoutArchitectureMap(
       label: displayLabel(connection),
       data: {
         ...(curve ? { curve } : {}),
-        curved: true,
         description: connection.connections
           .map(connectionDescription)
           .join("\n"),
@@ -291,74 +223,7 @@ export function layoutArchitectureMap(
         foundation: connection.foundation,
       },
     };
-  }
-
-  const edges = plans.map(
-    ({ connection, source, target, sourceSide, targetSide }) => {
-      const sourceHandle = registerHandle(
-        connection.sourcePartId,
-        "source",
-        sourceSide,
-        connection.id,
-      );
-      const targetHandle = registerHandle(
-        connection.targetPartId,
-        "target",
-        targetSide,
-        connection.id,
-      );
-      const sourceX =
-        source.x + (partNodeSize.width * offsets.get(sourceHandle)!) / 100;
-      const targetX =
-        target.x + (partNodeSize.width * offsets.get(targetHandle)!) / 100;
-      const direction = Math.sign(target.y - source.y);
-      const waypoints: XYPosition[] = [];
-
-      // A skip link only detours when an intermediate row blocks its path.
-      for (
-        let y = source.y + direction * rowStep;
-        direction * (target.y - y) > 0;
-        y += direction * rowStep
-      ) {
-        const row = rows[y / rowStep]!;
-        const firstX = positions.get(row[0]!.id)!.x;
-        const lastX = positions.get(row.at(-1)!.id)!.x + partNodeSize.width;
-        const idealX =
-          sourceX +
-          ((targetX - sourceX) * (y - source.y)) / (target.y - source.y);
-        const gaps = Array.from(
-          { length: row.length + 1 },
-          (_, index) => firstX - columnGap / 2 + index * columnStep,
-        );
-        const x =
-          idealX < firstX - 12 || idealX > lastX + 12
-            ? idealX
-            : gaps.reduce((best, gap) =>
-                Math.abs(gap - idealX) < Math.abs(best - idealX) ? gap : best,
-              );
-        const top = y - 8;
-        const bottom = y + partNodeSize.height + 8;
-        waypoints.push(
-          { x, y: direction > 0 ? top : bottom },
-          { x, y: direction > 0 ? bottom : top },
-        );
-      }
-      const curve = waypoints.length
-        ? {
-            source: {
-              x: sourceX,
-              y: source.y + (direction > 0 ? partNodeSize.height : 0),
-            },
-            target: {
-              x: targetX,
-              y: target.y + (direction > 0 ? 0 : partNodeSize.height),
-            },
-            waypoints,
-          }
-        : undefined;
-      return toEdge(connection, sourceHandle, targetHandle, curve);
-    },
-  );
+  });
 
   const nodes: PartNode[] = fullMap.parts.map((part) => {
     const position = positions.get(part.id)!;

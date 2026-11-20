@@ -635,7 +635,7 @@
   border-color: var(--architecture-edge);
 }
 .react-flow .react-flow__node-part.graph-unrelated {
-  opacity: 0.48;
+  opacity: 0.75;
 }
 .react-flow .react-flow__node-part.graph-unrelated:hover {
   opacity: 1;
