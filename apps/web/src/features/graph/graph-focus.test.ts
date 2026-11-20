@@ -75,3 +75,37 @@ test("selection keeps uncertainty and arrow direction visible on behaviour edges
   });
   expect(edge?.className).toContain("graph-edge-uncertain");
 });
+
+test("architecture lines rest faint, show counts on hover, and reveal foundation lines only on focus", () => {
+  const archEdges: Edge[] = [
+    {
+      id: "a->b",
+      source: "selected",
+      target: "dependency",
+      label: "3 imports",
+      data: { weight: 2.5, changeStatus: "unchanged", bidirectional: true },
+    },
+    {
+      id: "c->shared",
+      source: "caller",
+      target: "isolated",
+      label: "4 imports",
+      data: { weight: 3, changeStatus: "unchanged", foundation: true },
+    },
+  ];
+  const resting = focusGraph(nodes, archEdges, null, false);
+  expect(resting.edges.map((edge) => edge.id)).toEqual(["a->b"]);
+  expect(resting.edges[0]?.className).toContain("arch-edge-resting");
+  expect(resting.edges[0]?.label).toBeUndefined();
+  expect(resting.edges[0]?.markerStart).toBeDefined();
+  expect(resting.edges[0]?.style?.strokeWidth).toBe(2.5);
+
+  const hovered = focusGraph(nodes, archEdges, null, false, null, "a->b");
+  expect(hovered.edges[0]?.label).toBe("3 imports");
+
+  const focused = focusGraph(nodes, archEdges, "caller", false);
+  expect(focused.edges.map((edge) => edge.id)).toEqual(["a->b", "c->shared"]);
+  expect(focused.edges[0]?.className).toContain("graph-edge-unrelated");
+  expect(focused.edges[1]?.className).toContain("graph-edge-active");
+  expect(focused.edges[1]?.style?.strokeWidth).toBe(3.75);
+});

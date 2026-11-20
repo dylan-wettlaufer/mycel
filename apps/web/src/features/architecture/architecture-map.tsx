@@ -12,7 +12,10 @@ import { isFeatureList } from "@/features/semantic/feature-contracts";
 import { useResource } from "@/hooks/use-resource";
 import { isArchitectureMap, isRepositoryGraph } from "@/lib/contracts";
 import { ArchitectureDetails } from "./architecture-details";
-import { layoutArchitectureMap } from "./architecture-layout";
+import {
+  layoutArchitectureMap,
+  minorConnectionMaxCount,
+} from "./architecture-layout";
 
 const windowOptions: { value: ArchitectureChangeWindow; label: string }[] = [
   { value: "uncommitted", label: "Uncommitted" },
@@ -87,6 +90,7 @@ export function ArchitectureMapView({
   const [selection, setSelection] = useState<
     { kind: "part"; id: string } | { kind: "connection"; id: string } | null
   >(null);
+  const [showMinor, setShowMinor] = useState(false);
 
   const mapResource = useResource(
     `/api/architecture?window=${encodeURIComponent(windowMode)}`,
@@ -106,8 +110,11 @@ export function ArchitectureMapView({
 
   const map = mapResource.data;
   const layout = useMemo(
-    () => (map ? layoutArchitectureMap(map) : { nodes: [], edges: [] }),
-    [map],
+    () =>
+      map
+        ? layoutArchitectureMap(map, { showMinor })
+        : { nodes: [], edges: [], hiddenMinorCount: 0 },
+    [map, showMinor],
   );
 
   const selectedPart =
@@ -118,6 +125,14 @@ export function ArchitectureMapView({
     selection?.kind === "connection"
       ? map?.connections.find((connection) => connection.id === selection.id)
       : undefined;
+  // A merged two-way line uses one connection's id for both directions.
+  const selectedEdgeId = selectedConnection
+    ? (layout.edges.find(
+        (edge) =>
+          Array.isArray(edge.data?.connectionIds) &&
+          edge.data.connectionIds.includes(selectedConnection.id),
+      )?.id ?? null)
+    : null;
 
   const matchingFeatures = useMemo(
     () => findMatchingFeatures(selectedPart, featuresResource.data?.features),
@@ -170,6 +185,19 @@ export function ArchitectureMapView({
               </Button>
             ))}
           </div>
+          {(showMinor || layout.hiddenMinorCount > 0) && (
+            <Button
+              variant={showMinor ? "secondary" : "outline"}
+              size="xs"
+              aria-pressed={showMinor}
+              title={`Connections with ${minorConnectionMaxCount} or fewer imports and calls`}
+              onClick={() => setShowMinor((value) => !value)}
+            >
+              {showMinor
+                ? "Hide minor connections"
+                : `Show minor connections (${layout.hiddenMinorCount})`}
+            </Button>
+          )}
           <Button variant="outline" size="xs" onClick={onAllFiles}>
             All file dependencies
           </Button>
@@ -238,7 +266,7 @@ export function ArchitectureMapView({
             nodes={layout.nodes}
             edges={layout.edges}
             selectedId={selectedPart?.id ?? null}
-            selectedEdgeId={selectedConnection?.id ?? null}
+            selectedEdgeId={selectedEdgeId}
             onSelect={(id) => setSelection({ kind: "part", id })}
             onEdgeSelect={(id) => setSelection({ kind: "connection", id })}
             onClear={() => setSelection(null)}

@@ -144,7 +144,12 @@ async function selectionFitsScreen() {
     sidebar.x >= canvas.x + canvas.width,
     "details take their own space beside the graph",
   );
-  const legend = await page.getByLabel("Graph legend").boundingBox();
+  // The architecture map collapses its legend behind a toggle.
+  const legend = await page
+    .getByLabel("Graph legend")
+    .or(page.getByRole("button", { name: "Legend", exact: true }))
+    .first()
+    .boundingBox();
   const toolbar = await page.getByLabel("Graph reading controls").boundingBox();
   assert.ok(legend && toolbar);
   assert.ok(
@@ -263,13 +268,17 @@ try {
   await expect(
     page.getByRole("heading", { name: "Architecture map", exact: true }),
   ).toBeVisible();
+  const legendToggle = page.getByRole("button", { name: "Legend" });
+  await legendToggle.click();
   await expect(page.getByLabel("Graph legend")).toContainText(
-    "imports & calls",
+    "imports or calls",
   );
+  await legendToggle.click();
+  await expect(page.getByLabel("Graph legend")).toHaveCount(0);
   await graphFitsScreen();
   await expect(page.getByLabel("Selection details")).toHaveCount(0);
   const canvasBounds = await page.locator(".react-flow").boundingBox();
-  const legendBounds = await page.getByLabel("Graph legend").boundingBox();
+  const legendBounds = await legendToggle.boundingBox();
   const toolbarBounds = await page
     .getByLabel("Graph reading controls")
     .boundingBox();

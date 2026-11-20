@@ -37,6 +37,24 @@ interface Segment {
   b: XYPosition;
 }
 
+/** Connections with at most this many imports and calls are hidden unless requested. */
+export const minorConnectionMaxCount = 2;
+
+export interface ArchitectureLayoutOptions {
+  showMinor?: boolean;
+}
+
+/** One drawn line: a connection, or two opposite connections merged. */
+interface DisplayConnection {
+  id: string;
+  sourcePartId: string;
+  targetPartId: string;
+  connections: ArchitectureConnectionWithChanges[];
+  status: ArchitectureConnectionWithChanges["change"]["status"];
+  uncommitted: boolean;
+  foundation: boolean;
+}
+
 function connectionLabel(
   connection: ArchitectureConnectionWithChanges,
 ): string {
@@ -47,6 +65,99 @@ function connectionLabel(
     return `${connection.importCount} ${connection.importCount === 1 ? "import" : "imports"}`;
   }
   return `${connection.callCount} ${connection.callCount === 1 ? "call" : "calls"}`;
+}
+
+function displayLabel(display: DisplayConnection): string {
+  const [forward, backward] = display.connections;
+  return backward
+    ? `${connectionLabel(forward!)} → · ${connectionLabel(backward)} ←`
+    : connectionLabel(forward!);
+}
+
+/** Stroke width grows with the logarithm of the link count. */
+export function connectionWeight(count: number): number {
+  return Math.min(6, Math.round((1.25 + 1.25 * Math.log2(count)) * 4) / 4);
+}
+
+/**
+ * Parts that most other parts use and that depend on no other part, such as
+ * shared contracts. Their lines carry little information, so they are pinned
+ * below the map and drawn only when focused.
+ */
+export function findFoundationParts(map: ArchitectureMap): Set<string> {
+  const others = map.parts.length - 1;
+  if (others < 4) return new Set();
+  const users = new Map<string, Set<string>>();
+  const dependents = new Set<string>();
+  for (const { sourcePartId, targetPartId } of map.connections) {
+    if (sourcePartId === targetPartId) continue;
+    dependents.add(sourcePartId);
+    users.set(
+      targetPartId,
+      (users.get(targetPartId) ?? new Set()).add(sourcePartId),
+    );
+  }
+  const threshold = Math.max(3, Math.ceil(others * 0.6));
+  return new Set(
+    map.parts
+      .filter(
+        (part) =>
+          !dependents.has(part.id) &&
+          (users.get(part.id)?.size ?? 0) >= threshold,
+      )
+      .map((part) => part.id),
+  );
+}
+
+function displayConnections(
+  map: ArchitectureMap,
+  foundation: ReadonlySet<string>,
+  showMinor: boolean,
+): { displays: DisplayConnection[]; hiddenMinorCount: number } {
+  const visible = map.connections.filter(
+    (connection) => showMinor || connection.count > minorConnectionMaxCount,
+  );
+  const byPair = new Map<string, ArchitectureConnectionWithChanges>();
+  for (const connection of visible) {
+    byPair.set(
+      `${connection.sourcePartId}\0${connection.targetPartId}`,
+      connection,
+    );
+  }
+  const merged = new Set<string>();
+  const displays: DisplayConnection[] = [];
+  for (const connection of visible) {
+    if (merged.has(connection.id)) continue;
+    const reverse = byPair.get(
+      `${connection.targetPartId}\0${connection.sourcePartId}`,
+    );
+    const pair =
+      reverse && reverse.id !== connection.id
+        ? [connection, reverse].sort((a, b) => b.count - a.count)
+        : [connection];
+    for (const entry of pair) merged.add(entry.id);
+    const primary = pair[0]!;
+    const statuses = pair.map((entry) => entry.change.status);
+    displays.push({
+      id: primary.id,
+      sourcePartId: primary.sourcePartId,
+      targetPartId: primary.targetPartId,
+      connections: pair,
+      status: statuses.includes("new")
+        ? "new"
+        : statuses.includes("changed")
+          ? "changed"
+          : "unchanged",
+      uncommitted: pair.some((entry) => entry.change.uncommitted),
+      foundation:
+        foundation.has(primary.sourcePartId) ||
+        foundation.has(primary.targetPartId),
+    });
+  }
+  return {
+    displays,
+    hiddenMinorCount: map.connections.length - visible.length,
+  };
 }
 
 function connectionDescription(
@@ -203,10 +314,34 @@ function placeClearLabel(
   return preferred;
 }
 
-export function layoutArchitectureMap(map: ArchitectureMap): {
+export function layoutArchitectureMap(
+  fullMap: ArchitectureMap,
+  options: ArchitectureLayoutOptions = {},
+): {
   nodes: PartNode[];
   edges: Edge[];
+  hiddenMinorCount: number;
 } {
+  const foundation = findFoundationParts(fullMap);
+  const usedBy = new Map<string, Set<string>>();
+  for (const { sourcePartId, targetPartId } of fullMap.connections) {
+    if (!foundation.has(targetPartId)) continue;
+    usedBy.set(
+      targetPartId,
+      (usedBy.get(targetPartId) ?? new Set()).add(sourcePartId),
+    );
+  }
+  const { displays, hiddenMinorCount } = displayConnections(
+    fullMap,
+    foundation,
+    options.showMinor ?? false,
+  );
+  // Route and lay out only the main parts; foundation parts sit in a strip below.
+  const map = {
+    parts: fullMap.parts.filter((part) => !foundation.has(part.id)),
+    connections: displays.filter((display) => !display.foundation),
+  };
+
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: "LR",
@@ -220,7 +355,13 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
   for (const part of map.parts) {
     graph.setNode(part.id, { ...partNodeSize });
   }
-  for (const connection of map.connections) {
+  // Minor connections still shape the layout so toggling them does not move cards.
+  for (const connection of fullMap.connections) {
+    if (
+      foundation.has(connection.sourcePartId) ||
+      foundation.has(connection.targetPartId)
+    )
+      continue;
     graph.setEdge(connection.sourcePartId, connection.targetPartId);
   }
   dagre.layout(graph);
@@ -264,7 +405,7 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
   });
 
   interface EdgePlan {
-    connection: ArchitectureConnectionWithChanges;
+    connection: DisplayConnection;
     forward: boolean;
     sourceSide: Position;
     targetSide: Position;
@@ -654,74 +795,147 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
     });
   }
 
-  // Pass 2: place labels on clear segments away from cards, other labels, and other edges.
-  const placedLabels: Rect[] = [];
-  const edges: Edge[] = routedEdges.map((routed) => {
-    const { connection } = routed.plan;
-    const fullRoutePoints = [routed.start, ...routed.bends, routed.end];
-    const label = placeClearLabel(
-      connection.id,
-      fullRoutePoints,
-      routed.preferredLabel,
-      tightNodeBoxes,
-      placedLabels,
-      allSegments,
+  const foundationParts = fullMap.parts.filter((part) =>
+    foundation.has(part.id),
+  );
+  if (foundationParts.length > 0) {
+    const mainPositions = [...positions.values()];
+    const mainLeft = Math.min(...mainPositions.map((pos) => pos.x));
+    const mainRight = Math.max(
+      ...mainPositions.map((pos) => pos.x + partNodeSize.width),
     );
+    const gap = 64;
+    const stripWidth =
+      foundationParts.length * partNodeSize.width +
+      (foundationParts.length - 1) * gap;
+    const stripLeft = Math.round((mainLeft + mainRight - stripWidth) / 2);
+    const stripTop =
+      maxBottom + highwayOffset + highwaySpacing * bottomHighwayIndex + 72;
+    foundationParts.forEach((part, index) => {
+      positions.set(part.id, {
+        x: stripLeft + index * (partNodeSize.width + gap),
+        y: stripTop,
+      });
+    });
+  }
 
-    const statusClass =
-      connection.change.status === "new"
-        ? "arch-edge-new"
-        : connection.change.status === "changed"
-          ? "arch-edge-changed"
-          : "";
-    const uncommittedClass = connection.change.uncommitted
-      ? "arch-edge-uncommitted"
-      : "";
-
+  function toEdge(
+    connection: DisplayConnection,
+    sourceHandle: string,
+    targetHandle: string,
+    route?: {
+      source: XYPosition;
+      target: XYPosition;
+      bends: XYPosition[];
+      label: XYPosition;
+    },
+  ): Edge {
     const color =
-      connection.change.status === "new"
+      connection.status === "new"
         ? "var(--success)"
-        : connection.change.status === "changed"
+        : connection.status === "changed"
           ? "var(--warning)"
           : "var(--muted-foreground)";
-
+    const marker = {
+      type: MarkerType.ArrowClosed,
+      color,
+      width: 18,
+      height: 18,
+    };
+    const bidirectional = connection.connections.length > 1;
+    const weight = connectionWeight(
+      connection.connections.reduce((sum, entry) => sum + entry.count, 0),
+    );
     return {
       id: connection.id,
       type: "behaviour",
       source: connection.sourcePartId,
       target: connection.targetPartId,
-      sourceHandle: routed.sourceHandle,
-      targetHandle: routed.targetHandle,
-      label: connectionLabel(connection),
-      className: [statusClass, uncommittedClass].filter(Boolean).join(" "),
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color,
-        width: 18,
-        height: 18,
-      },
-      style: {
-        stroke: color,
-        strokeWidth: connection.change.uncommitted ? 2.8 : 2,
-      },
+      sourceHandle,
+      targetHandle,
+      label: displayLabel(connection),
+      className: [
+        connection.status === "new"
+          ? "arch-edge-new"
+          : connection.status === "changed"
+            ? "arch-edge-changed"
+            : "",
+        connection.uncommitted ? "arch-edge-uncommitted" : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      markerEnd: marker,
+      ...(bidirectional ? { markerStart: marker } : {}),
+      style: { stroke: color, strokeWidth: weight },
       data: {
-        route: {
-          source: routed.start,
-          target: routed.end,
-          bends: routed.bends,
-          label,
-        },
-        description: connectionDescription(connection),
+        ...(route ? { route } : {}),
+        description: connection.connections
+          .map(connectionDescription)
+          .join("\n"),
         connectionId: connection.id,
-        changeStatus: connection.change.status,
-        uncommitted: connection.change.uncommitted,
+        connectionIds: connection.connections.map((entry) => entry.id),
+        changeStatus: connection.status,
+        uncommitted: connection.uncommitted,
+        weight,
+        bidirectional,
+        foundation: connection.foundation,
       },
     };
+  }
+
+  // Pass 2: place labels on clear segments away from cards, other labels, and other edges.
+  const placedLabels: Rect[] = [];
+  const edges: Edge[] = routedEdges.map((routed) => {
+    const { connection } = routed.plan;
+    const label = placeClearLabel(
+      connection.id,
+      [routed.start, ...routed.bends, routed.end],
+      routed.preferredLabel,
+      tightNodeBoxes,
+      placedLabels,
+      allSegments,
+    );
+    return toEdge(connection, routed.sourceHandle, routed.targetHandle, {
+      source: routed.start,
+      target: routed.end,
+      bends: routed.bends,
+      label,
+    });
   });
 
-  const nodes: PartNode[] = map.parts.map((part) => {
+  // Foundation lines are drawn only on focus, so a direct step path is enough.
+  const foundationDisplays = displays.filter((display) => display.foundation);
+  const incomingByFoundation = new Map<string, DisplayConnection[]>();
+  for (const display of foundationDisplays) {
+    const group = incomingByFoundation.get(display.targetPartId) ?? [];
+    group.push(display);
+    incomingByFoundation.set(display.targetPartId, group);
+  }
+  for (const group of incomingByFoundation.values()) {
+    group.sort(
+      (a, b) =>
+        positions.get(a.sourcePartId)!.x - positions.get(b.sourcePartId)!.x,
+    );
+    group.forEach((display, index) => {
+      edges.push(
+        toEdge(
+          display,
+          registerHandle(display.sourcePartId, "source", Position.Bottom, 50),
+          registerHandle(
+            display.targetPartId,
+            "target",
+            Position.Top,
+            distributedOffset(index, group.length),
+          ),
+        ),
+      );
+    });
+  }
+
+  const nodes: PartNode[] = fullMap.parts.map((part) => {
     const position = positions.get(part.id)!;
     const handles = handlesByPart.get(part.id);
+    const users = usedBy.get(part.id)?.size;
     const classes = [
       "arch-part-node",
       `arch-part-kind-${part.kind}`,
@@ -731,6 +945,7 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
           ? "arch-part-changed"
           : "",
       part.change.uncommitted ? "arch-part-uncommitted" : "",
+      foundation.has(part.id) ? "arch-part-foundation" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -741,7 +956,7 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
       position,
       className: classes,
       style: partNodeSize,
-      ariaLabel: `${part.name}, ${part.kind}, ${part.files.length} files`,
+      ariaLabel: `${part.name}, ${part.kind}, ${part.files.length} files${users ? `, used by ${users} parts` : ""}`,
       data: {
         label: part.name,
         name: part.name,
@@ -750,11 +965,12 @@ export function layoutArchitectureMap(map: ArchitectureMap): {
         fileCount: part.files.length,
         status: part.change.status,
         uncommitted: part.change.uncommitted,
+        ...(users ? { usedBy: users } : {}),
         ...(part.fallback ? { fallback: true } : {}),
         ...(handles ? { handles: [...handles.values()] } : {}),
       },
     };
   });
 
-  return { nodes, edges };
+  return { nodes, edges, hiddenMinorCount };
 }

@@ -48,6 +48,8 @@ export interface PartNodeData extends Record<string, unknown> {
   fileCount: number;
   status: ArchitectureChangeStatus;
   uncommitted: boolean;
+  /** Set for foundation parts, whose incoming lines are hidden until focused. */
+  usedBy?: number;
   fallback?: boolean;
   handles?: NodeHandle[];
 }
@@ -137,6 +139,11 @@ export const PartNodeView = memo(function PartNodeView({
         </div>
         <div className="part-node-title">{data.name}</div>
         <p className="part-node-purpose">{data.purpose}</p>
+        {data.usedBy !== undefined && (
+          <p className="part-node-used-by">
+            Used by {data.usedBy} {data.usedBy === 1 ? "part" : "parts"}
+          </p>
+        )}
       </div>
     </>
   );

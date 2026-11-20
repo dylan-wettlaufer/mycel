@@ -27,12 +27,77 @@ export function graphConnections(
     outgoing: linked(outgoing, "target"),
   };
 }
+function focusArchitectureEdge(
+  edge: Edge,
+  {
+    weight,
+    active,
+    hasSelection,
+    showLabel,
+    outgoing,
+  }: {
+    weight: number;
+    active: boolean;
+    hasSelection: boolean;
+    showLabel: boolean;
+    outgoing: boolean;
+  },
+): Edge {
+  const status = edge.data?.changeStatus;
+  const color =
+    status === "new"
+      ? "var(--success)"
+      : status === "changed"
+        ? "var(--warning)"
+        : active
+          ? outgoing
+            ? "var(--primary)"
+            : "var(--chart-1)"
+          : "var(--muted-foreground)";
+  const marker = {
+    type: MarkerType.ArrowClosed,
+    color,
+    width: 18,
+    height: 18,
+  };
+  return {
+    ...edge,
+    className: [
+      edge.className,
+      active
+        ? "graph-edge-active"
+        : hasSelection
+          ? "graph-edge-unrelated"
+          : "arch-edge-resting",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    label: showLabel ? edge.label : undefined,
+    markerEnd: marker,
+    ...(edge.data?.bidirectional ? { markerStart: marker } : {}),
+    style: {
+      ...edge.style,
+      stroke: color,
+      strokeWidth: active ? weight + 0.75 : weight,
+    },
+    labelStyle: {
+      fill: "var(--foreground)",
+      fontSize: 12,
+      fontWeight: 500,
+    },
+    labelBgStyle: { fill: "var(--background)", fillOpacity: 1 },
+    labelBgPadding: [7, 4] as [number, number],
+    labelBgBorderRadius: 4,
+  };
+}
+
 export function focusGraph(
   nodes: Node[],
   edges: Edge[],
   selectedId: string | null,
   onlyConnections: boolean,
   selectedEdgeId: string | null = null,
+  hoveredEdgeId: string | null = null,
 ) {
   const selected = nodes.some((node) => node.id === selectedId)
     ? selectedId
@@ -86,12 +151,22 @@ export function focusGraph(
           edge.source === selected ||
           edge.target === selected,
       )
+      // Architecture lines into foundation parts appear only when focused.
+      .filter(
+        (edge) =>
+          !edge.data?.foundation ||
+          edge.id === selectedEdge?.id ||
+          edge.source === selected ||
+          edge.target === selected,
+      )
       .map((edge) => {
         const behaviour = edge.type === "behaviour";
         const uncertain =
           behaviour && edge.className === "graph-edge-uncertain";
         const archStatus = edge.data?.changeStatus;
         const archUncommitted = Boolean(edge.data?.uncommitted);
+        const archWeight =
+          typeof edge.data?.weight === "number" ? edge.data.weight : undefined;
         const isSelectedEdge = selectedEdge?.id === edge.id;
         const active =
           isSelectedEdge ||
@@ -99,6 +174,14 @@ export function focusGraph(
             selected && (edge.source === selected || edge.target === selected),
           );
         const hasSelection = Boolean(selected || selectedEdge);
+        if (archWeight !== undefined)
+          return focusArchitectureEdge(edge, {
+            weight: archWeight,
+            active,
+            hasSelection,
+            showLabel: isSelectedEdge || edge.id === hoveredEdgeId,
+            outgoing: edge.source === selected,
+          });
         const color = uncertain
           ? "var(--warning)"
           : archStatus === "new"

@@ -758,6 +758,25 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+.part-node-used-by {
+  margin: auto 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.react-flow .arch-part-foundation {
+  border-style: dashed;
+}
+.react-flow .arch-part-foundation .part-node-purpose {
+  -webkit-line-clamp: 1;
+}
+/* Architecture lines stay faint until a part or line is focused. */
+.react-flow .arch-edge-resting {
+  opacity: 0.22;
+}
+.react-flow .arch-edge-resting:hover {
+  opacity: 0.8;
+}
 .graph-swatch-new {
   background: var(--success);
 }

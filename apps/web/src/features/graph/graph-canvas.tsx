@@ -170,9 +170,29 @@ export function GraphCanvas({
       cancelAnimationFrame(frame);
     };
   }, [behaviour, fitOptions, layoutAnchorId]);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  // Architecture maps preview a part's connections on hover.
+  const previewId = mode === "architecture" ? hoveredNodeId : null;
   const focused = useMemo(
-    () => focusGraph(nodes, edges, selectedId, onlyConnections, selectedEdgeId),
-    [nodes, edges, selectedId, onlyConnections, selectedEdgeId],
+    () =>
+      focusGraph(
+        nodes,
+        edges,
+        previewId ?? selectedId,
+        onlyConnections,
+        previewId ? null : selectedEdgeId,
+        hoveredEdgeId,
+      ),
+    [
+      nodes,
+      edges,
+      previewId,
+      selectedId,
+      onlyConnections,
+      selectedEdgeId,
+      hoveredEdgeId,
+    ],
   );
   const visibleNodes = useMemo(
     () => withNodeState(focused.nodes, nodeState.byId),
@@ -251,6 +271,10 @@ export function GraphCanvas({
           onNodeClick={(_, node) => onSelect(node.id)}
           onNodeDoubleClick={(_, node) => onOpen?.(node.id)}
           onEdgeClick={(_, edge) => onEdgeSelect?.(edge.id)}
+          onNodeMouseEnter={(_, node) => setHoveredNodeId(node.id)}
+          onNodeMouseLeave={() => setHoveredNodeId(null)}
+          onEdgeMouseEnter={(_, edge) => setHoveredEdgeId(edge.id)}
+          onEdgeMouseLeave={() => setHoveredEdgeId(null)}
           onPaneClick={onClear}
         >
           <Panel position="top-right">
@@ -327,7 +351,7 @@ export function GraphCanvas({
             />
           )}
           <Panel position="top-left" className="max-w-[calc(100%-64px)]">
-            {behaviour ? (
+            {behaviour || mode === "architecture" ? (
               <Collapsible.Root className="group">
                 <Collapsible.Trigger asChild>
                   <Button variant="outline" size="sm">
@@ -432,11 +456,13 @@ function GraphLegend({
           : mode === "behaviour"
             ? "Source-verified flow"
             : mode === "architecture"
-              ? "A → B: imports & calls"
+              ? "A → B: A imports or calls B"
               : "A → B: A imports B"}
       </span>
       {mode === "architecture" && (
         <>
+          <span>Thicker lines carry more links</span>
+          <span>Hover or select a part to trace it</span>
           <span>
             <i className="graph-legend-swatch graph-swatch-new" aria-hidden />
             New in window

@@ -116,6 +116,11 @@ try {
   await expect(serverCard).toContainText("HTTP API server.");
   await expect(coreCard).toContainText("Changed");
   await expect(dbCard).toContainText("New");
+  // Both one-import connections are minor, so they start hidden.
+  await expect(page.locator(".react-flow__edge")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Show minor connections (2)" })
+    .click();
   await expect(page.locator(".react-flow__edge")).toHaveCount(2);
 
   // 2. Selecting a part shows connections, files, and allows drilling into connection evidence and source.
