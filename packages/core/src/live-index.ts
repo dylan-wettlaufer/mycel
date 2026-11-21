@@ -36,7 +36,7 @@ export interface WatchRepositoryOptions extends IndexRepositoryOptions {
   debounceMs?: number;
   onEvent?(event: ChangeEvent): void;
   onError(error: unknown): void;
-  /** Alternate parser for engine integrations; defaults to the TypeScript parser. */
+  /** Alternate parser for engine integrations; defaults to @mycel/parser. */
   parse?: typeof parseFile;
 }
 

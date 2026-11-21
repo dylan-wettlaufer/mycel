@@ -101,7 +101,7 @@ export function isFileContent(
     typeof value.path === "string" &&
     typeof value.content === "string" &&
     typeof value.contentHash === "string" &&
-    ["typescript", "tsx"].includes(String(value.language))
+    ["typescript", "tsx", "python"].includes(String(value.language))
   );
 }
 

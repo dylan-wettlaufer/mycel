@@ -26,6 +26,9 @@ dashboard in your default browser. Outside Git, it opens the current folder.
 The dashboard shows the selected repository's name and absolute path. The
 terminal stays running; press Ctrl+C to stop the server and close its database.
 
+Mycel indexes TypeScript, TSX, and Python. Python maps show file-to-file
+connections from module-level imports.
+
 Each launch uses an available port on `127.0.0.1` and prints the dashboard URL.
 Use `mycel --no-open` when you want to open the URL yourself, or `mycel --help`
 for usage. No subcommand is required.

@@ -1,11 +1,97 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { openDatabase } from "@mycel/db";
 import { parseFile } from "@mycel/parser";
-import { createGraphQueries, indexRepository } from "../dist/index.js";
+import {
+  createGraphQueries,
+  indexRepository,
+  openIndexedProject,
+} from "../dist/index.js";
+
+test("maps a Python fixture repository from indexed imports and source evidence", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "mycel-python-imports-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const paths = [
+    "app/__init__.py",
+    "app/config.py",
+    "app/main.py",
+    "app/routes/view.py",
+    "data/store.py",
+    "services/__init__.py",
+    "services/formatter.py",
+  ];
+  await Promise.all(
+    paths.map(async (path) => {
+      const source = await readFile(
+        new URL(`fixtures/python-imports/${path}.txt`, import.meta.url),
+      );
+      const target = join(root, path);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, source);
+    }),
+  );
+  const { architecture, graph, close } = await openIndexedProject({
+    project: { name: "python-imports", root },
+    databasePath: ":memory:",
+  });
+  t.after(close);
+  const { revision, symbolCount, diagnosticCount } = graph.getStats();
+  assert.equal(symbolCount, 0);
+  assert.equal(diagnosticCount, 0);
+  const repository = graph.getRepositoryGraph();
+  assert.deepEqual(
+    repository.files.map(({ path }) => path),
+    paths,
+  );
+  const byId = new Map(repository.files.map(({ id, path }) => [id, path]));
+  assert.deepEqual(
+    repository.dependencies
+      .map(
+        ({ sourceId, targetId }) =>
+          `${byId.get(sourceId)} -> ${byId.get(targetId)}`,
+      )
+      .sort(),
+    [
+      "app/main.py -> app/config.py",
+      "app/main.py -> data/store.py",
+      "app/main.py -> services/__init__.py",
+      "app/main.py -> services/formatter.py",
+      "app/routes/view.py -> app/config.py",
+      "app/routes/view.py -> services/formatter.py",
+      "services/__init__.py -> services/formatter.py",
+    ],
+  );
+  assert.equal(graph.getFileContent("app/main.py").language, "python");
+  assert.equal(
+    graph.getFileContent("app/main.py", revision).language,
+    "python",
+  );
+
+  const map = await architecture.getArchitecture();
+  assert.equal(map.source, "folder-fallback");
+  assert.deepEqual(
+    map.connections.map(({ id, importCount, callCount }) => [
+      id,
+      importCount,
+      callCount,
+    ]),
+    [
+      ["app->data", 1, 0],
+      ["app->services", 3, 0],
+    ],
+  );
+  assert.deepEqual(
+    map.connections[0].evidence.map(({ file, targetFile, line }) => [
+      file,
+      targetFile,
+      line,
+    ]),
+    [["app/main.py", "data/store.py", 5]],
+  );
+});
 
 async function sources() {
   return Object.fromEntries(

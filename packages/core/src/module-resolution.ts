@@ -45,7 +45,9 @@ export async function loadModuleResolver(
   // Virtual POSIX paths also make resolution independent of the host platform.
   const base = "/repository";
   const absolute = (path: string) => posix.join(base, path);
-  const sources = new Set(sourcePaths.map(absolute));
+  const sources = new Set(
+    sourcePaths.filter((path) => !path.endsWith(".py")).map(absolute),
+  );
   const metadata = new Map<string, string>();
   const available = new Set(metadataPaths);
   const diagnostics: Diagnostic[] = [];

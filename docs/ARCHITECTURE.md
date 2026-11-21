@@ -18,7 +18,7 @@ consumes project-scoped HTTP queries and server-sent events (SSE).
 | Package | Responsibility |
 | --- | --- |
 | [`@mycel/cli`](../packages/cli/) | Resolve the repository, start the indexed server, and open the browser. |
-| [`@mycel/parser`](../packages/parser/README.md) | Extract TypeScript and TSX facts and source ranges through Tree-sitter. |
+| [`@mycel/parser`](../packages/parser/README.md) | Extract TypeScript and TSX structure, Python imports, and source ranges through Tree-sitter. |
 | [`@mycel/core`](../packages/core/README.md) | Discover and watch files, resolve references, build structural and semantic graphs, and publish committed changes. |
 | [`@mycel/db`](../packages/db/README.md) | Own SQLite migrations, persistence, revisions, history, and queries. |
 | [`@mycel/server`](../packages/server/README.md) | Expose Core's project-scoped queries and SSE through Hono and serve the built UI. |

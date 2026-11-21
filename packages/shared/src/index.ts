@@ -5,10 +5,10 @@ export type {
   IndexProgress,
   IndexStatus,
   ProjectInfo,
-  SourceExtension,
-  SourceLanguage,
   SourceRange,
 } from "./types.js";
+export { sourceExtensions, sourceLanguageForPath } from "./languages.js";
+export type { SourceExtension, SourceLanguage } from "./languages.js";
 export type { IndexingSettings, Project, ProjectId } from "./project.js";
 export type {
   ContentHash,

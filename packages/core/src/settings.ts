@@ -1,3 +1,4 @@
+import { sourceExtensions } from "@mycel/shared";
 import type { IndexingSettings } from "@mycel/shared";
 
 export function resolveIndexingSettings(
@@ -6,16 +7,18 @@ export function resolveIndexingSettings(
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new TypeError("Indexing settings must be an object");
   }
-  const extensions: IndexingSettings["extensions"] =
-    input.extensions === undefined ? [".ts", ".tsx"] : input.extensions;
+  const extensions =
+    input.extensions === undefined ? sourceExtensions : input.extensions;
   const exclude = input.exclude === undefined ? [] : input.exclude;
   const respectGitignore =
     input.respectGitignore === undefined ? true : input.respectGitignore;
   if (
     !Array.isArray(extensions) ||
-    extensions.some((extension) => extension !== ".ts" && extension !== ".tsx")
+    extensions.some((extension) => !sourceExtensions.includes(extension))
   ) {
-    throw new TypeError("Indexing extensions must be .ts or .tsx");
+    throw new TypeError(
+      `Indexing extensions must be one of ${sourceExtensions.join(", ")}`,
+    );
   }
   if (
     !Array.isArray(exclude) ||

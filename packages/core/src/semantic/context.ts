@@ -27,10 +27,11 @@ export interface SemanticCallable {
 
 /** Additional semantic binding over captured text only; no disk or package execution. */
 export function createSemanticContext(input: SemanticInput) {
-  const paths = new Set(input.files.map((file) => file.parsed.path));
-  const captured = new Map(input.files.map((file) => [file.parsed.path, file]));
+  const files = input.files.filter((file) => file.parsed.language !== "python");
+  const paths = new Set(files.map((file) => file.parsed.path));
+  const captured = new Map(files.map((file) => [file.parsed.path, file]));
   const sourceFiles = new Map(
-    input.files
+    files
       .filter((file) => file.parsed.status === "parsed")
       .map((file) => [
         file.parsed.path,
@@ -148,7 +149,7 @@ export function createSemanticContext(input: SemanticInput) {
       let changed = true;
       while (changed) {
         changed = false;
-        for (const file of input.files) {
+        for (const file of files) {
           if (invalidModules.has(file.parsed.path)) continue;
           const dependencies = [...file.parsed.imports, ...file.parsed.exports];
           if (

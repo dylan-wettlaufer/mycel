@@ -29,14 +29,13 @@ repository-relative paths with forward slashes. `indexing` accepts partial
 `IndexingSettings`; omitted settings default to:
 
 ```ts
-{ extensions: [".ts", ".tsx"], exclude: [], respectGitignore: true }
+{ extensions: [".ts", ".tsx", ".py"], exclude: [], respectGitignore: true }
 ```
 
-- Supported files match the existing parser: `.ts` (including `.d.ts`) and
-  `.tsx`. JavaScript, JSON, `.mts`, `.cts`, and other unsupported extensions
-  are excluded. Configured extensions can narrow this set, not expand it.
+- Supported source extensions are `.ts` (including `.d.ts`), `.tsx`, and
+  `.py`. Configured extensions select a subset of these extensions.
 - `.git`, `node_modules`, `dist`, `build`, `coverage`, `.pnpm-store`, and
-  `.next` directories are pruned at every depth, even when Git ignores are
+  `.next` and `.venv` directories are pruned at every depth, even when Git ignores are
   disabled or a negation pattern would otherwise include them.
 - Root and nested `.gitignore` files are interpreted relative to their own
   directories, with deeper rules taking precedence. Ignored directories are
@@ -136,6 +135,12 @@ specifiers. Named, default, namespace, aliased, and chained re-exports are
 supported, with cycle guards and ambiguity checks. Type-only imports contribute
 file dependencies but never runtime calls. Missing local modules produce
 resolver diagnostics, which disappear when the module becomes available.
+
+Python module-level imports resolve to indexed `.py` modules and package
+`__init__.py` files. Absolute imports use the repository root and then `src`.
+Relative imports follow the importing file's package directory. For
+`from package import name`, an indexed `name` submodule takes precedence over
+the package initializer.
 
 TypeScript `paths` and `baseUrl` are read from the nearest `tsconfig.json`,
 including local `extends` files (JSONC) and referenced application configs. Local

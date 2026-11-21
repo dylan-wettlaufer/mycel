@@ -5,6 +5,43 @@ import { parseFile } from "../dist/index.js";
 
 const fixture = (name) =>
   readFile(new URL(`fixtures/${name}.txt`, import.meta.url), "utf8");
+
+test("extracts Python module-level imports with aliases, dotted names, and multiline ranges", () => {
+  const source = `from __future__ import annotations
+import app . rules as rules, json; import sys
+from ..shared import (
+    café as label,
+    utils,
+)
+from .handlers import *
+
+def local():
+    import hidden
+`;
+  const result = parseFile("app/ui/main.py", source);
+  assert.equal(result.language, "python");
+  assert.equal(result.status, "parsed");
+  assert.deepEqual(result.diagnostics, []);
+  assert.deepEqual(
+    result.imports.map(({ specifier }) => specifier),
+    ["app.rules", "json", "sys", "..shared", ".handlers"],
+  );
+  const { bindings, range } = result.imports[3];
+  assert.deepEqual(bindings, [
+    { kind: "named", imported: "café", local: "label", typeOnly: false },
+    { kind: "named", imported: "utils", local: "utils", typeOnly: false },
+  ]);
+  assert.deepEqual([range.startLine, range.endLine], [3, 6]);
+  assert.equal(
+    source.slice(range.start, range.end),
+    "from ..shared import (\n    café as label,\n    utils,\n)",
+  );
+  assert.deepEqual(
+    [result.symbols, result.exports, result.calls],
+    [[], [], []],
+  );
+});
+
 const symbolNamed = (result, name) => {
   const symbol = result.symbols.find((item) => item.qualifiedName === name);
   assert.ok(symbol, `Missing symbol: ${name}`);

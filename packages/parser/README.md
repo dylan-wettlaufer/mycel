@@ -1,7 +1,7 @@
 # @mycel/parser
 
-Fresh Tree-sitter extraction for TypeScript and TSX. This package takes source
-text supplied by its caller. It does not discover/read source files, resolve
+Fresh Tree-sitter extraction for TypeScript, TSX, and Python. This package takes
+source text supplied by its caller. It does not discover/read source files, resolve
 modules or calls, write to storage, or depend on the engine or HTTP server.
 No implementation or fixtures were copied from Texo.
 
@@ -22,7 +22,7 @@ result.contains; // file contains save
 ## Contract
 
 `parseFile(path, source)` is synchronous and selects TypeScript for `.ts`
-(including `.d.ts`) or TSX for `.tsx`. Paths are caller-supplied identifiers:
+(including `.d.ts`), TSX for `.tsx`, and Python for `.py`. Paths are caller-supplied identifiers:
 the parser preserves them, performs no filesystem normalization, and never
 reads the named source file. Core should supply consistent repository-relative
 paths. Invalid argument types and unsupported extensions throw.
@@ -42,6 +42,9 @@ The result is plain serializable data:
   Calls outside callable bodies have no caller ID. JSX elements are not calls.
 - `diagnostics`: ranged syntax errors, missing tokens, and duplicate-symbol
   warnings. Syntax errors mark the result `partial`; recoverable facts remain.
+
+Python extraction records syntax diagnostics and module-level `import` and
+`from … import` statements with source ranges and imported names.
 
 Source ranges use **UTF-16 code-unit offsets**, one-based lines/columns, and an
 exclusive end. Use `source.slice(range.start, range.end)`. These are not byte
@@ -72,8 +75,8 @@ and actual runtime dispatch are outside this package.
 ## Dependencies and verification
 
 The native Node binding provides a synchronous API with no WASM initialization
-or grammar assets to locate. Both dependencies are pinned to a compatible
-pair: `tree-sitter@0.21.1` and `tree-sitter-typescript@0.23.2`. Their native
+or grammar assets to locate. `tree-sitter@0.21.1` is pinned alongside the
+`tree-sitter-typescript@0.23.2` and `tree-sitter-python@0.23.4` grammars. Their native
 install scripts are allowed by the root pnpm configuration. Only the parser's
 `tsconfig` skips dependency declaration checking because the grammar package
 ships an invalid ambient export assignment; Mycel source remains strictly

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { sourceLanguageForPath } from "@mycel/shared";
 import type {
   Diagnostic,
   GraphEdge,
@@ -363,9 +364,7 @@ export function getFileContent(
           projectId,
           revision,
           path,
-          language: path.endsWith(".tsx")
-            ? ("tsx" as const)
-            : ("typescript" as const),
+          language: sourceLanguageForPath(path) ?? "typescript",
           ...row,
         }
       : undefined;

@@ -17,11 +17,6 @@ export interface IndexProgress {
 
 export type DatabaseStatus = "closed" | "ready" | "error";
 
-export type SourceLanguage = "typescript" | "tsx";
-
-/** Matches the parser's current supported extensions; .ts includes .d.ts. */
-export type SourceExtension = ".ts" | ".tsx";
-
 export interface ProjectInfo {
   name: string;
   root: string;

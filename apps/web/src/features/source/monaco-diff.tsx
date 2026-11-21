@@ -1,19 +1,20 @@
 import { useEffect, useRef } from "react";
 import type { ChangeDiff } from "@mycel/shared";
-import { editorOptions, monaco } from "./monaco-view";
+import { editorLanguage, editorOptions, monaco } from "./monaco-view";
 
 export default function MonacoDiff({ diff }: { diff: ChangeDiff }) {
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!container.current) return;
+    const language = editorLanguage(diff.path);
     const original = monaco.editor.createModel(
       diff.beforeContent ?? "",
-      "typescript",
+      language,
       monaco.Uri.parse(`mycel-history://${diff.changeId}/before/${diff.path}`),
     );
     const modified = monaco.editor.createModel(
       diff.afterContent ?? "",
-      "typescript",
+      language,
       monaco.Uri.parse(`mycel-history://${diff.changeId}/after/${diff.path}`),
     );
     const editor = monaco.editor.createDiffEditor(container.current, {

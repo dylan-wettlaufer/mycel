@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import Editor, { loader, type OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor/editor/editor.api.js";
 import "monaco-editor/editor/contrib/hover/browser/hoverContribution.js";
+import "monaco-editor/languages/definitions/python/register.js";
 import "monaco-editor/languages/definitions/typescript/register.js";
 import EditorWorker from "monaco-editor/editor/editor.worker.js?worker";
+import { sourceLanguageForPath } from "@mycel/shared";
 import type { EdgeSourceRange, SourceRange } from "@mycel/shared";
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
@@ -29,6 +31,10 @@ export const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions =
     scrollBeyondLastLine: false,
     padding: { top: 12 },
   };
+
+export function editorLanguage(path: string): string {
+  return sourceLanguageForPath(path) === "python" ? "python" : "typescript";
+}
 
 export interface SourceWorkspaceOptions {
   wrapped: boolean;
@@ -174,7 +180,7 @@ export default function MonacoView({
     <Editor
       height={workspace ? "100%" : "480px"}
       path={path}
-      language="typescript"
+      language={editorLanguage(path)}
       value={content}
       theme="mycel"
       options={

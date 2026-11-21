@@ -19,6 +19,7 @@ export const excludedDirectories = new Set([
   "coverage",
   ".pnpm-store",
   ".next",
+  ".venv",
 ]);
 
 interface IgnoreRules {

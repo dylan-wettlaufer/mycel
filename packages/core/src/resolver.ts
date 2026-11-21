@@ -9,6 +9,7 @@ import type {
 } from "@mycel/shared";
 import { hashIdentity } from "./hash.js";
 import type { CapturedFile } from "./graph.js";
+import { resolvePythonImport } from "./python-resolution.js";
 
 /** Resolve repository-relative TS/TSX modules, including emitted .js specifiers. */
 export function resolveRelativeModule(
@@ -45,7 +46,10 @@ export function resolveRelationships(
   const files = new Map(
     captured.map((file) => [file.parsed.path, file.parsed]),
   );
-  const paths = new Set(files.keys());
+  const paths = new Set<string>();
+  const pythonPaths = new Set<string>();
+  for (const [path, file] of files)
+    (file.language === "python" ? pythonPaths : paths).add(path);
   const resolveModule = (
     from: string,
     specifier: string,
@@ -241,6 +245,23 @@ export function resolveRelationships(
       : undefined;
   }
   for (const [path, file] of files) {
+    if (file.language === "python") {
+      for (const item of file.imports) {
+        const targets = resolvePythonImport(path, item, pythonPaths);
+        for (const target of targets) {
+          if (target !== path)
+            edge("IMPORTS", file.fileId, files.get(target)!.fileId, item.range);
+        }
+        if (!targets.length && item.specifier.startsWith("."))
+          diagnostic(
+            path,
+            item.range,
+            "unresolved-module",
+            `Could not resolve local module: ${item.specifier}`,
+          );
+      }
+      continue;
+    }
     for (const item of [
       ...file.imports,
       ...file.exports.filter((item) => item.specifier !== undefined),

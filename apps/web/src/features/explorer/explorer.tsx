@@ -21,9 +21,9 @@ export function Explorer({
     const timer = setTimeout(() => setSearch(query.trim()), 200);
     return () => clearTimeout(timer);
   }, [query]);
-  // All indexed languages have .ts in their path, including .tsx and .d.ts.
+  // Every indexed path has a source extension.
   const { data, error } = useResource(
-    `/api/graph/search?q=${encodeURIComponent(search || ".ts")}&limit=100`,
+    `/api/graph/search?q=${encodeURIComponent(search || ".")}&limit=100`,
     isSearchResult,
     revision,
   );

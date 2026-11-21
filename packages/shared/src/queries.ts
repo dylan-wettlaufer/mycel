@@ -6,7 +6,8 @@ import type {
   Revision,
 } from "./graph.js";
 import type { ProjectId } from "./project.js";
-import type { Diagnostic, SourceLanguage } from "./types.js";
+import type { SourceLanguage } from "./languages.js";
+import type { Diagnostic } from "./types.js";
 
 /** Options after HTTP parameter parsing; the server validates numeric bounds. */
 export interface SearchQuery {

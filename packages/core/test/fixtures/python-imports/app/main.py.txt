@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+import json, services.formatter as formatter
+from services import format_label
+from data import (
+    store as records,
+)
+from . import config
+
+def main():
+    import logging
+    print(formatter.format_label(config.PREFIX), records.ORDERS)

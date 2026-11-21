@@ -9,7 +9,7 @@ does not load Node APIs, Tree-sitter, SQLite, or HTTP code.
 - `ProjectInfo`: the existing `{ name, root }` launch metadata. `root` is an
   absolute path. This shape remains valid before engine initialization.
 - `Project`: adds a persistent `id` and `IndexingSettings` to launch metadata.
-  Settings select `.ts`/`.tsx` extensions, repository-relative exclude globs,
+  Settings select `.ts`, `.tsx`, and `.py` extensions, repository-relative exclude globs,
   and whether to honor `.gitignore`. `.ts` includes declaration files.
 - `GraphNode`: project and node IDs, kind, name, lexical qualified name,
   repository-relative path, source range, content hash, and last-written
