@@ -88,15 +88,14 @@ export function App() {
   );
   const localEvent = activity.events.find((event) => event.id === changeId);
   const record = useResource(
-    changeId && !localEvent
+    view === "Activity" && changeId
       ? `/api/changes/${encodeURIComponent(changeId)}`
       : null,
     isChangeEvent,
   );
-  const selectedEvent = localEvent ?? record.data;
+  const selectedEvent = record.data ?? localEvent;
   const relationshipView =
-    !nodeId &&
-    (relationships ?? (!changeId || Boolean(selectedEvent?.relationship)));
+    !nodeId && (relationships ?? Boolean(selectedEvent?.relationship));
   const rootNode = root.data?.node;
   const nodeDetails = scopeId === nodeId ? root.data : selected.data;
   const node = nodeDetails?.node;
@@ -170,8 +169,10 @@ export function App() {
             <p role="alert">Change unavailable. {record.error}</p>
           )}
           <RecordedChanges
-            {...activity}
-            events={nodeId ? nodeEvents : activity.events}
+            key={nodeId ?? (relationshipView ? "relationships" : "files")}
+            revision={activity.revision}
+            nodeId={nodeId}
+            selectedId={changeId}
             selectedEvent={selectedEvent}
             architecture={architecture.data}
             relationshipView={relationshipView}
@@ -186,7 +187,9 @@ export function App() {
               navigate({ ...navigation, changeId: id, source: false })
             }
             onNode={openNode}
-            onSource={() => navigate({ ...navigation, source: true })}
+            onSource={(id) =>
+              navigate({ ...navigation, changeId: id, source: true })
+            }
             showSource={source ?? false}
           />
         </>

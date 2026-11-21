@@ -1,26 +1,16 @@
-import { eventNode } from "./event-node";
-import { HistoricalSource } from "@/features/source/historical-source";
-import type { GraphNode } from "@mycel/shared";
-import { HistoryNode } from "./history-node";
-import type { ArchitectureMap, ChangeEvent } from "@mycel/shared";
+import { ArrowRight, FileCode2, GitCompareArrows } from "lucide-react";
+import type { ArchitectureMap, ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { DiffPanel } from "@/features/source/diff-panel";
+import { Card } from "@/components/ui/card";
 import { formatRelativeTime } from "@/lib/format";
-import { ArrowDownUp } from "lucide-react";
-import { Card, CardFooter } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { navigationHref } from "@/hooks/use-navigation";
-import {
-  relationshipPartNames,
-  relationshipTitle,
-} from "./relationship-change";
+import { ChangeDetails } from "./change-details";
+import { changeTitle, fileChangePreview } from "./change-presentation";
+import { useChangeFeed } from "./use-change-feed";
+
 export function RecordedChanges({
-  events,
-  error,
-  loading,
-  cursor,
-  loadMore,
+  revision,
+  nodeId,
+  selectedId,
   selectedEvent,
   onSelectEvent,
   onNode,
@@ -30,228 +20,221 @@ export function RecordedChanges({
   relationshipView,
   onFilter,
 }: {
-  events: ChangeEvent[];
-  error?: string | undefined;
-  loading: boolean;
-  cursor: string | null;
-  loadMore: () => void;
+  revision: number;
+  nodeId?: string | undefined;
+  selectedId?: string | undefined;
   selectedEvent?: ChangeEvent | undefined;
   onSelectEvent: (id: string) => void;
   onNode: (node: GraphNode) => void;
-  onSource: () => void;
+  onSource: (id: string) => void;
   showSource: boolean;
   architecture?: ArchitectureMap | undefined;
   relationshipView: boolean;
   onFilter?: (enabled: boolean) => void;
 }) {
-  const selectedNode = selectedEvent ? eventNode(selectedEvent) : null;
-  const visible = relationshipView
-    ? events.filter((event) => event.relationship)
-    : events;
-  const relationship = selectedEvent?.relationship;
-  const title = (event: ChangeEvent) =>
-    event.relationship
-      ? relationshipTitle(
-          event.relationship,
-          event.action === "deleted" ? "deleted" : "created",
-          relationshipPartNames(architecture, event.id, event.relationship),
-        )
-      : undefined;
+  const query = new URLSearchParams(
+    nodeId
+      ? { node: nodeId }
+      : { kind: relationshipView ? "relationships" : "files" },
+  );
+  const { data, error, loadingMore, loadMore } = useChangeFeed(
+    query.toString(),
+    revision,
+  );
+  const events = data?.items ?? [];
+  const selected = selectedId
+    ? (events.find((event) => event.id === selectedId) ?? selectedEvent)
+    : nodeId
+      ? undefined
+      : events[0];
+  const owners = new Map(
+    architecture?.parts.flatMap(({ name, files }) =>
+      files.map((path) => [path, name] as const),
+    ),
+  );
+  const heading = nodeId
+    ? "Symbol history"
+    : relationshipView
+      ? "Call & import changes"
+      : "File changes";
+
   return (
-    <section className="space-y-4">
-      <h2 className="text-xl font-semibold">Activity</h2>
-      <p className="text-sm text-muted-foreground">
-        Indexed changes · includes uncommitted saves · newest first
-      </p>
-      {onFilter && (
-        <div
-          role="group"
-          aria-label="Activity filter"
-          className="flex flex-wrap gap-2"
-        >
-          <Button
-            size="sm"
-            variant={relationshipView ? "outline" : "secondary"}
-            aria-pressed={!relationshipView}
-            onClick={() => onFilter(false)}
-          >
-            All changes
-          </Button>
-          <Button
-            size="sm"
-            variant={relationshipView ? "secondary" : "outline"}
-            aria-pressed={relationshipView}
-            onClick={() => onFilter(true)}
-          >
-            Relationships
-          </Button>
+    <section className="space-y-4" aria-labelledby="activity-title">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h2 id="activity-title" className="text-xl font-semibold">
+            Activity
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Review saved code changes, including uncommitted edits.
+          </p>
         </div>
-      )}
-      {error && <p role="alert">History unavailable. {error}</p>}
-      {!visible.length && (
-        <p>
-          {loading
-            ? "Loading history…"
-            : relationshipView
-              ? "No recorded relationship changes in the loaded history."
-              : "No recorded changes yet. Edit a TypeScript file to begin."}
-        </p>
-      )}
-      <div
-        className={
-          selectedEvent
-            ? "grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
-            : "space-y-4"
-        }
-      >
-        {(visible.length > 0 || cursor) && (
-          <Card className="gap-0 overflow-hidden rounded-lg py-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium">Change history</h3>
-                <Badge variant="secondary">{visible.length} changes</Badge>
-              </div>
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <ArrowDownUp className="size-3.5" aria-hidden />
-                Scroll to browse
-              </span>
-            </div>
-            <ScrollArea
-              type="always"
-              className="[&_[data-slot=scroll-area-scrollbar]]:bg-muted/40 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/50"
-              viewportProps={{
-                className: "max-h-[min(520px,60svh)] [&>div]:block!",
-                role: "region",
-                "aria-label": "Recorded changes",
-                tabIndex: 0,
-              }}
+        {onFilter && (
+          <div
+            role="group"
+            aria-label="Activity filter"
+            className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1"
+          >
+            <Button
+              size="sm"
+              variant={relationshipView ? "ghost" : "secondary"}
+              aria-pressed={!relationshipView}
+              onClick={() => onFilter(false)}
             >
-              <ul className="divide-y pr-3">
-                {visible.map((event) => (
-                  <li key={event.id}>
-                    <Button
-                      variant="ghost"
-                      className="h-auto w-full justify-start py-3 aria-pressed:bg-muted"
-                      aria-pressed={event.id === selectedEvent?.id}
-                      onClick={() => onSelectEvent(event.id)}
-                    >
-                      <Badge
-                        variant="outline"
-                        className={
-                          event.action === "created"
-                            ? "text-success"
-                            : event.action === "modified"
-                              ? "text-warning"
-                              : "text-destructive"
-                        }
-                      >
-                        {event.relationship
-                          ? event.action === "deleted"
-                            ? "removed"
-                            : "added"
-                          : event.action}
-                      </Badge>
-                      <span className="min-w-0 flex-1 truncate text-left">
-                        <span
-                          className={
-                            event.relationship
-                              ? "block whitespace-normal break-words"
-                              : "block truncate"
-                          }
-                        >
-                          {title(event) ??
-                            (event.entityType === "node" &&
-                            event.after &&
-                            "name" in event.after
-                              ? event.after.name
-                              : event.path)}
-                        </span>
-                        <span className="block truncate font-mono text-xs text-muted-foreground">
-                          {event.relationship
-                            ? `${event.path}:${event.relationship.startLine} · ${event.relationship.kind === "CALLS" ? "call" : "import"}`
-                            : `${event.path} · ${event.entityType}`}
-                        </span>
-                      </span>
-                      <time
-                        dateTime={event.timestamp}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {formatRelativeTime(event.timestamp)}
-                      </time>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </ScrollArea>
-            {cursor && (
-              <CardFooter className="border-t px-4 py-3">
-                <Button variant="outline" disabled={loading} onClick={loadMore}>
-                  {loading ? "Loading…" : "Load older changes"}
-                </Button>
-              </CardFooter>
-            )}
-          </Card>
-        )}
-        {selectedEvent && (
-          <div className="min-w-0 space-y-4">
-            {relationship ? (
-              <Card className="gap-2 px-4 py-3">
-                <h3 className="break-words text-sm font-semibold">
-                  {title(selectedEvent)}
-                </h3>
-                <p className="break-words font-mono text-xs text-muted-foreground">
-                  {relationship.source.path}:{relationship.startLine} →{" "}
-                  {relationship.target.path}
-                  {relationship.approximate ? " · approximate source" : ""}
-                </p>
-                {relationship.features.length > 0 ? (
-                  <ul
-                    className="mt-1 flex flex-wrap gap-2"
-                    aria-label="Affected behavior"
-                  >
-                    {relationship.features.map((feature) => (
-                      <li key={feature.id}>
-                        <Button asChild variant="outline" size="sm">
-                          <a
-                            href={navigationHref({
-                              view: "Features",
-                              featureId: feature.id,
-                            })}
-                          >
-                            {feature.name.charAt(0).toUpperCase() +
-                              feature.name.slice(1)}{" "}
-                            behavior
-                          </a>
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : relationship.kind === "CALLS" ? (
-                  <p className="text-xs text-muted-foreground">
-                    No feature behavior traced for this call.
-                  </p>
-                ) : null}
-              </Card>
-            ) : (
-              <HistoryNode event={selectedEvent} />
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={onSource}>
-                {relationship
-                  ? `Open ${selectedEvent.action === "deleted" ? "removed" : "added"} ${relationship.kind === "CALLS" ? "call" : "import"} at line ${relationship.startLine}`
-                  : "Open recorded source"}
-              </Button>
-              {selectedNode && selectedEvent.action !== "deleted" && (
-                <Button onClick={() => onNode(selectedNode)}>
-                  Open live graph
-                </Button>
-              )}
-            </div>
-            {showSource && <HistoricalSource event={selectedEvent} />}
-            <DiffPanel changeId={selectedEvent.id} />
+              <FileCode2 aria-hidden /> Files
+            </Button>
+            <Button
+              size="sm"
+              variant={relationshipView ? "secondary" : "ghost"}
+              aria-pressed={relationshipView}
+              onClick={() => onFilter(true)}
+            >
+              <GitCompareArrows aria-hidden /> Relationships
+            </Button>
           </div>
         )}
-      </div>
+      </header>
+
+      {error && (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 px-3 py-2 text-sm"
+        >
+          History unavailable. {error}
+        </p>
+      )}
+      {!data && !error && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading activity…
+        </p>
+      )}
+      {data && events.length === 0 && !selected && (
+        <Card className="items-start gap-2 px-5 py-6">
+          {relationshipView ? (
+            <GitCompareArrows className="size-5 text-primary" aria-hidden />
+          ) : (
+            <FileCode2 className="size-5 text-primary" aria-hidden />
+          )}
+          <h3 className="font-semibold">
+            {relationshipView
+              ? "No call or import changes recorded"
+              : nodeId
+                ? "No changes recorded for this symbol"
+                : "No file edits recorded yet"}
+          </h3>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            {relationshipView
+              ? "This view fills in when a save adds or removes a resolved call or import. File edits are available in Files."
+              : "Mycel records edits after indexing the repository. Saved TypeScript changes will appear here."}
+          </p>
+          {relationshipView && onFilter && (
+            <Button
+              className="mt-2"
+              variant="secondary"
+              size="sm"
+              onClick={() => onFilter(false)}
+            >
+              Browse file changes <ArrowRight aria-hidden />
+            </Button>
+          )}
+        </Card>
+      )}
+      {(events.length > 0 || selected) && (
+        <div
+          className={
+            events.length > 0
+              ? "grid items-start gap-4 lg:grid-cols-[minmax(16rem,23rem)_minmax(0,1fr)]"
+              : undefined
+          }
+        >
+          {events.length > 0 && (
+            <Card className="min-w-0 gap-0 overflow-hidden py-0">
+              <h3 className="border-b px-4 py-3 text-sm font-semibold">
+                {heading}
+              </h3>
+              <div
+                role="region"
+                aria-label="Recorded changes"
+                tabIndex={0}
+                className="max-h-[min(62svh,680px)] overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              >
+                <ul className="divide-y">
+                  {events.map((event) => (
+                    <li key={event.id}>
+                      <Button
+                        variant="ghost"
+                        className="block h-auto w-full rounded-none border-l-2 border-l-transparent px-4 py-3 text-left whitespace-normal aria-pressed:border-l-primary aria-pressed:bg-primary/10"
+                        aria-pressed={event.id === selected?.id}
+                        onClick={() => onSelectEvent(event.id)}
+                      >
+                        <span className="mb-1 flex items-baseline justify-between gap-3 text-xs font-normal text-muted-foreground">
+                          {owners.has(event.path) && (
+                            <span className="truncate">
+                              {owners.get(event.path)}
+                            </span>
+                          )}
+                          <time
+                            className="ml-auto shrink-0"
+                            dateTime={event.timestamp}
+                          >
+                            {formatRelativeTime(event.timestamp)}
+                          </time>
+                        </span>
+                        <span className="block break-words font-medium text-foreground">
+                          {changeTitle(event, architecture)}
+                        </span>
+                        {event.fileSummary && (
+                          <span className="mt-1 block break-words text-xs font-normal text-muted-foreground">
+                            {fileChangePreview(event.fileSummary)}
+                          </span>
+                        )}
+                        <span
+                          className="mt-1 block truncate font-mono text-[11px] font-normal text-muted-foreground"
+                          title={event.path}
+                        >
+                          {event.path}
+                          {event.relationship && !event.relationship.approximate
+                            ? `:${event.relationship.startLine}`
+                            : null}
+                        </span>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {data?.cursor && (
+                <div className="border-t px-3 py-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? "Loading…" : "Load older changes"}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+          {selected ? (
+            <ChangeDetails
+              event={selected}
+              title={changeTitle(selected, architecture)}
+              owner={owners.get(selected.path)}
+              onSource={() => onSource(selected.id)}
+              onNode={onNode}
+              showSource={showSource}
+            />
+          ) : (
+            <Card className="gap-2 px-5 py-6">
+              <h3 className="text-sm font-semibold">Source diff</h3>
+              <p className="text-sm text-muted-foreground">
+                Select a change to compare its recorded source.
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
     </section>
   );
 }

@@ -582,7 +582,7 @@ try {
   await page
     .getByRole("button", { name: "Show node activity", exact: true })
     .click();
-  await page.getByRole("button", { name: /modified double/ }).click();
+  await page.getByRole("button", { name: /Edited double/ }).click();
   await expect(
     page
       .getByRole("region", { name: "Recorded source diff" })
@@ -602,15 +602,14 @@ try {
   await page.goBack();
   await sourceContains("value * 3", "Recorded source");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
-  await page.getByRole("button", { name: "All changes", exact: true }).click();
   await phase("delete", () => unlink(join(root, "obsolete.ts")));
   await page
-    .getByRole("button", { name: /deleted obsolete.ts/ })
+    .getByRole("button", { name: /Removed obsolete.ts/ })
     .first()
     .click();
-  await expect(page.getByLabel("Historical node")).toContainText(
-    "Deleted from the live graph",
-  );
+  await expect(
+    page.getByRole("heading", { name: "Removed obsolete.ts" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open live graph" }),
   ).toHaveCount(0);
@@ -636,7 +635,6 @@ try {
   await expect(page.getByRole("status").first()).toHaveText("Connected");
   await expect(page.getByLabel("Live connection")).toHaveText("Live updates");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
-  await page.getByRole("button", { name: "All changes", exact: true }).click();
   await phase("reconnect", () =>
     writeFile(
       join(root, "math.ts"),
@@ -647,10 +645,10 @@ try {
     .poll(async () => (await json("/api/files/content?path=math.ts")).content)
     .toContain("value * 4");
   await expect(
-    page.getByRole("button", { name: /modified double/ }),
+    page.getByRole("button", { name: /Edited math.ts.*Edited double/s }),
   ).toHaveCount(2);
   await page
-    .getByRole("button", { name: /modified double/ })
+    .getByRole("button", { name: /Edited math.ts.*Edited double/s })
     .first()
     .click();
   await page.getByRole("button", { name: "Open recorded source" }).click();

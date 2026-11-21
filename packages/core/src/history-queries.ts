@@ -1,4 +1,4 @@
-import { listChanges, getDiff, getEventsAfter } from "@mycel/db";
+import { listChanges, getChange, getDiff, getEventsAfter } from "@mycel/db";
 import type { SqliteDatabase } from "@mycel/db";
 import type {
   ChangesQuery,
@@ -8,6 +8,7 @@ import type {
 } from "@mycel/shared";
 export interface HistoryQueries {
   listChanges(query?: ChangesQuery): ChangesPage;
+  getChange(id: string): ChangeEvent | undefined;
   getDiff(id: string): ChangeDiff | undefined;
   getEventsAfter(id: string, limit?: number): ChangeEvent[];
   onEvent(listener: (event: ChangeEvent) => void): () => void;
@@ -21,8 +22,9 @@ export function createHistoryQueries(
   signal: AbortSignal,
 ): HistoryQueries {
   return {
-    listChanges: ({ cursor, limit } = {}) =>
-      listChanges(db, projectId, cursor, limit),
+    listChanges: ({ cursor, limit, ...filter } = {}) =>
+      listChanges(db, projectId, cursor, limit, filter),
+    getChange: (id) => getChange(db, projectId, id),
     getDiff: (id) => getDiff(db, projectId, id),
     getEventsAfter: (id, limit) => getEventsAfter(db, projectId, id, limit),
     onEvent,

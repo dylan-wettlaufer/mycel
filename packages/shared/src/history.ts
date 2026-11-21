@@ -21,6 +21,15 @@ export interface RecordedRelationship {
   features: { id: string; name: string }[];
 }
 
+export interface FileChangeSummary {
+  symbols: { name: string; action: ChangeAction }[];
+  symbolCount: number;
+  addedCalls: number;
+  removedCalls: number;
+  addedImports: number;
+  removedImports: number;
+}
+
 export interface ChangeEvent {
   id: ChangeId;
   projectId: ProjectId;
@@ -34,6 +43,7 @@ export interface ChangeEvent {
   before: GraphNode | GraphEdge | null;
   after: GraphNode | GraphEdge | null;
   relationship?: RecordedRelationship;
+  fileSummary?: FileChangeSummary;
   sessionId?: string;
   attribution?: {
     status: "confirmed" | "inferred" | "unknown";
@@ -54,6 +64,8 @@ export type ChangeKind = ChangeAction;
 export interface ChangesQuery {
   cursor?: ChangeId;
   limit?: number;
+  kind?: "files" | "relationships";
+  nodeId?: string;
 }
 export interface ChangesPage {
   items: ChangeEvent[];

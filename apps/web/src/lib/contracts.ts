@@ -136,9 +136,31 @@ export function isChangeEvent(
       (value.entityType === "edge" &&
         (value.action === "created" || value.action === "deleted") &&
         isRecordedRelationship(value.relationship))) &&
+    (value.fileSummary === undefined ||
+      isFileChangeSummary(value.fileSummary)) &&
     (value.beforeRevision === null ||
       typeof value.beforeRevision === "number") &&
     (value.afterRevision === null || typeof value.afterRevision === "number")
+  );
+}
+
+function isFileChangeSummary(value: unknown): boolean {
+  const count = (item: unknown) =>
+    typeof item === "number" && Number.isSafeInteger(item) && item >= 0;
+  return (
+    isRecord(value) &&
+    Array.isArray(value.symbols) &&
+    value.symbols.every(
+      (symbol) =>
+        isRecord(symbol) &&
+        typeof symbol.name === "string" &&
+        ["created", "modified", "deleted"].includes(String(symbol.action)),
+    ) &&
+    count(value.symbolCount) &&
+    count(value.addedCalls) &&
+    count(value.removedCalls) &&
+    count(value.addedImports) &&
+    count(value.removedImports)
   );
 }
 export function isChangesPage(

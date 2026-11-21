@@ -20,7 +20,8 @@ export default function MonacoDiff({ diff }: { diff: ChangeDiff }) {
       ...editorOptions,
       theme: "mycel",
       originalEditable: false,
-      renderSideBySide: true,
+      renderSideBySide: false,
+      hideUnchangedRegions: { enabled: true },
     });
     editor.setModel({ original, modified });
     return () => {

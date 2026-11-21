@@ -39,6 +39,20 @@ export function createHistoryRoutes(
       });
     const after = cursor(c.req.query("cursor"));
     const raw = c.req.query("limit");
+    const kinds = c.req.queries("kind");
+    const nodes = c.req.queries("node");
+    const kind = kinds?.[0];
+    const nodeId = nodes?.[0];
+    if (
+      (kinds &&
+        (kinds.length !== 1 ||
+          (kind !== "files" && kind !== "relationships"))) ||
+      (nodes && (nodes.length !== 1 || !nodeId || nodeId.length > 256)) ||
+      (kinds && nodes)
+    )
+      throw new HTTPException(400, {
+        message: "Choose a history kind or a node",
+      });
     if (
       raw !== undefined &&
       (!/^[0-9]+$/.test(raw) || Number(raw) < 1 || Number(raw) > 100)
@@ -50,6 +64,8 @@ export function createHistoryRoutes(
     return c.json(
       history.listChanges({
         ...(after === undefined ? {} : { cursor: after }),
+        ...(kind === "files" || kind === "relationships" ? { kind } : {}),
+        ...(nodeId ? { nodeId } : {}),
         limit: raw === undefined ? 50 : Number(raw),
       }),
     );
@@ -57,12 +73,7 @@ export function createHistoryRoutes(
   routes.get("/changes/:id", (c) => {
     const id = cursor(c.req.param("id"))!;
     if (!history) return c.json({ error: "History unavailable" }, 503);
-    const event =
-      Number(id) > 0
-        ? history
-            .getEventsAfter(String(Number(id) - 1), 1)
-            .find((event) => event.id === id)
-        : undefined;
+    const event = history.getChange(id);
     return event ? c.json(event) : c.json({ error: "Change not found" }, 404);
   });
   routes.get("/changes/:id/diff", (c) => {
@@ -74,7 +85,12 @@ export function createHistoryRoutes(
   routes.get("/events", (c) => {
     if (!history) return c.json({ error: "History unavailable" }, 503);
     if (history.signal.aborted) return c.json({ error: "History closed" }, 503);
-    let lastId = cursor(c.req.header("Last-Event-ID")) ?? "0";
+    let lastId =
+      cursor(c.req.header("Last-Event-ID")) ??
+      (c.req.query("tail") === "1"
+        ? history.listChanges({ limit: 1 }).items[0]?.id
+        : undefined) ??
+      "0";
     return streamSSE(c, async (stream) => {
       let stopped = false;
       let wake: (() => void) | undefined;

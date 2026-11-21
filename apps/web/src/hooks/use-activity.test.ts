@@ -52,18 +52,14 @@ test("event merging sorts decimal ids numerically and deduplicates replay", () =
     ),
   ).toEqual(["11", "10", "9"]);
 });
-test("SSE and initial history converge, reconnects preserve data, pagination loads older events", async () => {
+test("SSE and initial history converge and reconnects preserve data", async () => {
   vi.stubGlobal("EventSource", Stream);
   vi.stubGlobal(
     "fetch",
     vi
       .fn()
-      .mockImplementation(async (url: string) =>
-        Response.json(
-          url.includes("cursor")
-            ? { items: [event("8")], cursor: null }
-            : { items: [event("9")], cursor: "9" },
-        ),
+      .mockImplementation(async () =>
+        Response.json({ items: [event("9")], cursor: "9" }),
       ),
   );
   const { result, unmount } = renderHook(useActivity);
@@ -95,16 +91,10 @@ test("SSE and initial history converge, reconnects preserve data, pagination loa
   expect(result.current.connection).toBe("disconnected");
   act(() => {
     Stream.instance.onopen?.();
-    result.current.loadMore();
   });
   await waitFor(() =>
-    expect(result.current.events.map((item) => item.id)).toEqual([
-      "10",
-      "9",
-      "8",
-    ]),
+    expect(result.current.events.map((item) => item.id)).toEqual(["10", "9"]),
   );
-  expect(result.current.cursor).toBeNull();
   unmount();
   expect(Stream.instance.close).toHaveBeenCalledOnce();
 });

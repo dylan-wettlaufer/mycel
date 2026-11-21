@@ -24,6 +24,7 @@ export type { EntityChange, ChangeSet } from "./history.js";
 export {
   listChanges,
   listRecentRelationships,
+  getChange,
   parseChangeId,
 } from "./history.js";
 export { getEventsAfter } from "./history.js";

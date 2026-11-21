@@ -39,4 +39,11 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX relationship_events_by_project
         ON change_events(project_id, timestamp, id) WHERE relationship IS NOT NULL;`,
   },
+  {
+    version: 8,
+    name: "activity history lookup indexes",
+    sql: `CREATE INDEX change_events_by_entity ON change_events(project_id, entity_type, entity_id, id);
+      CREATE INDEX change_events_by_file_revision
+        ON change_events(project_id, path, COALESCE(after_revision, before_revision + 1));`,
+  },
 ];

@@ -109,7 +109,19 @@ try {
   await expect(
     page.getByRole("link", { name: "View relationship activity" }),
   ).toBeVisible();
-  await relationshipReview.click();
+  await page.getByRole("link", { name: "View relationship activity" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No call or import changes recorded" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Load older changes" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Browse file changes" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No file edits recorded yet" }),
+  ).toBeVisible();
+  await page.goto(base);
+  await page.getByTestId("rf__node-orders").click();
   const liveEdge = page.locator(
     '.react-flow__edge[aria-label="Edge from orders to payments"]',
   );
@@ -169,7 +181,7 @@ try {
   await expect(
     page.getByRole("button", { name: "Relationships", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText(/includes uncommitted saves/)).toBeVisible();
+  await expect(page.getByText(/including uncommitted edits/)).toBeVisible();
   expect(git("status", "--short")).toContain("M services/orders.ts");
   await expect(
     page.getByRole("region", { name: "Recorded source diff" }),

@@ -1,6 +1,8 @@
 import type {
   ChangeAction,
   ChangeEvent,
+  ChangesQuery,
+  FileChangeSummary,
   GraphEdge,
   GraphNode,
   RecordedRelationship,
@@ -69,6 +71,9 @@ const eventColumns = `id, project_id AS projectId, timestamp, entity_type AS ent
   entity_id AS entityId, action, path, before_revision AS beforeRevision,
   after_revision AS afterRevision, before_entity AS before, after_entity AS after,
   session_id AS sessionId, attribution, relationship`;
+const changeRevision = "COALESCE(after_revision, before_revision + 1)";
+const entityKind =
+  "json_extract(COALESCE(after_entity, before_entity), '$.kind')";
 function toEvent(row: EventRow): ChangeEvent {
   const { sessionId, attribution, relationship, ...rest } = row;
   return {
@@ -82,6 +87,144 @@ function toEvent(row: EventRow): ChangeEvent {
       ? {}
       : { relationship: JSON.parse(relationship) }),
   };
+}
+
+function changeKind(event: ChangeEvent) {
+  return (event.after ?? event.before)?.kind;
+}
+
+function summarizeFileChange(
+  db: SqliteDatabase,
+  file: ChangeEvent,
+): FileChangeSummary {
+  const revision = file.afterRevision ?? file.beforeRevision! + 1;
+  const rows = db
+    .prepare<[string, string, number], EventRow>(
+      `SELECT ${eventColumns} FROM change_events
+      WHERE project_id = ? AND path = ? AND ${changeRevision} = ?
+      ORDER BY id`,
+    )
+    .all(file.projectId, file.path, revision);
+  const summary: FileChangeSummary = {
+    symbols: [],
+    symbolCount: 0,
+    addedCalls: 0,
+    removedCalls: 0,
+    addedImports: 0,
+    removedImports: 0,
+  };
+  const symbols = new Map<string, FileChangeSummary["symbols"][number]>();
+  for (const row of rows) {
+    const event = toEvent(row);
+    const node = event.after ?? event.before;
+    if (
+      node &&
+      "qualifiedName" in node &&
+      node.kind !== "file" &&
+      !node.name.startsWith("$")
+    ) {
+      const beforeHash =
+        event.before && "contentHash" in event.before
+          ? event.before.contentHash
+          : undefined;
+      const afterHash =
+        event.after && "contentHash" in event.after
+          ? event.after.contentHash
+          : undefined;
+      if (beforeHash !== afterHash) {
+        symbols.set(node.qualifiedName, {
+          name: node.qualifiedName,
+          action: event.action,
+        });
+      }
+    }
+    const kind = changeKind(event);
+    if (kind === "CALLS") {
+      if (event.action === "created") summary.addedCalls++;
+      if (event.action === "deleted") summary.removedCalls++;
+    } else if (kind === "IMPORTS") {
+      if (event.action === "created") summary.addedImports++;
+      if (event.action === "deleted") summary.removedImports++;
+    }
+  }
+  summary.symbolCount = symbols.size;
+  summary.symbols = [...symbols.values()]
+    .sort(
+      (a, b) =>
+        a.name.split(".").length - b.name.split(".").length ||
+        a.name.localeCompare(b.name),
+    )
+    .slice(0, 8);
+  return summary;
+}
+
+/** Older records saved edge IDs and node history, but did not save call-site coordinates. */
+function recoverRelationship(
+  db: SqliteDatabase,
+  event: ChangeEvent,
+): RecordedRelationship | undefined {
+  const edge = event.after ?? event.before;
+  const revision = event.afterRevision ?? event.beforeRevision;
+  if (
+    !edge ||
+    !("sourceId" in edge) ||
+    edge.kind === "CONTAINS" ||
+    revision === null
+  )
+    return;
+  const atRevision = db.prepare<
+    [string, string, number],
+    { entity: string | null }
+  >(
+    `SELECT after_entity AS entity FROM change_events
+      WHERE project_id = ? AND entity_type = 'node' AND entity_id = ?
+        AND ${changeRevision} <= ?
+      ORDER BY id DESC LIMIT 1`,
+  );
+  const endpoint = (id: string): GraphNode | undefined => {
+    const recorded = atRevision.get(event.projectId, id, revision);
+    if (recorded)
+      return recorded.entity
+        ? (JSON.parse(recorded.entity) as GraphNode)
+        : undefined;
+    const current = getNode(db, event.projectId, id);
+    return current && current.revision <= revision ? current : undefined;
+  };
+  const source = endpoint(edge.sourceId);
+  const target = endpoint(edge.targetId);
+  if (!source || !target) return;
+  return {
+    kind: edge.kind,
+    source: {
+      id: source.id,
+      path: source.path,
+      qualifiedName: source.qualifiedName,
+    },
+    target: {
+      id: target.id,
+      path: target.path,
+      qualifiedName: target.qualifiedName,
+    },
+    startLine: source.range.startLine,
+    endLine: source.range.startLine,
+    approximate: true,
+    features: [],
+  };
+}
+
+function describeEvent(db: SqliteDatabase, event: ChangeEvent): ChangeEvent {
+  const kind = changeKind(event);
+  if (kind === "file")
+    return { ...event, fileSummary: summarizeFileChange(db, event) };
+  if (
+    !event.relationship &&
+    event.action !== "modified" &&
+    (kind === "CALLS" || kind === "IMPORTS")
+  ) {
+    const relationship = recoverRelationship(db, event);
+    if (relationship) return { ...event, relationship };
+  }
+  return event;
 }
 
 function recordRelationships(
@@ -256,21 +399,51 @@ export function listChanges(
   projectId: string,
   cursor?: string,
   limit = 50,
+  filter: Pick<ChangesQuery, "kind" | "nodeId"> = {},
 ): import("@mycel/shared").ChangesPage {
   historyLimit(limit);
+  const offset =
+    cursor === undefined ? Number.MAX_SAFE_INTEGER : parseChangeId(cursor);
+  const clause =
+    filter.kind === "files"
+      ? `AND entity_type = 'node' AND ${entityKind} = 'file' AND ${changeRevision} > 1
+      AND (action <> 'modified' OR json_extract(before_entity, '$.contentHash') <> json_extract(after_entity, '$.contentHash'))`
+      : filter.kind === "relationships"
+        ? `AND entity_type = 'edge' AND action IN ('created', 'deleted')
+        AND ${entityKind} IN ('CALLS', 'IMPORTS') AND ${changeRevision} > 1`
+        : filter.nodeId
+          ? "AND entity_type = 'node' AND entity_id = ?"
+          : "";
   const rows = db
-    .prepare<[string, number, number], EventRow>(
-      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id < ? ORDER BY id DESC LIMIT ?`,
+    .prepare<(string | number)[], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id < ? ${clause} ORDER BY id DESC LIMIT ?`,
     )
     .all(
       projectId,
-      cursor === undefined ? Number.MAX_SAFE_INTEGER : parseChangeId(cursor),
+      offset,
+      ...(filter.nodeId && !filter.kind ? [filter.nodeId] : []),
       limit + 1,
     );
   return {
-    items: rows.slice(0, limit).map(toEvent),
+    items: rows.slice(0, limit).map((row) => {
+      const event = toEvent(row);
+      return filter.kind ? describeEvent(db, event) : event;
+    }),
     cursor: rows.length > limit ? String(rows[limit - 1]!.id) : null,
   };
+}
+
+export function getChange(
+  db: SqliteDatabase,
+  projectId: string,
+  id: string,
+): ChangeEvent | undefined {
+  const row = db
+    .prepare<[string, number], EventRow>(
+      `SELECT ${eventColumns} FROM change_events WHERE project_id = ? AND id = ?`,
+    )
+    .get(projectId, parseChangeId(id));
+  return row ? describeEvent(db, toEvent(row)) : undefined;
 }
 
 /** Oldest first; bounded replay batches prevent unbounded allocations. */

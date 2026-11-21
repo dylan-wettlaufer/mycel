@@ -1,6 +1,7 @@
 import type {
   ArchitectureMap,
   RecordedRelationship,
+  RelationshipEndpoint,
   SourceRange,
 } from "@mycel/shared";
 
@@ -9,18 +10,43 @@ export interface RelationshipPartNames {
   targetPartName?: string;
 }
 
+export function relationshipSymbol(
+  endpoint: RelationshipEndpoint,
+  call = false,
+) {
+  const callback = /^\$callback\d+$/;
+  const parts = endpoint.qualifiedName.split(".");
+  const firstCallback = parts.findIndex((part) => callback.test(part));
+  const suffix = call ? "()" : "";
+  if (firstCallback < 0) return `${endpoint.qualifiedName}${suffix}`;
+  const owner =
+    parts.slice(0, firstCallback).join(".") || endpoint.path.split("/").at(-1);
+  const name = parts.at(-1)!;
+  return callback.test(name)
+    ? `Callback in ${owner}`
+    : `${name}${suffix} in a callback in ${owner}`;
+}
+
 export function relationshipTitle(
   relationship: RecordedRelationship,
   action: "created" | "deleted",
   names?: RelationshipPartNames,
 ) {
   const { source, target, kind } = relationship;
-  const caller = names?.sourcePartName ?? source.qualifiedName;
-  const callee = names?.targetPartName ?? target.qualifiedName;
+  const caller =
+    names?.sourcePartName ??
+    (source.qualifiedName === source.path
+      ? source.path.split("/").at(-1)
+      : relationshipSymbol(source));
+  const callee =
+    names?.targetPartName ??
+    (kind === "IMPORTS"
+      ? target.path.split("/").at(-1)
+      : relationshipSymbol(target, true));
   const verb = kind === "CALLS" ? "calls" : "imports";
   const via =
     kind === "CALLS" && names?.targetPartName
-      ? ` through ${target.qualifiedName}()`
+      ? ` through ${relationshipSymbol(target, true)}`
       : "";
   return `${caller} ${action === "created" ? "now" : "no longer"} ${verb} ${callee}${via}`;
 }

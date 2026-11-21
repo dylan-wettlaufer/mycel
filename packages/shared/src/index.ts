@@ -45,6 +45,8 @@ export type {
   ActivityEvent,
   ChangeKind,
   RecordedRelationship,
+  RelationshipEndpoint,
+  FileChangeSummary,
 } from "./history.js";
 export type { ChangesQuery, ChangesPage, ChangeDiff } from "./history.js";
 export type { SseMessage } from "./history.js";

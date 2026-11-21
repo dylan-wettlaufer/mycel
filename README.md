@@ -80,10 +80,11 @@ CLI and compiled dashboard must remain in the checkout together.
   Use **Open files** to inspect file dependencies, symbols, and source.
   Use **Only connections** to narrow the graph or **Focus selection** to
   frame a node and its neighbors.
-- **Explorer** searches indexed files and symbols. **Activity** opens on
-  recorded call and import changes, including changes from uncommitted
-  saves. Open a change for the exact recorded source, diff, and any affected
-  feature Mycel can trace. **All changes** includes file and symbol history.
+- **Explorer** searches indexed files and symbols. **Activity** groups
+  edits by file and indexed save, including uncommitted edits. Each entry
+  shows a source diff and the symbols that changed. **Relationships** shows
+  added and removed calls and imports, with links to affected behavior where
+  Mycel has trace evidence.
   Graph and change selections can be reopened through browser history or
   hash links.
 

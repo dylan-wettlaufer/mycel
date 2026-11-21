@@ -4,6 +4,8 @@ import {
   openDatabase,
   commitChangeSet,
   currentRevision,
+  getChange,
+  listChanges,
 } from "../dist/index.js";
 const project = {
   id: "p",
@@ -168,4 +170,126 @@ test("symbol deletion diffs retain both source sides and their revisions after p
     beforeRevision: 1,
     afterRevision: 2,
   });
+});
+
+test("activity pages summarize actual file edits and recover older call endpoints", (t) => {
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const caller = {
+    ...node,
+    id: "caller",
+    kind: "function",
+    name: "saveOrder",
+    qualifiedName: "saveOrder",
+  };
+  const callee = {
+    ...caller,
+    id: "callee",
+    name: "authorizePayment",
+    qualifiedName: "authorizePayment",
+  };
+  const callback = {
+    ...caller,
+    id: "callback",
+    name: "$callback1",
+    qualifiedName: "saveOrder.$callback1",
+  };
+  const changed = (before, after) => ({
+    entityType: "node",
+    entityId: (after ?? before).id,
+    path: node.path,
+    action:
+      before === null ? "created" : after === null ? "deleted" : "modified",
+    before,
+    after,
+  });
+  const set = changeSet();
+  set.graph.nodes.push(caller, callee, callback);
+  set.changes.push(
+    ...[caller, callee, callback].map((symbol) => changed(null, symbol)),
+  );
+  commitChangeSet(db, set);
+  assert.equal(
+    listChanges(db, "p", undefined, 3, { kind: "files" }).items.length,
+    0,
+  );
+
+  const edited = { ...node, contentHash: "1".repeat(64) };
+  const editedCaller = { ...caller, contentHash: "2".repeat(64) };
+  const editedCallback = { ...callback, contentHash: "3".repeat(64) };
+  const shiftedCallee = {
+    ...callee,
+    range: { ...callee.range, startLine: 2, endLine: 2 },
+  };
+  const edge = {
+    id: "call",
+    projectId: "p",
+    sourceId: caller.id,
+    targetId: callee.id,
+    kind: "CALLS",
+  };
+  const added = {
+    entityType: "edge",
+    entityId: edge.id,
+    path: node.path,
+    action: "created",
+    before: null,
+    after: edge,
+  };
+  set.graph.nodes = [edited, editedCaller, shiftedCallee, editedCallback];
+  set.graph.edges = [edge];
+  set.sources.set(node.path, "edited source");
+  set.changes = [
+    changed(node, edited),
+    changed(caller, editedCaller),
+    changed(callee, shiftedCallee),
+    changed(callback, editedCallback),
+    added,
+  ];
+  const addedEvent = commitChangeSet(db, set).events.at(-1);
+  const files = listChanges(db, "p", undefined, 3, { kind: "files" });
+  assert.equal(files.items.length, 1);
+  assert.equal(files.cursor, null);
+  assert.deepEqual(files.items[0].fileSummary, {
+    symbols: [{ name: "saveOrder", action: "modified" }],
+    symbolCount: 1,
+    addedCalls: 1,
+    removedCalls: 0,
+    addedImports: 0,
+    removedImports: 0,
+  });
+
+  set.graph.nodes = [edited, editedCaller, editedCallback];
+  set.graph.edges = [];
+  set.changes = [
+    changed(shiftedCallee, null),
+    { ...added, action: "deleted", before: edge, after: null },
+  ];
+  const removedEvent = commitChangeSet(db, set).events.at(-1);
+  // Before the relationship metadata migration, only the edge and node records were saved.
+  db.exec("UPDATE change_events SET relationship = NULL");
+  const relationships = listChanges(db, "p", undefined, 1, {
+    kind: "relationships",
+  });
+  assert.equal(relationships.items[0].id, removedEvent.id);
+  assert.equal(
+    relationships.items[0].relationship.target.qualifiedName,
+    "authorizePayment",
+  );
+  assert.equal(relationships.items[0].relationship.approximate, true);
+  assert.equal(
+    listChanges(db, "p", relationships.cursor, 1, { kind: "relationships" })
+      .items[0].id,
+    addedEvent.id,
+  );
+  assert.equal(
+    getChange(db, "p", addedEvent.id).relationship.source.qualifiedName,
+    "saveOrder",
+  );
+  assert.deepEqual(
+    listChanges(db, "p", undefined, 2, { nodeId: callee.id }).items.map(
+      ({ action }) => action,
+    ),
+    ["deleted", "modified"],
+  );
 });

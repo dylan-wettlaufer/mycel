@@ -13,10 +13,7 @@ export function DiffPanel({ changeId }: { changeId: string }) {
       aria-label="Recorded source diff"
     >
       <div className="border-b px-4 py-3">
-        <h3 className="font-mono text-sm">
-          Recorded change #{changeId}
-          {data ? ` · ${data.path}` : ""}
-        </h3>
+        <h3 className="font-mono text-sm">Source diff</h3>
         {data && (
           <p className="text-xs text-muted-foreground">
             Before:{" "}
@@ -36,6 +33,12 @@ export function DiffPanel({ changeId }: { changeId: string }) {
         </p>
       ) : !data ? (
         <p className="p-4">Loading diff…</p>
+      ) : data.beforeContent === data.afterContent ? (
+        <p className="p-4 text-sm text-muted-foreground">
+          {data.beforeContent === null
+            ? "Source was unavailable for these revisions."
+            : "The file has identical text in both revisions."}
+        </p>
       ) : (
         <Suspense fallback={<p className="p-4">Loading diff editor…</p>}>
           <MonacoDiff diff={data} />
