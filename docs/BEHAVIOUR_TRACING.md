@@ -1,9 +1,7 @@
 # Evidence-backed behaviour tracing
 
-Behavior traces are a drill-down from a feature to its implementation. The
-current **Features** view shows supported traces and their exact source
-references. In V0 this drill-down starts from the
-[architecture map](../mycel_prd.md#v0-04--progressive-feature-exploration).
+Behavior traces describe a feature's implementation and provide source
+references through the semantic API.
 See [feature discovery](FEATURE_DISCOVERY.md) for how Mycel groups code into
 candidate areas.
 

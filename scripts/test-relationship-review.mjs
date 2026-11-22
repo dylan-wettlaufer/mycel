@@ -192,18 +192,6 @@ try {
       .getByRole("region", { name: "Recorded source", exact: true })
       .locator(".view-lines"),
   ).toContainText("authorizePayment();");
-  await page.getByRole("link", { name: "Orders behavior" }).click();
-  const behaviour = page.getByRole("region", { name: "Behaviour graph" });
-  const endpoint = behaviour.getByLabel(
-    "Create Order, POST /api/orders, API Endpoint",
-    { exact: true },
-  );
-  await endpoint
-    .getByRole("button", { name: "Show call steps for POST /api/orders" })
-    .click();
-  await expect(
-    behaviour.getByLabel(/Authorize Payment, authorizePayment/),
-  ).toBeVisible();
 
   await page
     .getByRole("navigation", { name: "Primary" })
@@ -239,9 +227,6 @@ try {
   await page.goto(`${base}/${removalUrl}`);
   await expect(
     page.getByRole("region", { name: "Recorded source diff" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Orders behavior" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Open removed call at line 7" })

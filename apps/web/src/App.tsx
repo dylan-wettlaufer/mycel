@@ -3,11 +3,9 @@ import { lazy, Suspense, useState } from "react";
 import type { ArchitectureChangeWindow, GraphNode } from "@mycel/shared";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { Explorer } from "@/features/explorer/explorer";
 import { NodeDetailsPanel } from "@/features/details/node-details";
 import { GraphBreadcrumbs } from "@/features/graph/graph-breadcrumbs";
-import { FeatureBrowser } from "@/features/semantic/feature-browser";
 import { RecordedChanges } from "@/features/activity/recorded-changes";
 import { SourcePanel } from "@/features/source/source-panel";
 import { useBackendHealth } from "@/hooks/use-backend-health";
@@ -44,7 +42,6 @@ export function App() {
     view,
     nodeId,
     rootId,
-    featureId,
     changeId,
     relationships,
     source,
@@ -115,7 +112,6 @@ export function App() {
   return (
     <AppShell
       view={view}
-      fillWorkspace={view === "Features" && Boolean(featureId)}
       onNavigate={(view) => navigate({ view })}
       projectName={project?.name ?? "Mycel"}
       projectRoot={project?.root}
@@ -132,23 +128,8 @@ export function App() {
           unavailable={Boolean(selected.error || root.error)}
         />
       )}
-      {view === "Dashboard" ? (
-        <DashboardPage
-          project={project}
-          projectError={error}
-          revision={activity.revision}
-          events={activity.events}
-          onActivity={() => navigate({ view: "Activity" })}
-        />
-      ) : view === "Explorer" ? (
+      {view === "Explorer" ? (
         <Explorer revision={activity.revision} onSelect={openNode} />
-      ) : view === "Features" ? (
-        <FeatureBrowser
-          featureId={featureId}
-          revision={activity.revision}
-          onSelect={(id) => navigate({ view: "Features", featureId: id })}
-          onBack={() => navigate({ view: "Features" })}
-        />
       ) : view === "Activity" ? (
         <>
           {nodeId && (
@@ -251,9 +232,6 @@ export function App() {
                   })
                 }
                 onAllFiles={() => navigate({ view: "Graph", files: true })}
-                onOpenFeature={(id) =>
-                  navigate({ view: "Features", featureId: id })
-                }
               />
             </Suspense>
           )}

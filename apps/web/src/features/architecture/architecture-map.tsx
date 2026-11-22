@@ -6,11 +6,9 @@ import type {
   ArchitectureMap,
   ArchitecturePartWithChanges,
   GraphNode,
-  SemanticEntity,
 } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { GraphCanvas } from "@/features/graph/graph-canvas";
-import { isFeatureList } from "@/features/semantic/feature-contracts";
 import { useResource } from "@/hooks/use-resource";
 import { isRepositoryGraph } from "@/lib/contracts";
 import { ArchitectureDetails } from "./architecture-details";
@@ -60,31 +58,6 @@ function describeWindow(map: {
   return map.changes.branch ? `${map.changes.branch} · ${period}` : period;
 }
 
-function findMatchingFeatures(
-  part: ArchitecturePartWithChanges | undefined,
-  features: readonly SemanticEntity[] | undefined,
-): SemanticEntity[] {
-  if (!part || !features || features.length === 0) return [];
-  const fileSet = new Set(part.files);
-  const pathPrefixes = part.paths.map((pattern) =>
-    pattern.replace(/\/\*\*$/, "").replace(/\/\*$/, ""),
-  );
-  return features.filter((feature) => {
-    if (feature.sources.some((source) => fileSet.has(source.path))) return true;
-    const scope =
-      typeof feature.attributes.scope === "string"
-        ? feature.attributes.scope
-        : undefined;
-    if (!scope) return false;
-    return pathPrefixes.some(
-      (prefix) =>
-        prefix === scope ||
-        prefix.startsWith(`${scope}/`) ||
-        scope.startsWith(`${prefix}/`),
-    );
-  });
-}
-
 /** A merged two-way line carries both connection IDs. */
 function findDisplayEdgeId(
   edges: readonly Edge[],
@@ -111,7 +84,6 @@ export function ArchitectureMapView({
   onSelectFile,
   onOpenPartFiles,
   onAllFiles,
-  onOpenFeature,
 }: {
   revision: number;
   map: ArchitectureMap | undefined;
@@ -124,7 +96,6 @@ export function ArchitectureMapView({
   onSelectFile: (node: GraphNode, part?: string) => void;
   onOpenPartFiles: (part: ArchitecturePartWithChanges) => void;
   onAllFiles: () => void;
-  onOpenFeature: (featureId: string) => void;
 }) {
   const scope = component ? `component:${component}` : "overview";
   const [views, setViews] = useState<Record<string, MapViewState>>({});
@@ -136,11 +107,6 @@ export function ArchitectureMapView({
   const repoResource = useResource(
     "/api/graph/repository",
     isRepositoryGraph,
-    revision,
-  );
-  const featuresResource = useResource(
-    "/api/graph/semantic/features",
-    isFeatureList,
     revision,
   );
 
@@ -266,11 +232,6 @@ export function ArchitectureMapView({
     setAuditComponent(undefined);
     onOpenComponent(part.id);
   };
-
-  const matchingFeatures = useMemo(
-    () => findMatchingFeatures(selectedPart, featuresResource.data?.features),
-    [selectedPart, featuresResource.data?.features],
-  );
 
   const filesByPath = useMemo(
     () =>
@@ -473,7 +434,6 @@ export function ArchitectureMapView({
                   selectedPart={selectedPart}
                   selectedConnection={selectedConnection}
                   missingConnection={missingConnection}
-                  matchingFeatures={matchingFeatures}
                   onSelectPart={(id) => select("part", id)}
                   onSelectConnection={(id) => select("connection", id)}
                   onPreviewConnections={(ids) =>
@@ -487,7 +447,6 @@ export function ArchitectureMapView({
                   onOpenPartFiles={onOpenPartFiles}
                   onOpenComponent={openComponent}
                   onOpenFile={openFileByPath}
-                  onOpenFeature={onOpenFeature}
                 />
               ) : undefined
             }

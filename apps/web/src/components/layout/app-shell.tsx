@@ -1,12 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  Activity,
-  Boxes,
-  FolderTree,
-  LayoutDashboard,
-  Network,
-  Waypoints,
-} from "lucide-react";
+import { Activity, FolderTree, Network, Waypoints } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,19 +13,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard },
   { label: "Graph", icon: Network },
-  { label: "Features", icon: Boxes },
   { label: "Activity", icon: Activity },
   { label: "Explorer", icon: FolderTree },
 ];
 
-export type WorkspaceView =
-  "Dashboard" | "Graph" | "Features" | "Activity" | "Explorer";
+export type WorkspaceView = "Graph" | "Activity" | "Explorer";
 
 interface AppShellProps {
   view: WorkspaceView;
-  fillWorkspace?: boolean;
   onNavigate: (view: WorkspaceView) => void;
   projectName: string;
   projectRoot?: string | undefined;
@@ -48,16 +37,13 @@ export function AppShell({
   liveConnection,
   children,
   view,
-  fillWorkspace = false,
   onNavigate,
 }: AppShellProps) {
   return (
     <div
       className={cn(
         "flex flex-col bg-background text-foreground md:flex-row",
-        view === "Graph" || fillWorkspace
-          ? "h-dvh overflow-hidden"
-          : "min-h-svh",
+        view === "Graph" ? "h-dvh overflow-hidden" : "min-h-svh",
       )}
     >
       <aside className="w-full md:w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex">
@@ -137,7 +123,6 @@ export function AppShell({
           className={cn(
             "min-w-0 flex-1 p-4 md:p-6",
             view === "Graph" && "flex min-h-0 flex-col overflow-hidden",
-            fillWorkspace && "flex min-h-0 flex-col overflow-y-auto",
           )}
         >
           {children}

@@ -149,11 +149,9 @@ view and its drill-downs.
 
 ## Frontend
 
-**Current.** The default **Graph** view groups indexed files by folder and
-shows directed imports across groups. **Features** lists explicit and inferred
-features and opens supported behavior graphs with source evidence.
-**Explorer** searches files and symbols. **Dashboard** uses real index counts
-and recent events. **Activity** opens saved changes and source diffs. Hash
+**Current.** The default **Graph** view maps architecture parts and shows
+resolved imports and calls. **Explorer** searches files and symbols.
+**Activity** opens saved changes and source diffs. Hash
 navigation preserves top-level selections across reloads and browser
 Back/Forward. The header reports HTTP health and SSE status separately.
 

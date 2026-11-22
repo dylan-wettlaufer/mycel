@@ -4,7 +4,6 @@ export interface Navigation {
   view: WorkspaceView;
   nodeId?: string;
   rootId?: string;
-  featureId?: string;
   changeId?: string;
   relationships?: boolean;
   source?: boolean;
@@ -16,19 +15,12 @@ export interface Navigation {
 export function parseNavigation(hash: string): Navigation {
   const query = new URLSearchParams(hash.replace(/^#/, ""));
   const view = query.get("view");
+  if (view === "Dashboard" || view === "Features") return { view: "Graph" };
   const relationships = query.get("relationships");
   return {
-    view:
-      view === "Dashboard" ||
-      view === "Graph" ||
-      view === "Features" ||
-      view === "Activity" ||
-      view === "Explorer"
-        ? view
-        : "Graph",
+    view: view === "Activity" || view === "Explorer" ? view : "Graph",
     ...(query.get("node") ? { nodeId: query.get("node")! } : {}),
     ...(query.get("root") ? { rootId: query.get("root")! } : {}),
-    ...(query.get("feature") ? { featureId: query.get("feature")! } : {}),
     ...(query.get("change") && /^\d+$/.test(query.get("change")!)
       ? { changeId: query.get("change")! }
       : {}),
@@ -50,7 +42,6 @@ export function navigationHref(next: Navigation): string {
   const query = new URLSearchParams({ view: next.view });
   if (next.nodeId) query.set("node", next.nodeId);
   if (next.rootId) query.set("root", next.rootId);
-  if (next.featureId) query.set("feature", next.featureId);
   if (next.changeId) query.set("change", next.changeId);
   if (next.files) query.set("files", "1");
   if (next.relationships !== undefined)

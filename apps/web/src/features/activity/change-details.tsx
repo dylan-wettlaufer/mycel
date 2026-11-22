@@ -1,11 +1,10 @@
-import { FileCode2, GitCompareArrows, Network } from "lucide-react";
+import { FileCode2, Network } from "lucide-react";
 import type { ChangeEvent, GraphNode } from "@mycel/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DiffPanel } from "@/features/source/diff-panel";
 import { HistoricalSource } from "@/features/source/historical-source";
-import { navigationHref } from "@/hooks/use-navigation";
 import { relationshipCountText } from "./change-presentation";
 import { eventNode } from "./event-node";
 import { HistoryNode } from "./history-node";
@@ -94,27 +93,6 @@ export function ChangeDetails({
               This earlier record identifies the connected code. Use the diff to
               find the exact edit.
             </p>
-          )}
-          {relationship && relationship.features.length > 0 && (
-            <ul className="flex flex-wrap gap-2" aria-label="Affected behavior">
-              {relationship.features.map((feature) => (
-                <li key={feature.id}>
-                  <Button asChild variant="outline" size="sm">
-                    <a
-                      href={navigationHref({
-                        view: "Features",
-                        featureId: feature.id,
-                      })}
-                    >
-                      <GitCompareArrows aria-hidden />
-                      {feature.name.charAt(0).toUpperCase() +
-                        feature.name.slice(1)}{" "}
-                      behavior
-                    </a>
-                  </Button>
-                </li>
-              ))}
-            </ul>
           )}
         </Card>
       )}

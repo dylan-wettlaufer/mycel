@@ -72,10 +72,6 @@ CLI and compiled dashboard must remain in the checkout together.
 
 ## Current experience
 
-- **Features** lists declared features and inferred candidates for supported
-  code patterns. Open a feature to explore its supported behavior traces and
-  source evidence. See [feature discovery](docs/FEATURE_DISCOVERY.md) and
-  [behavior tracing](docs/BEHAVIOUR_TRACING.md).
 - **Graph**, the landing view, maps architecture parts and their resolved
   imports and calls. Open a connection to inspect its evidence. Mycel keeps
   open evidence aligned with the indexed source as you save edits. The map
@@ -86,8 +82,7 @@ CLI and compiled dashboard must remain in the checkout together.
 - **Explorer** searches indexed files and symbols. **Activity** groups
   edits by file and indexed save, including uncommitted edits. Each entry
   shows a source diff and the symbols that changed. **Relationships** shows
-  added and removed calls and imports, with links to affected behavior where
-  Mycel has trace evidence.
+  added and removed calls and imports, with links to the recorded source.
   Graph and change selections can be reopened through browser history or
   hash links.
 

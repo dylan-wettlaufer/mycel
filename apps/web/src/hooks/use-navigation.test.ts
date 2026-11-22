@@ -26,3 +26,10 @@ test("navigation roundtrips opaque ids and supports browser history", async () =
     view: "Graph",
   });
 });
+
+test("bookmarks for retired workspace views open the architecture map", () => {
+  expect(parseNavigation("#view=Dashboard")).toEqual({ view: "Graph" });
+  expect(parseNavigation("#view=Features&feature=orders")).toEqual({
+    view: "Graph",
+  });
+});

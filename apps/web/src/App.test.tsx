@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
@@ -9,7 +15,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("the dashboard shows backend health and the repository selected by the CLI", async () => {
+test("the workspace shows backend health and the repository selected by the CLI", async () => {
   const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (url) => {
     return url === "/api/health"
       ? Response.json({ status: "ok" })
@@ -49,17 +55,22 @@ test("invalid repository metadata is reported without showing a fake project", a
   expect(screen.getByRole("heading", { name: "Mycel" })).toBeTruthy();
 });
 
-test("primary navigation switches workspace views", async () => {
+test("the workspace opens on Graph and offers Activity and Explorer", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(Response.json({ status: "ok" })),
   );
   render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+  const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+  expect(
+    nav.getAllByRole("button").map((button) => button.textContent),
+  ).toEqual(["Graph", "Activity", "Explorer"]);
   expect(
     await screen.findByRole("heading", { name: "Architecture map" }),
   ).toBeTruthy();
   expect(
-    screen.getByRole("button", { name: "Graph" }).getAttribute("aria-current"),
+    nav.getByRole("button", { name: "Graph" }).getAttribute("aria-current"),
   ).toBe("page");
+  fireEvent.click(nav.getByRole("button", { name: "Explorer" }));
+  expect(await screen.findByRole("heading", { name: "Explorer" })).toBeTruthy();
 });

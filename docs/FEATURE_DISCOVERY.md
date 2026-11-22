@@ -2,7 +2,7 @@
 
 Discovery groups supported code into candidate application areas. It enriches
 the [semantic graph](SEMANTIC_GRAPH.md) with heuristic provenance and source
-anchors, and the current **Features** view labels these candidates **Inferred**.
+anchors.
 The [V0 architecture map](../mycel_prd.md#v0-03--high-level-architecture-visualization)
 will use semantic representations of features, flows, and subsystems. The
 rules below describe the current feature candidates and their memberships.
@@ -76,8 +76,7 @@ responses. `createGraphQueries` exposes `getFeatures` and `getFeature`;
 `@mycel/db` exposes `getSemanticFeatures` and `getSemanticFeature`. Existing semantic
 snapshot and neighborhood queries also include the new candidates and memberships.
 
-The dashboard's **Features** view uses
-`GET /api/graph/semantic/features/:id/behaviour` to read membership and up to
+`GET /api/graph/semantic/features/:id/behaviour` returns membership and up to
 eight UI event traces in one project revision. It matches events to page or
 component declarations by structural symbol ID. The membership `limit` follows
 the detail endpoint, and the response reports truncation when membership, event,

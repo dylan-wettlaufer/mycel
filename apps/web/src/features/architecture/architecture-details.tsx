@@ -15,7 +15,6 @@ import type {
   ArchitectureMap,
   ArchitecturePartWithChanges,
   ArchitectureRelationshipChange,
-  SemanticEntity,
 } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -42,7 +41,6 @@ interface ArchitectureDetailsProps {
   selectedConnection: ArchitectureConnectionWithChanges | undefined;
   missingConnection?:
     { id: string; sourceName: string; targetName: string } | undefined;
-  matchingFeatures: SemanticEntity[];
   onSelectPart: (partId: string) => void;
   onSelectConnection: (connectionId: string) => void;
   onPreviewConnections: (connectionIds: string[]) => void;
@@ -50,7 +48,6 @@ interface ArchitectureDetailsProps {
   onOpenPartFiles: (part: ArchitecturePartWithChanges) => void;
   onOpenComponent: (part: ArchitecturePartWithChanges) => void;
   onOpenFile: (path: string) => void;
-  onOpenFeature: (featureId: string) => void;
 }
 
 function Inspector({
@@ -241,18 +238,6 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
                 Open files
               </Button>
             )}
-            {props.matchingFeatures.slice(0, 2).map((feature) => (
-              <Button
-                key={feature.id}
-                size="sm"
-                variant="outline"
-                className="h-auto max-w-full whitespace-normal py-1.5 text-left"
-                onClick={() => props.onOpenFeature(feature.id)}
-              >
-                <Boxes aria-hidden />
-                Behaviour: {feature.name}
-              </Button>
-            ))}
           </div>
         </>
       }
