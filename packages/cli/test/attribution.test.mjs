@@ -273,7 +273,10 @@ test("Codex multi-file patches and Cursor edits match indexed saves across hook 
         "*** End Patch",
       ].join("\n"),
     },
-    tool_response: success + "A new file.ts\nM modify.ts\nD delete.ts\n",
+    tool_response:
+      "Exit code: 0\nWall time: 0 seconds\nOutput:\n" +
+      success +
+      "A new file.ts\nM modify.ts\nD delete.ts\n",
   };
   await record("codex", patchCall, true);
   assert.equal(
@@ -342,7 +345,10 @@ test("Codex multi-file patches and Cursor edits match indexed saves across hook 
   await record("codex", {
     ...codexHook,
     tool_use_id: "failed",
-    tool_response: "Failed to patch manual.ts",
+    tool_response:
+      "Exit code: 1\nWall time: 0 seconds\nOutput:\n" +
+      success +
+      "M manual.ts\n",
   });
   await record("cursor", {
     ...cursorHook,

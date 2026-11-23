@@ -10,6 +10,8 @@ import {
 } from "./evidence.js";
 
 const successHeader = "Success. Updated the following files:";
+const successfulOutputPrefix =
+  /^Exit code: 0\r?\nWall time: \d+(?:\.\d+)? seconds\r?\n(?:Total output lines: \d+\r?\n)?Output:\r?\n/;
 
 /** A Codex Add File hunk supplies the complete new file, including its trailing newline. */
 function addedHashes(input: unknown, cwd: string): Map<string, string> {
@@ -47,7 +49,9 @@ export const codexAdapter: AgentAdapter = {
     )
       return [];
 
-    const [header, ...lines] = input.tool_response.split(/\r?\n/);
+    // Codex can wrap the patch summary in its standard command output.
+    const output = input.tool_response.replace(successfulOutputPrefix, "");
+    const [header, ...lines] = output.split(/\r?\n/);
     if (header !== successHeader) return [];
     const hashes = addedHashes(input.tool_input, input.cwd);
     const events = new Map<string, AgentToolEvent>();

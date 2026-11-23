@@ -26,7 +26,7 @@ export function AgentHookStatusPanel({ revision }: { revision: number }) {
               : lastReceivedAt !== undefined
                 ? `Last hook received ${formatRecordedTime(new Date(lastReceivedAt).toISOString())}`
                 : provider === "codex"
-                  ? "Hook configured. Waiting for a native file edit. Review it in /hooks if Codex prompts you."
+                  ? "Hook configured. Waiting for a Codex apply_patch edit. If prompted, trust the hook in Settings → Hooks or /hooks in the CLI."
                   : "Hook configured. Waiting for a supported edit."}
           </li>
         ))}
