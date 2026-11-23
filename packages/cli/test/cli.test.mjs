@@ -198,10 +198,14 @@ test(
     const { root, nested } = await repository(t);
     await writeFile(join(root, "sample.ts"), "export function sample() {}\n");
     const databasePath = resolveDatabasePath(root);
-    const child = spawn(process.execPath, [binary, "--no-open"], {
-      cwd: nested,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      [binary, "--no-open", "--no-agent-hooks"],
+      {
+        cwd: nested,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     const exit = once(child, "exit");
     t.after(async () => {
       if (child.exitCode === null && child.signalCode === null) {

@@ -5,19 +5,24 @@ import { defaultWebDistPath, startIndexedServer } from "@mycel/server";
 import open from "open";
 
 import { resolveRepository } from "./repository.js";
+import { setManagedHooks, setupAgentHooks } from "./setup-agent-hooks.js";
 
 interface LaunchOptions {
   cwd?: string;
   webDistPath?: string;
   databasePath?: string;
+  port?: number;
   openBrowser?: (url: string) => Promise<unknown>;
+  agentHooks?: "enabled" | "disabled";
 }
 
 export async function launchDashboard({
   cwd = process.cwd(),
   webDistPath = defaultWebDistPath,
   databasePath,
+  port = 0,
   openBrowser = open,
+  agentHooks,
 }: LaunchOptions = {}) {
   const project = await resolveRepository(cwd);
   try {
@@ -29,12 +34,35 @@ export async function launchDashboard({
     );
   }
 
+  const hookSetup =
+    agentHooks === "enabled" && databasePath === undefined
+      ? await setupAgentHooks(project.root)
+      : undefined;
   // Let the OS choose a free port so other projects and dev servers can coexist.
-  const server = await startIndexedServer(0, {
+  const server = await startIndexedServer(port, {
     project,
     webDistPath,
     ...(databasePath === undefined ? {} : { databasePath }),
+    ...(hookSetup === undefined ? {} : { agentHooks: hookSetup }),
   });
+  if (agentHooks && databasePath === undefined) {
+    try {
+      await setManagedHooks(
+        project.root,
+        Boolean(hookSetup?.some(({ state }) => state === "configured")),
+      );
+    } catch (error) {
+      for (const hook of hookSetup ?? []) {
+        if (hook.state !== "configured") continue;
+        hook.state = "error";
+        hook.message = "Mycel could not enable capture for this repository";
+      }
+      console.warn(
+        "Mycel could not update automatic agent attribution:",
+        error,
+      );
+    }
+  }
   const address = server.address();
   if (!address || typeof address === "string") {
     server.close();

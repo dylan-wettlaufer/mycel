@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
+import { isAgentProvider } from "@mycel/shared";
 
 async function main() {
   const { values, positionals } = parseArgs({
@@ -8,6 +9,8 @@ async function main() {
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
       "no-open": { type: "boolean" },
+      "no-agent-hooks": { type: "boolean" },
+      managed: { type: "boolean" },
       component: { type: "string" },
     },
     allowPositionals: true,
@@ -16,7 +19,7 @@ async function main() {
   const [command, provider] = positionals;
   const isAgentHook =
     command === "agent-hook" &&
-    provider === "claude-code" &&
+    isAgentProvider(provider) &&
     positionals.length === 2;
   if (
     positionals.length &&
@@ -27,12 +30,14 @@ async function main() {
     throw new Error(`Unexpected argument: ${positionals.join(" ")}`);
   if (values.component !== undefined && command !== "architecture")
     throw new Error("--component requires the architecture command");
+  if (values.managed && !isAgentHook)
+    throw new Error("--managed requires the agent-hook command");
 
   if (values.help) {
     console.info(`Usage: mycel [options]
        mycel architecture [--component <name-or-id>]
        mycel install-skill
-       mycel agent-hook claude-code
+       mycel agent-hook <claude-code|codex|cursor>
 
 Open a live dashboard for the current repository.
 
@@ -44,12 +49,13 @@ Commands:
                  and responsibility assignments.
   install-skill  Add the mycel-architecture agent skill to .agents/skills
                  (Codex) and .claude/skills (Claude Code) in this repository.
-  agent-hook     Record Claude Code hook metadata from stdin for local attribution.
+  agent-hook     Record coding agent hook metadata from stdin for local attribution.
 
 Options:
   -h, --help     Show help
   -v, --version  Show version
       --no-open  Start the dashboard without opening a browser
+      --no-agent-hooks  Turn off automatic agent attribution for this repository
 
 Run from any directory in a Git repository to select its root.
 Outside Git, the current folder is used. Press Ctrl+C to stop.`);
@@ -77,13 +83,20 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
   }
 
   if (isAgentHook) {
-    const { runClaudeCodeHook } = await import("./agent-hook.js");
-    await runClaudeCodeHook(process.stdin, process.cwd());
+    const { runAgentHook } = await import("./agent-hook.js");
+    await runAgentHook(
+      provider,
+      process.stdin,
+      process.cwd(),
+      undefined,
+      values.managed,
+    );
     return;
   }
 
   const { launchDashboard } = await import("./launch.js");
   const { server, project, url } = await launchDashboard({
+    agentHooks: values["no-agent-hooks"] ? "disabled" : "enabled",
     ...(values["no-open"] ? { openBrowser: async () => {} } : {}),
   });
 

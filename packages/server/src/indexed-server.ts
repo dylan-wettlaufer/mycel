@@ -4,7 +4,10 @@ import type { ProjectInfo } from "@mycel/shared";
 import type { AppOptions } from "./app.js";
 import { startServer } from "./server.js";
 
-export interface IndexedServerOptions extends Pick<AppOptions, "webDistPath"> {
+export interface IndexedServerOptions extends Pick<
+  AppOptions,
+  "webDistPath" | "agentHooks"
+> {
   project: ProjectInfo;
   databasePath?: string;
 }
@@ -22,6 +25,9 @@ export async function startIndexedServer(
       graph: indexed.graph,
       history: indexed.history,
       architecture: indexed.architecture,
+      ...(options.agentHooks === undefined
+        ? {}
+        : { agentHooks: options.agentHooks }),
       ...(options.webDistPath === undefined
         ? {}
         : { webDistPath: options.webDistPath }),

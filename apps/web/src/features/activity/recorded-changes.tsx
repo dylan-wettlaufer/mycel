@@ -2,9 +2,10 @@ import { ArrowRight, FileCode2, GitCompareArrows } from "lucide-react";
 import type { ArchitectureMap, ChangeEvent, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { formatRelativeTime } from "@/lib/format";
+import { formatRecordedTime, formatRelativeTime } from "@/lib/format";
 import { ChangeDetails } from "./change-details";
 import { AgentAttribution } from "./agent-attribution";
+import { AgentHookStatusPanel } from "./agent-hook-status";
 import { changeTitle, fileChangePreview } from "./change-presentation";
 import { useChangeFeed } from "./use-change-feed";
 
@@ -67,7 +68,8 @@ export function RecordedChanges({
             Activity
           </h2>
           <p className="text-sm text-muted-foreground">
-            Review saved code changes, including uncommitted edits.
+            Review saved file and relationship changes, including uncommitted
+            edits.
           </p>
         </div>
         {onFilter && (
@@ -96,6 +98,9 @@ export function RecordedChanges({
         )}
       </header>
 
+      {!nodeId && !relationshipView && (
+        <AgentHookStatusPanel revision={revision} />
+      )}
       {error && (
         <p
           role="alert"
@@ -126,7 +131,7 @@ export function RecordedChanges({
           <p className="max-w-prose text-sm text-muted-foreground">
             {relationshipView
               ? "This view fills in when a save adds or removes a resolved call or import. File edits are available in Files."
-              : "Mycel records edits after indexing the repository. Saved TypeScript changes will appear here."}
+              : "Mycel records edits after indexing the repository. Saved TypeScript, TSX, and Python changes will appear here."}
           </p>
           {relationshipView && onFilter && (
             <Button
@@ -177,6 +182,7 @@ export function RecordedChanges({
                           <time
                             className="ml-auto shrink-0"
                             dateTime={event.timestamp}
+                            title={formatRecordedTime(event.timestamp)}
                           >
                             {formatRelativeTime(event.timestamp)}
                           </time>

@@ -9,7 +9,12 @@ import type {
   GraphQueries,
   HistoryQueries,
 } from "@mycel/core";
-import type { HealthResponse, ProjectInfo } from "@mycel/shared";
+import type {
+  AgentHookSetup,
+  AgentHookStatus,
+  HealthResponse,
+  ProjectInfo,
+} from "@mycel/shared";
 import { Hono } from "hono";
 import { createGraphRoutes } from "./routes/graph.js";
 
@@ -23,6 +28,7 @@ export interface AppOptions {
   graph?: GraphQueries;
   history?: HistoryQueries;
   architecture?: ArchitectureQueries;
+  agentHooks?: readonly AgentHookSetup[];
 }
 
 export function createApp({
@@ -31,6 +37,7 @@ export function createApp({
   graph,
   history,
   architecture,
+  agentHooks,
 }: AppOptions = {}) {
   const app = new Hono();
 
@@ -42,6 +49,15 @@ export function createApp({
   app.get("/api/project", (context) => {
     if (!project) return context.json({ error: "No repository selected" }, 503);
     return context.json(project);
+  });
+
+  app.get("/api/agent-hooks", (context) => {
+    const activity = history?.getAgentHookActivity?.();
+    const statuses: AgentHookStatus[] = (agentHooks ?? []).map((hook) => {
+      const lastReceivedAt = activity?.get(hook.provider);
+      return lastReceivedAt === undefined ? hook : { ...hook, lastReceivedAt };
+    });
+    return context.json(statuses);
   });
 
   app.get("/api/files/content", (context) => {

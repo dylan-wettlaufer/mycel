@@ -101,44 +101,30 @@ history, and SSE APIs. Mycel starts watching during the initial index and
 continues watching while it runs. The header shows backend health and live-stream
 connection state separately. See [server usage](packages/server/README.md).
 
-### Attribute file changes to Claude Code
+### Attribute file changes to coding agents
 
-Claude Code attribution is opt-in per repository. Run Mycel once to initialize
-its local database. Merge the following hooks into
-`.claude/settings.local.json` in that repository and use **Activity → Files**
-while Mycel is running. If Claude Code cannot find `mycel` on its PATH, use the
-absolute path to the installed command.
+Mycel sets up attribution automatically when you run `mycel` in a repository.
+It registers hooks once in the user settings of detected agents and enables
+capture for the repository you opened. Existing Mycel project hooks are reused.
+Use `mycel --no-agent-hooks` to turn off automatically installed capture for
+that repository. Manually configured hooks are controlled by the agent’s settings.
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Edit|Write", "hooks": [
-        { "type": "command", "command": "mycel agent-hook claude-code" }
-      ]}
-    ],
-    "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [
-        { "type": "command", "command": "mycel agent-hook claude-code" }
-      ]}
-    ],
-    "PostToolUseFailure": [
-      { "matcher": "Edit|Write", "hooks": [
-        { "type": "command", "command": "mycel agent-hook claude-code" }
-      ]}
-    ]
-  }
-}
-```
+**Activity → Files** shows the hook setup status and the last event Mycel
+received from each configured agent. After a supported edit, its row and diff
+show the provider, session, and confidence.
 
-Activity shows the Claude Code session and its attribution status. A successful
-`Write` whose content hash matches the indexed file is **confirmed**. A
-single-session path and timing match for an `Edit` is **inferred**. Matching
-uses a five-second window around the tool call. Overlapping sessions and
-conflicting evidence show **Agent unknown**. Shell writes and
-ordinary saves still appear in Activity. The integration stores tool and session
-metadata, repository-relative paths, timestamps, and a hash when available.
-Remove the three hook entries to stop capture. [Claude Code hook reference](https://code.claude.com/docs/en/hooks)
+- **Codex** requires a one-time review of the Mycel hook in **Settings → Hooks**
+  or `/hooks` in the CLI. It reports successful native `apply_patch` operations.
+  An addition with exact content evidence is **confirmed**. Other matches
+  are **inferred**. [Codex hooks reference](https://learn.chatgpt.com/docs/hooks)
+- **Cursor** reports completed Agent file edits and Mycel matches them to
+  indexed saves. [Cursor hooks reference](https://cursor.com/docs/hooks)
+- **Claude Code** reports its `Edit` and `Write` tool calls. Exact content
+  matches for `Write` are **confirmed**. [Claude Code hook reference](https://code.claude.com/docs/en/hooks)
+
+Competing evidence for the same indexed save shows **Agent unknown**. Shell
+writes, Cursor Tab completions, and ordinary saves appear as file changes.
+Mycel keeps attribution metadata and hashes in its local database.
 
 ## Workspace
 
