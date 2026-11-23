@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatRelativeTime } from "@/lib/format";
 import { ChangeDetails } from "./change-details";
+import { AgentAttribution } from "./agent-attribution";
 import { changeTitle, fileChangePreview } from "./change-presentation";
 import { useChangeFeed } from "./use-change-feed";
 
@@ -183,6 +184,11 @@ export function RecordedChanges({
                         <span className="block break-words font-medium text-foreground">
                           {changeTitle(event, architecture)}
                         </span>
+                        {event.attribution && (
+                          <span className="mt-1 block">
+                            <AgentAttribution attribution={event.attribution} />
+                          </span>
+                        )}
                         {event.fileSummary && (
                           <span className="mt-1 block break-words text-xs font-normal text-muted-foreground">
                             {fileChangePreview(event.fileSummary)}

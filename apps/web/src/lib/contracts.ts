@@ -138,6 +138,15 @@ export function isChangeEvent(
         isRecordedRelationship(value.relationship))) &&
     (value.fileSummary === undefined ||
       isFileChangeSummary(value.fileSummary)) &&
+    (value.attribution === undefined ||
+      (isRecord(value.attribution) &&
+        ["confirmed", "inferred", "unknown"].includes(
+          String(value.attribution.status),
+        ) &&
+        (value.attribution.provider === undefined ||
+          value.attribution.provider === "claude-code") &&
+        (value.attribution.sessionId === undefined ||
+          typeof value.attribution.sessionId === "string"))) &&
     (value.beforeRevision === null ||
       typeof value.beforeRevision === "number") &&
     (value.afterRevision === null || typeof value.afterRevision === "number")

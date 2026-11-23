@@ -53,6 +53,7 @@ export function App() {
   const [architectureWindow, setArchitectureWindow] =
     useState<ArchitectureChangeWindow>("branch");
   const activity = useActivity();
+  const historyRevision = activity.revision + activity.attributionRevision;
   const connection = useBackendHealth();
   const { project, error } = useProject(connection);
   const architecture = useResource(
@@ -90,6 +91,7 @@ export function App() {
       ? `/api/changes/${encodeURIComponent(changeId)}`
       : null,
     isChangeEvent,
+    historyRevision,
   );
   const selectedEvent = record.data ?? localEvent;
   const relationshipView =
@@ -152,7 +154,7 @@ export function App() {
           )}
           <RecordedChanges
             key={nodeId ?? (relationshipView ? "relationships" : "files")}
-            revision={activity.revision}
+            revision={historyRevision}
             nodeId={nodeId}
             selectedId={changeId}
             selectedEvent={selectedEvent}

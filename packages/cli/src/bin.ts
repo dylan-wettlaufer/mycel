@@ -2,10 +2,6 @@
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
-import { checkArchitecture } from "./architecture.js";
-import { launchDashboard } from "./launch.js";
-import { installSkill } from "./skill.js";
-
 async function main() {
   const { values, positionals } = parseArgs({
     options: {
@@ -17,9 +13,14 @@ async function main() {
     allowPositionals: true,
   });
 
-  const [command] = positionals;
+  const [command, provider] = positionals;
+  const isAgentHook =
+    command === "agent-hook" &&
+    provider === "claude-code" &&
+    positionals.length === 2;
   if (
     positionals.length &&
+    !isAgentHook &&
     (!["architecture", "install-skill"].includes(command ?? "") ||
       positionals.length !== 1)
   )
@@ -31,6 +32,7 @@ async function main() {
     console.info(`Usage: mycel [options]
        mycel architecture [--component <name-or-id>]
        mycel install-skill
+       mycel agent-hook claude-code
 
 Open a live dashboard for the current repository.
 
@@ -42,6 +44,7 @@ Commands:
                  and responsibility assignments.
   install-skill  Add the mycel-architecture agent skill to .agents/skills
                  (Codex) and .claude/skills (Claude Code) in this repository.
+  agent-hook     Record Claude Code hook metadata from stdin for local attribution.
 
 Options:
   -h, --help     Show help
@@ -62,15 +65,24 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
   }
 
   if (command === "architecture") {
+    const { checkArchitecture } = await import("./architecture.js");
     await checkArchitecture(values.component);
     return;
   }
 
   if (command === "install-skill") {
+    const { installSkill } = await import("./skill.js");
     await installSkill();
     return;
   }
 
+  if (isAgentHook) {
+    const { runClaudeCodeHook } = await import("./agent-hook.js");
+    await runClaudeCodeHook(process.stdin, process.cwd());
+    return;
+  }
+
+  const { launchDashboard } = await import("./launch.js");
   const { server, project, url } = await launchDashboard({
     ...(values["no-open"] ? { openBrowser: async () => {} } : {}),
   });

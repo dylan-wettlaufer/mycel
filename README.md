@@ -101,11 +101,51 @@ history, and SSE APIs. Mycel starts watching during the initial index and
 continues watching while it runs. The header shows backend health and live-stream
 connection state separately. See [server usage](packages/server/README.md).
 
+### Attribute file changes to Claude Code
+
+Claude Code attribution is opt-in per repository. Run Mycel once to initialize
+its local database. Merge the following hooks into
+`.claude/settings.local.json` in that repository and use **Activity → Files**
+while Mycel is running. If Claude Code cannot find `mycel` on its PATH, use the
+absolute path to the installed command.
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write", "hooks": [
+        { "type": "command", "command": "mycel agent-hook claude-code" }
+      ]}
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [
+        { "type": "command", "command": "mycel agent-hook claude-code" }
+      ]}
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "Edit|Write", "hooks": [
+        { "type": "command", "command": "mycel agent-hook claude-code" }
+      ]}
+    ]
+  }
+}
+```
+
+Activity shows the Claude Code session and its attribution status. A successful
+`Write` whose content hash matches the indexed file is **confirmed**. A
+single-session path and timing match for an `Edit` is **inferred**. Matching
+uses a five-second window around the tool call. Overlapping sessions and
+conflicting evidence show **Agent unknown**. Shell writes and
+ordinary saves still appear in Activity. The integration stores tool and session
+metadata, repository-relative paths, timestamps, and a hash when available.
+Remove the three hook entries to stop capture. [Claude Code hook reference](https://code.claude.com/docs/en/hooks)
+
 ## Workspace
 
 | Directory | Package | Responsibility |
 | --- | --- | --- |
 | `packages/cli` | `@mycel/cli` | Command-line entry point and application lifecycle |
+| `packages/agents` | `@mycel/agents` | Provider hook adapters for local attribution |
 | `packages/server` | `@mycel/server` | Local HTTP API, events, and static asset serving |
 | `packages/core` | `@mycel/core` | Indexing, watching, semantic extraction, and change coordination |
 | `packages/parser` | `@mycel/parser` | Source structure extraction |
@@ -163,8 +203,9 @@ imports can resolve dependency declarations, then checks each package without
 emitting additional files.
 
 Internal dependencies use `workspace:*` and imports use package names such as
-`@mycel/shared`. The CLI depends on server and core; server depends on core;
-core depends on parser and db. Shared is available to every consumer, and web
+`@mycel/shared`. The CLI uses server and core to launch the dashboard, and
+agents and db to record hooks. Server depends on core, and core depends on
+parser and db. Shared is available to every consumer, and web
 depends only on shared to keep backend modules out of the browser.
 
 For development with hot reload, run these commands in separate terminals:

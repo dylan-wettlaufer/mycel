@@ -95,8 +95,13 @@ export function createHistoryRoutes(
       let stopped = false;
       let wake: (() => void) | undefined;
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let pendingAttribution = false;
       const pendingArchitecture: ArchitectureUpdateEvent[] = [];
       const unsubscribe = history.onEvent(() => wake?.());
+      const unsubscribeAttribution = history.onAttribution?.(() => {
+        pendingAttribution = true;
+        wake?.();
+      });
       const unsubscribeArchitecture = architecture?.onUpdate((event) => {
         pendingArchitecture.push(event);
         wake?.();
@@ -105,6 +110,7 @@ export function createHistoryRoutes(
         stopped = true;
         clearTimeout(timer);
         unsubscribe();
+        unsubscribeAttribution?.();
         unsubscribeArchitecture?.();
         wake?.();
       };
@@ -133,7 +139,16 @@ export function createHistoryRoutes(
               data: JSON.stringify(archEvent),
             });
           }
-          if (!events.length && !pendingArchitecture.length && !stopped) {
+          if (pendingAttribution && !stopped) {
+            pendingAttribution = false;
+            await stream.writeSSE({ event: "attribution", data: "{}" });
+          }
+          if (
+            !events.length &&
+            !pendingArchitecture.length &&
+            !pendingAttribution &&
+            !stopped
+          ) {
             let heartbeat = false;
             await new Promise<void>((resolve) => {
               wake = resolve;

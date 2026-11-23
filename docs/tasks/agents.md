@@ -16,37 +16,37 @@ architecture remains usable without a provider-specific adapter.
 
 ## Post-V0 session attribution
 
-Optional adapters could collect agent session and tool metadata to show which
-agent made an observed change. No agent adapter package currently exists.
+The opt-in Claude Code integration shows session attribution for indexed file
+changes in Activity. The watcher remains the source of recorded file changes.
 
 ### Tasks
 
-- [ ] Create `packages/agents` and add the `agents` commit scope to
+- [x] Create `packages/agents` and add the `agents` commit scope to
       `AGENTS.md`.
-- [ ] Define an adapter interface independent of the indexer: start and stop,
-      and a stream of agent events (session id, tool name, timestamp, affected
-      paths).
-- [ ] Implement a Claude Code adapter using its supported session and tool
-      hooks.
-- [ ] Store agent sessions and tool events in db, in new tables added by
-      migration.
-- [ ] Correlate agent events with observed file changes by path and time
-      window.
-- [ ] Record attribution as `confirmed`, `inferred`, or `unknown`, and never
-      force an ambiguous assignment.
-- [ ] Expose attribution on change events through the API and SSE.
+- [x] Define an adapter interface independent of the indexer that normalizes
+      hook input to tool events with a session ID, path, and timestamp.
+- [x] Implement Claude Code capture using supported edit and write tool hooks.
+- [x] Store tool events with provider session IDs and optional content hashes
+      in a dedicated database table.
+- [x] Correlate tool events with observed file changes by path and capture
+      time, including completion hooks that arrive after the indexed save.
+- [x] Record attribution as `confirmed`, `inferred`, or `unknown` and
+      display it on file changes in Activity.
+- [x] Expose attribution through history queries and signal updates over SSE.
+- [ ] Add agent session filters once users have sessions to review.
+- [ ] Record explicit agent session lifecycle events if session review needs
+      them.
 - [ ] Flag overlapping changes to the same file or symbol by different agents.
 - [ ] Investigate Codex and Cursor integration mechanisms before building
       adapters for them.
 
 ### Tests
 
-- [ ] Concurrent agents editing different files are attributed correctly.
-- [ ] Overlapping edits to one file produce `inferred` or `unknown`, not a
-      wrong `confirmed`.
-- [ ] Mycel behaves the same with no adapters configured.
+- [x] Concurrent sessions editing different files are attributed independently.
+- [x] Overlapping edits to one file produce `unknown`.
+- [x] Ordinary saves continue to appear without an agent identity.
 
 ### Done when
 
-- Activity items show which agent made a change when evidence exists, and
-  users can filter by agent.
+- Activity identifies agent sessions when evidence supports an assignment and
+  keeps ambiguous file changes visible.

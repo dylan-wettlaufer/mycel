@@ -39,7 +39,7 @@ test("generates workspace parts for Mycel itself", async () => {
   const byId = new Map(result.parts.map((part) => [part.id, part]));
   assert.deepEqual(
     [...byId.keys()],
-    ["cli", "core", "db", "parser", "server", "shared", "web"],
+    ["agents", "cli", "core", "db", "parser", "server", "shared", "web"],
   );
 
   assert.deepEqual(byId.get("cli"), {

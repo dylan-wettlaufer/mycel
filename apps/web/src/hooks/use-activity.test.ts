@@ -87,6 +87,10 @@ test("SSE and initial history converge and reconnects preserve data", async () =
       prevArchRevision,
     ),
   );
+  const graphRevision = result.current.revision;
+  act(() => Stream.instance.emit("attribution", {}));
+  expect(result.current.attributionRevision).toBe(1);
+  expect(result.current.revision).toBe(graphRevision);
   act(() => Stream.instance.onerror?.());
   expect(result.current.connection).toBe("disconnected");
   act(() => {

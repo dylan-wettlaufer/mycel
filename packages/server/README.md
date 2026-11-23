@@ -143,6 +143,10 @@ and project/health behavior.
   file.
 - `GET /api/events` streams ordered changes with SSE IDs and replays after the
   native browser's `Last-Event-ID` on reconnection.
+- A file change can include optional `attribution` with its confidence status
+  and, when known, the agent provider and session ID. When a hook updates a
+  recorded change, the stream sends an ID-less `attribution` notice so Activity
+  can refetch history without advancing its change cursor.
 
 
 ### Feature discovery queries

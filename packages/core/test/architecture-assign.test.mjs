@@ -44,11 +44,15 @@ test("assigns every indexed file in Mycel to its workspace fallback part", async
   const byId = new Map(result.parts.map((entry) => [entry.id, entry]));
   assert.deepEqual(
     [...byId.keys()],
-    ["cli", "core", "db", "parser", "server", "shared", "web"],
+    ["agents", "cli", "core", "db", "parser", "server", "shared", "web"],
   );
-  for (const id of ["cli", "core", "db", "parser", "server", "shared", "web"]) {
-    assert.ok(byId.get(id).files.length > 0, `expected files in ${id}`);
+  for (const [id, { files }] of byId) {
+    assert.ok(files.length > 0, `expected files in ${id}`);
   }
+  assert.equal(
+    result.fileToPart["packages/agents/src/claude-code.ts"],
+    "agents",
+  );
   assert.equal(result.fileToPart["packages/core/src/index.ts"], "core");
   assert.equal(result.fileToPart["apps/web/src/App.tsx"], "web");
 });

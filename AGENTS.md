@@ -34,7 +34,7 @@ Types:
 - `ci` — CI/CD changes
 - `style` — Formatting only
 
-Scopes: `web`, `cli`, `server`, `core`, `parser`, `db`, `shared`.
+Scopes: `web`, `cli`, `server`, `core`, `parser`, `db`, `shared`, `agents`.
 
 Examples:
 - `feat(parser): add TypeScript symbol extraction`

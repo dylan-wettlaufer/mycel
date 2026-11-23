@@ -24,6 +24,7 @@ export function useActivity() {
   const [connections, setConnections] = useState(0);
   const [revision, setRevision] = useState(0);
   const [architectureRevision, setArchitectureRevision] = useState(0);
+  const [attributionRevision, setAttributionRevision] = useState(0);
   const recent = useResource(
     "/api/changes?limit=100",
     isChangesPage,
@@ -45,6 +46,9 @@ export function useActivity() {
       setRevision((value) => value + 1);
     };
     stream.onerror = () => setConnection("disconnected");
+    stream.addEventListener("attribution", () => {
+      setAttributionRevision((value) => value + 1);
+    });
     stream.addEventListener("change", (message: MessageEvent<string>) => {
       try {
         const event: unknown = JSON.parse(message.data);
@@ -86,5 +90,6 @@ export function useActivity() {
     connection,
     revision,
     architectureRevision,
+    attributionRevision,
   };
 }

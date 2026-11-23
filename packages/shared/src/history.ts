@@ -1,5 +1,6 @@
 import type { GraphEdge, GraphNode, NodeKind, Revision } from "./graph.js";
 import type { ProjectId } from "./project.js";
+import type { ChangeAttribution } from "./agents.js";
 
 export type ChangeAction = "created" | "modified" | "deleted";
 /** Decimal string representation of a database-wide monotonically increasing id. */
@@ -45,10 +46,7 @@ export interface ChangeEvent {
   relationship?: RecordedRelationship;
   fileSummary?: FileChangeSummary;
   sessionId?: string;
-  attribution?: {
-    status: "confirmed" | "inferred" | "unknown";
-    sessionId?: string;
-  };
+  attribution?: ChangeAttribution;
 }
 /** Dashboard presentation of an event; graph events retain full before/after data. */
 export interface ActivityEvent {
@@ -82,6 +80,7 @@ export interface ChangeDiff {
 
 export type SseMessage =
   | { type: "change"; data: ChangeEvent }
+  | { type: "attribution"; data: Record<string, never> }
   | {
       type: "architecture";
       data: import("./architecture.js").ArchitectureUpdateEvent;

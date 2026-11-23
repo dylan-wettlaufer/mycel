@@ -12,6 +12,7 @@ import type { ProjectGraph } from "./graph.js";
 import { applyProjectGraph } from "./graph.js";
 import { getNode } from "./queries.js";
 import { getCallFeatures } from "./behaviour.js";
+import { attributeFileChange } from "./agents.js";
 
 type Entity = Omit<GraphNode, "revision"> | Omit<GraphEdge, "revision">;
 export interface EntityChange {
@@ -28,6 +29,8 @@ export interface ChangeSet {
   sources: ReadonlyMap<string, string>;
   changes: readonly EntityChange[];
   sessionId?: string;
+  /** Wall-clock capture times for changed files from the live watcher. */
+  fileCaptureTimes?: ReadonlyMap<string, number>;
 }
 export function currentRevision(db: SqliteDatabase, projectId: string): number {
   return db
@@ -343,6 +346,18 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           set.sessionId ?? null,
           relationship ? JSON.stringify(relationship) : null,
         );
+        const capturedAt = set.fileCaptureTimes?.get(change.path);
+        const attribution =
+          after?.kind === "file" && capturedAt !== undefined
+            ? attributeFileChange(
+                db,
+                projectId,
+                change.path,
+                capturedAt,
+                result.lastInsertRowid,
+                after.contentHash,
+              )
+            : undefined;
         const event: ChangeEvent = {
           id: String(result.lastInsertRowid),
           projectId,
@@ -357,6 +372,7 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           after,
           ...(relationship ? { relationship } : {}),
           ...(set.sessionId ? { sessionId: set.sessionId } : {}),
+          ...(attribution ? { attribution } : {}),
         };
         return event;
       });

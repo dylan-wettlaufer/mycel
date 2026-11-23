@@ -12,6 +12,7 @@ import type { SourceChange } from "./watcher.js";
 export interface SourceBatch {
   /** Null represents a deletion or a file excluded by current ignore rules. */
   files: ReadonlyMap<string, string | null>;
+  fileCaptureTimes: ReadonlyMap<string, number>;
   metadataPaths: readonly string[];
   observedAt: number;
   captureStartedAt: number;
@@ -60,6 +61,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
       for (const path of hashes.keys())
         if (!included.has(path)) candidates.add(path);
       const files = new Map<string, string | null>();
+      const fileCaptureTimes = new Map<string, number>();
       const nextHashes = new Map<string, string | null>();
       for (const path of [...candidates].sort()) {
         if (!included.has(path)) {
@@ -80,8 +82,10 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
           }
           continue;
         }
+        const capturedAt = Date.now();
         const hash = hashContent(source);
         if (hash === hashes.get(path)) continue;
+        fileCaptureTimes.set(path, capturedAt);
         files.set(path, source);
         nextHashes.set(path, hash);
       }
@@ -92,6 +96,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
         return;
       await options.onBatch({
         files,
+        fileCaptureTimes,
         metadataPaths: discovered.metadataPaths,
         observedAt: Math.min(...changes.values()),
         captureStartedAt,

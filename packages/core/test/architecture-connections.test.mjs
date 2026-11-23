@@ -54,6 +54,7 @@ test("computes evidence-backed cross-part connections for Mycel itself", async (
 
   // Verify real workspace package connections backed by indexed imports/calls.
   for (const id of [
+    "cli->agents",
     "cli->server",
     "server->core",
     "core->parser",

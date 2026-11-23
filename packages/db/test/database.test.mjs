@@ -145,6 +145,7 @@ test("initializes a strict, indexed schema with foreign keys and a busy timeout"
     .all()
     .map((row) => row.name);
   assert.deepEqual(tables, [
+    "agent_tool_events",
     "change_events",
     "diagnostics",
     "edges",
@@ -165,6 +166,10 @@ test("initializes a strict, indexed schema with foreign keys and a busy timeout"
       1,
     );
   for (const [table, expected] of [
+    [
+      "agent_tool_events",
+      ["unassigned_agent_tools_by_path", "agent_tools_by_change"],
+    ],
     [
       "nodes",
       [

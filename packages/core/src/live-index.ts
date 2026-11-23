@@ -207,6 +207,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           sources: new Map(
             [...next].map(([path, file]) => [path, file.source]),
           ),
+          fileCaptureTimes: batch.fileCaptureTimes,
           changes: diffGraph(
             readGraphState(options.database, project.id),
             graph,
