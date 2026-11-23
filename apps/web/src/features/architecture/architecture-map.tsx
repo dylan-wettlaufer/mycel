@@ -9,6 +9,7 @@ import type {
 } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
 import { GraphCanvas } from "@/features/graph/graph-canvas";
+import { GraphNotice } from "@/features/graph/graph-notice";
 import { useResource } from "@/hooks/use-resource";
 import { isRepositoryGraph } from "@/lib/contracts";
 import { ArchitectureDetails } from "./architecture-details";
@@ -76,6 +77,9 @@ export function ArchitectureMapView({
   revision,
   map,
   mapError,
+  mapLoading,
+  onRetry,
+  onOverview,
   component,
   initialPart,
   windowMode,
@@ -88,6 +92,9 @@ export function ArchitectureMapView({
   revision: number;
   map: ArchitectureMap | undefined;
   mapError: string | undefined;
+  mapLoading: boolean;
+  onRetry: () => void;
+  onOverview: () => void;
   component?: string | undefined;
   initialPart?: string | undefined;
   windowMode: ArchitectureChangeWindow;
@@ -103,9 +110,11 @@ export function ArchitectureMapView({
   const [showMinor, setShowMinor] = useState(false);
   const [auditComponent, setAuditComponent] = useState<string>();
   const showAll = component !== undefined && component === auditComponent;
+  const hasFiles = map?.parts.some((part) => part.files.length > 0);
+  const [fileOpen, setFileOpen] = useState<{ scope: string; path: string }>();
 
   const repoResource = useResource(
-    "/api/graph/repository",
+    hasFiles ? "/api/graph/repository" : null,
     isRepositoryGraph,
     revision,
   );
@@ -137,6 +146,7 @@ export function ArchitectureMapView({
       ? map?.parts.find((part) => part.id === selection.id)
       : undefined;
   const selectedPartId = selectedPart?.id ?? null;
+  const missingPart = map && selection?.kind === "part" && !selectedPart;
   const selectedNeighborIds = useMemo(() => {
     const neighbors = new Set<string>();
     if (selectedPartId === null) return neighbors;
@@ -200,6 +210,7 @@ export function ArchitectureMapView({
     const name = (partId: string) =>
       map?.parts.find((part) => part.id === partId)?.name ?? partId;
     setConnectionPreview(null);
+    setFileOpen(undefined);
     const nextFocus =
       kind === "part" && responsibilities.some((part) => part.id === id)
         ? id
@@ -221,6 +232,7 @@ export function ArchitectureMapView({
   };
   const clearSelection = () => {
     setConnectionPreview(null);
+    setFileOpen(undefined);
     setViews((previous) => ({
       ...previous,
       [scope]: { selection: null, ...(focusId ? { focusId } : {}) },
@@ -243,8 +255,16 @@ export function ArchitectureMapView({
 
   const openFileByPath = (path: string) => {
     const file = filesByPath.get(path);
-    if (file) onSelectFile(file, selectedPartId ?? focusId);
+    if (file) {
+      onSelectFile(file, selectedPartId ?? focusId);
+    } else {
+      setFileOpen({ scope, path });
+    }
   };
+  const unavailableFile = fileOpen?.scope === scope ? fileOpen.path : undefined;
+  const recoveredFile = unavailableFile
+    ? filesByPath.get(unavailableFile)
+    : undefined;
 
   return (
     <section
@@ -262,28 +282,34 @@ export function ArchitectureMapView({
               ? map.component
                 ? `${canvasMap?.connections.length ?? 0} connections shown · ${describeWindow(map)}`
                 : `${map.parts.length} ${map.parts.length === 1 ? "part" : "parts"} · ${map.connections.length} ${map.connections.length === 1 ? "connection" : "connections"} · ${describeWindow(map)}`
-              : "Loading…"}
+              : mapError
+                ? "Map unavailable"
+                : "Loading…"}
           </p>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          <div
-            role="group"
-            aria-label="Change window"
-            className="flex flex-wrap items-center gap-1"
-          >
-            {windowOptions.map((option) => (
-              <Button
-                key={option.value}
-                variant={windowMode === option.value ? "secondary" : "outline"}
-                size="xs"
-                aria-pressed={windowMode === option.value}
-                onClick={() => onWindowChange(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
+          {map?.changes.available && hasFiles && (
+            <div
+              role="group"
+              aria-label="Change window"
+              className="flex flex-wrap items-center gap-1"
+            >
+              {windowOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={
+                    windowMode === option.value ? "secondary" : "outline"
+                  }
+                  size="xs"
+                  aria-pressed={windowMode === option.value}
+                  onClick={() => onWindowChange(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          )}
           {!component && (showMinor || layout.hiddenMinorCount > 0) && (
             <Button
               variant={showMinor ? "secondary" : "outline"}
@@ -297,12 +323,12 @@ export function ArchitectureMapView({
                 : `Show minor connections (${layout.hiddenMinorCount})`}
             </Button>
           )}
-          {!component && (
+          {!component && hasFiles && (
             <Button variant="outline" size="xs" onClick={onAllFiles}>
               All file dependencies
             </Button>
           )}
-          {component && (
+          {component && hasFiles && (
             <Button
               variant={showAll ? "secondary" : "outline"}
               size="xs"
@@ -322,13 +348,15 @@ export function ArchitectureMapView({
           className="flex shrink-0 items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground"
         >
           <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden />
-          <p className="min-w-0">
+          <p className="min-w-0 break-words">
             Showing folder fallback because{" "}
             <code className="font-mono">.mycel/architecture.json</code> has
-            validation issues: {map.fileIssues[0]?.message}
+            issues. {map.fileIssues[0]?.path && `${map.fileIssues[0].path} · `}
+            {map.fileIssues[0]?.message} Run <code>mycel architecture</code> for
+            details.
           </p>
         </div>
-      ) : map && map.source === "folder-fallback" ? (
+      ) : map && hasFiles && map.source === "folder-fallback" ? (
         <div
           role="status"
           aria-label="Architecture fallback notice"
@@ -362,96 +390,202 @@ export function ArchitectureMapView({
         </div>
       ) : null}
 
-      {map?.relationshipChanges !== undefined && (
-        <details className="shrink-0 rounded-md border bg-card px-3 py-2">
-          <summary className="cursor-pointer rounded-sm text-xs focus-visible:outline-2 focus-visible:outline-ring">
-            <span className="font-medium">Recent relationship changes</span>{" "}
-            <span className="ml-2 text-muted-foreground" aria-live="polite">
-              {featuredChange
-                ? relationshipTitle(
-                    featuredChange.relationship,
-                    featuredChange.action,
-                    featuredChange,
-                  )
-                : "No relationship changes in the last 7 days"}
-            </span>
-          </summary>
-          <div className="mt-2 max-h-44 overflow-y-auto">
-            {recentChanges.length > 0 ? (
-              <RelationshipChangeLinks changes={recentChanges.slice(0, 12)} />
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Changes appear here when a save adds or removes a resolved call
-                or import between architecture parts.
+      {map?.relationshipChanges !== undefined &&
+        (hasFiles || featuredChange) && (
+          <details className="shrink-0 rounded-md border bg-card px-3 py-2">
+            <summary className="cursor-pointer rounded-sm text-xs focus-visible:outline-2 focus-visible:outline-ring">
+              <span className="font-medium">Recent relationship changes</span>{" "}
+              <span className="ml-2 text-muted-foreground" aria-live="polite">
+                {featuredChange
+                  ? relationshipTitle(
+                      featuredChange.relationship,
+                      featuredChange.action,
+                      featuredChange,
+                    )
+                  : "No relationship changes in the last 7 days"}
+              </span>
+            </summary>
+            <div className="mt-2 max-h-44 overflow-y-auto">
+              {recentChanges.length > 0 ? (
+                <RelationshipChangeLinks changes={recentChanges.slice(0, 12)} />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Changes appear here when a save adds or removes a resolved
+                  call or import between architecture parts.
+                </p>
+              )}
+              <Button asChild variant="link" size="sm" className="px-0">
+                <a
+                  href={navigationHref({
+                    view: "Activity",
+                    relationships: true,
+                  })}
+                >
+                  View relationship activity
+                </a>
+              </Button>
+            </div>
+          </details>
+        )}
+
+      {mapError && (
+        <GraphNotice
+          error
+          title={
+            map
+              ? "Could not refresh the map"
+              : component
+                ? "Component map unavailable"
+                : "Architecture map unavailable"
+          }
+          detail={
+            map
+              ? `Showing indexed revision ${map.revision}. ${mapError}`
+              : mapError
+          }
+        >
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={onRetry}
+            disabled={mapLoading}
+          >
+            {mapLoading ? "Retrying…" : "Retry"}
+          </Button>
+          {component && (
+            <Button variant="ghost" size="xs" onClick={onOverview}>
+              Back to architecture map
+            </Button>
+          )}
+        </GraphNotice>
+      )}
+      {missingPart && (
+        <GraphNotice
+          title="Part unavailable"
+          detail="This part may have been renamed or removed. Choose a part from the current map."
+        >
+          <Button variant="outline" size="xs" onClick={clearSelection}>
+            Clear selection
+          </Button>
+        </GraphNotice>
+      )}
+      {unavailableFile && (
+        <GraphNotice
+          error={!recoveredFile && !repoResource.loading}
+          title={
+            recoveredFile
+              ? "Indexed file ready"
+              : repoResource.loading
+                ? "Loading indexed files…"
+                : "Could not open indexed file"
+          }
+          detail={
+            repoResource.error ??
+            (recoveredFile || repoResource.loading
+              ? unavailableFile
+              : `${unavailableFile} is missing from the current file index.`)
+          }
+        >
+          {recoveredFile && (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => openFileByPath(unavailableFile)}
+            >
+              Open file
+            </Button>
+          )}
+          {repoResource.error && !repoResource.loading && (
+            <Button variant="outline" size="xs" onClick={repoResource.retry}>
+              Retry file lookup
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setFileOpen(undefined)}
+          >
+            Dismiss
+          </Button>
+        </GraphNotice>
+      )}
+      {map && !hasFiles && !missingConnection ? (
+        <GraphNotice
+          title={
+            component
+              ? "No indexed files in this component"
+              : "No indexed source files"
+          }
+          detail={
+            component
+              ? "Check that its configured paths match indexed files in this repository."
+              : "Add a TypeScript, TSX, or Python file in an indexed path. The map updates when Mycel indexes the save."
+          }
+        >
+          {component && (
+            <Button variant="outline" size="xs" onClick={onOverview}>
+              Back to architecture map
+            </Button>
+          )}
+        </GraphNotice>
+      ) : (
+        map && (
+          <>
+            {hasFiles && map.connections.length === 0 && (
+              <p role="status" className="text-xs text-muted-foreground">
+                No resolved imports or calls connect these{" "}
+                {component ? "responsibilities" : "parts"}.
               </p>
             )}
-            <Button asChild variant="link" size="sm" className="px-0">
-              <a
-                href={navigationHref({ view: "Activity", relationships: true })}
-              >
-                View relationship activity
-              </a>
-            </Button>
-          </div>
-        </details>
-      )}
-
-      {mapError ? (
-        <p role="alert">Architecture map unavailable. {mapError}</p>
-      ) : (
-        map &&
-        (map.parts.length === 0 && !missingConnection ? (
-          <p className="text-sm text-muted-foreground">
-            No architecture parts found yet.
-          </p>
-        ) : (
-          <GraphCanvas
-            key={`${scope}:${map.source}:${canvasMap?.parts.map((part) => part.id).join(",")}`}
-            mode="architecture"
-            nodes={layout.nodes}
-            edges={layout.edges}
-            selectedId={selectedPartId}
-            selectedNeighborIds={selectedNeighborIds}
-            selectedEdgeId={selectedEdgeId}
-            previewEdgeId={previewEdgeId}
-            hideConnectionFilter={Boolean(component)}
-            onSelect={(id) => select("part", id)}
-            onEdgeSelect={(id) => select("connection", id)}
-            onClear={clearSelection}
-            onOpen={(id) => {
-              const part = map.parts.find((item) => item.id === id);
-              if (!part) return;
-              if (!component && part.subcomponents?.length) openComponent(part);
-              else if (part.files.length > 0) onOpenPartFiles(part);
-            }}
-            sidePanel={
-              map.component ||
-              selectedPart ||
-              selectedConnection ||
-              missingConnection ? (
-                <ArchitectureDetails
-                  map={map}
-                  selectedPart={selectedPart}
-                  selectedConnection={selectedConnection}
-                  missingConnection={missingConnection}
-                  onSelectPart={(id) => select("part", id)}
-                  onSelectConnection={(id) => select("connection", id)}
-                  onPreviewConnections={(ids) =>
-                    setConnectionPreview(
-                      selectedPartId && ids.length
-                        ? { scope, partId: selectedPartId, ids }
-                        : null,
-                    )
-                  }
-                  onClear={clearSelection}
-                  onOpenPartFiles={onOpenPartFiles}
-                  onOpenComponent={openComponent}
-                  onOpenFile={openFileByPath}
-                />
-              ) : undefined
-            }
-          />
-        ))
+            <GraphCanvas
+              key={`${scope}:${map.source}:${canvasMap?.parts.map((part) => part.id).join(",")}`}
+              mode="architecture"
+              nodes={layout.nodes}
+              edges={layout.edges}
+              selectedId={selectedPartId}
+              selectedNeighborIds={selectedNeighborIds}
+              selectedEdgeId={selectedEdgeId}
+              previewEdgeId={previewEdgeId}
+              hideConnectionFilter={Boolean(component)}
+              onSelect={(id) => select("part", id)}
+              onEdgeSelect={(id) => select("connection", id)}
+              onClear={clearSelection}
+              onOpen={(id) => {
+                const part = map.parts.find((item) => item.id === id);
+                if (!part) return;
+                if (!component && part.subcomponents?.length)
+                  openComponent(part);
+                else if (part.files.length > 0) onOpenPartFiles(part);
+              }}
+              sidePanel={
+                map.component ||
+                selectedPart ||
+                selectedConnection ||
+                missingConnection ? (
+                  <ArchitectureDetails
+                    map={map}
+                    selectedPart={selectedPart}
+                    selectedConnection={selectedConnection}
+                    missingConnection={missingConnection}
+                    onSelectPart={(id) => select("part", id)}
+                    onSelectConnection={(id) => select("connection", id)}
+                    onPreviewConnections={(ids) =>
+                      setConnectionPreview(
+                        selectedPartId && ids.length
+                          ? { scope, partId: selectedPartId, ids }
+                          : null,
+                      )
+                    }
+                    onClear={clearSelection}
+                    onOpenPartFiles={onOpenPartFiles}
+                    onOpenComponent={openComponent}
+                    onOpenFile={openFileByPath}
+                  />
+                ) : undefined
+              }
+            />
+          </>
+        )
       )}
     </section>
   );

@@ -41,7 +41,7 @@ See [architecture](../ARCHITECTURE.md#change-pipeline).
       with query methods (delegating to db), `start()`, `stop()`, and an event
       subscription such as `onEvent(listener)`.
 - [x] Add a standalone full-index entry point and discovery API.
-- [x] Walk the repository for supported `.ts` and `.tsx` files,
+- [x] Walk the repository for supported `.ts`, `.tsx`, and `.py` files,
       skipping `node_modules`, `dist`, `build`, `.git`, and coverage
       directories, and honoring `.gitignore`.
 - [x] Parse each file and store file/symbol nodes, containment edges, and parser
@@ -60,6 +60,14 @@ See [architecture](../ARCHITECTURE.md#change-pipeline).
 - [x] Resolve calls to imported or same-file symbols. Leave everything else
       unresolved and record a diagnostic where useful.
 - [ ] Report progress (files indexed of total) for `/api/health`.
+
+### V0 architecture map
+
+- [x] Assign indexed files to declared parts and component responsibilities,
+      with a workspace or folder fallback.
+- [x] Aggregate resolved cross-part imports and calls with exact counts and Git
+      highlights. Bound retained evidence by connection and cap the source
+      locations returned for each link.
 
 ### Phase 3: live updates
 
@@ -95,6 +103,8 @@ See [architecture](../ARCHITECTURE.md#change-pipeline).
       unsupported files, generated directories, and symlinks.
 - [x] Failed scans/graph writes preserve the previous graph and revision.
 - [x] Extract and index a checked-in two-file import/call fixture without seeded edges.
+- [x] Exercise evidence caps with duplicate links, unsorted input, and changes
+      backed by links omitted from the response.
 - [x] Pass acceptance tests for `main.ts → utils.ts` imports and `save → validate` calls.
 - [x] Watcher integration tests: create, edit, delete, and rename files in a
       temporary directory and assert the resulting events.

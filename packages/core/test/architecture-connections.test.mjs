@@ -339,6 +339,25 @@ test("extracts links from in-memory graphs, deduplicates, caps evidence, and val
     },
   ]);
 
+  const manyLinks = Array.from({ length: 251 }, (_, index) => ({
+    kind: "CALLS",
+    sourcePath: "a/one.ts",
+    sourceLine: 251 - index,
+    targetPath: "b/two.ts",
+    sourceSymbol: "caller",
+    targetSymbol: "callee",
+  }));
+  manyLinks.push(manyLinks[0], manyLinks[250]);
+  const [bounded] = computeArchitectureConnections(assignment, manyLinks, {
+    evidenceLimit: 100,
+  });
+  assert.equal(bounded.callCount, 251);
+  assert.equal(bounded.truncated, true);
+  assert.deepEqual(
+    bounded.evidence.map(({ line }) => line),
+    Array.from({ length: 100 }, (_, index) => index + 1),
+  );
+
   for (const invalid of [0, -1, 1.5, Number.NaN]) {
     assert.throws(
       () =>

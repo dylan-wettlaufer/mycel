@@ -623,7 +623,7 @@ function ConnectionDetails({
     ? [evidence.line, ...(evidence.additionalLines ?? [])]
     : [];
   const line =
-    source && source.siteCount === sites.length
+    source && source.siteCount === (evidence?.siteCount ?? sites.length)
       ? sites[source.index]
       : undefined;
   const removal =
@@ -716,6 +716,11 @@ function ConnectionDetails({
               Showing {connection.evidence.length} of {connection.count} links.
             </p>
           )}
+          {groups.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No source evidence is available for this connection.
+            </p>
+          )}
           {groups.map(([file, items]) => (
             <details
               key={file}
@@ -771,7 +776,8 @@ function ConnectionDetails({
                                   setSource({
                                     id: evidenceIdentity(item),
                                     index: siteIndex,
-                                    siteCount: itemSites.length,
+                                    siteCount:
+                                      item.siteCount ?? itemSites.length,
                                     kind: item.kind,
                                   })
                                 }
@@ -782,6 +788,12 @@ function ConnectionDetails({
                           },
                         )}
                       </div>
+                      {item.siteCount !== undefined && (
+                        <p className="text-xs text-muted-foreground">
+                          First {(item.additionalLines?.length ?? 0) + 1} of{" "}
+                          {item.siteCount} source locations
+                        </p>
+                      )}
                       <p>
                         {item.kind === "call" && item.symbol
                           ? `${item.sourceSymbol ? `${item.sourceSymbol} → ` : ""}${item.symbol} (${item.targetFile})`

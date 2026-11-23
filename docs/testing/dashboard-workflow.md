@@ -7,15 +7,18 @@ pnpm exec playwright install chromium
 pnpm test:workflow
 ```
 
-The runner builds the workspace, creates a disposable Git repository, launches
-`startIndexedServer` with its own SQLite database, and opens Chromium. It keeps
-screenshots and `result.json` in the temporary directory printed in the output.
-No working repository source is changed.
+The workflow builds the workspace and runs three checks in Chromium. Each
+check creates a disposable Git repository and launches `startIndexedServer`
+with a dedicated SQLite database. The dashboard runner saves screenshots and
+`result.json` in the temporary directory printed in its output.
 
-The workflow verifies:
+The architecture and relationship runners verify the Graph landing view,
+fallback and named component maps, connection evidence and source drill-down,
+and live updates to recorded imports and calls. The file and symbol runner
+verifies:
 
 1. Backend and SSE status, the visible graph legend, selection highlighting,
-   connection-only filtering and clearing selection, the default folder overview, file dependencies and
+   connection-only filtering and clearing selection, file dependencies and
    symbol drill-down, explorer search, graph selection, expansion/collapse,
    caller navigation, and source navigation to the caller's declaration line.
 2. Creating a new caller updates the graph and highlights the new node.

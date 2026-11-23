@@ -65,6 +65,7 @@ export function App() {
       : null,
     isArchitectureMap,
     activity.revision + activity.architectureRevision,
+    true,
   );
   const activePart = architecture.data?.parts.find(
     (entry) => entry.id === part,
@@ -189,6 +190,8 @@ export function App() {
                 part={part}
                 activePart={activePart}
                 architectureError={architecture.error}
+                architectureLoading={architecture.loading}
+                onRetryArchitecture={architecture.retry}
                 onFiles={(folder) =>
                   navigate({
                     view: "Graph",
@@ -206,6 +209,9 @@ export function App() {
                 revision={activity.revision}
                 map={architecture.data}
                 mapError={architecture.error}
+                mapLoading={architecture.loading}
+                onRetry={architecture.retry}
+                onOverview={() => navigate({ view: "Graph" })}
                 component={component}
                 initialPart={part}
                 windowMode={architectureWindow}

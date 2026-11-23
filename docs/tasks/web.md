@@ -1,6 +1,6 @@
 # `@mycel/web` tasks
 
-The browser workspace presents architecture, behavior, source, and changes
+The browser workspace presents architecture, file dependencies, source, and changes
 at different levels of detail. It talks to `/api` using types from
 `@mycel/shared`.
 
@@ -11,12 +11,12 @@ See [architecture](../ARCHITECTURE.md#frontend).
 - Vite 8, React 19, TypeScript, Tailwind CSS v4, and shadcn/ui (`new-york`
   style) with the Mycel theme in `src/index.css`, dark by default, with Geist
   and JetBrains Mono bundled locally.
-- Responsive `AppShell` with five workspace views, project metadata, backend
+- Responsive `AppShell` with Graph, Explorer, and Activity, project metadata, backend
   health, and separate SSE status.
 - Real counts, debounced explorer search, bounded React Flow neighborhoods with
   dagre layout, and details with linked relationships and diagnostics.
-- A default folder dependency graph and a Features view with declared and
-  inferred features, behavior traces, and source evidence.
+- Architecture map as the landing view, with named component responsibilities,
+  file dependency and source drill-downs, and recent relationship changes.
 - Lazily loaded Monaco source and diff viewers, with local workers and captured
   revision content. Deleted nodes retain saved metadata and source in history.
 - `useResource` provides validated, abortable reads; `useActivity` merges history
@@ -29,12 +29,15 @@ See [architecture](../ARCHITECTURE.md#frontend).
 
 ### V0 architecture workflow
 
-- [ ] Land on an architecture map of features, flows, and subsystems with
+- [x] Land on an architecture map of parts and subsystems with
       source-backed relationships.
-- [ ] Open a feature, follow a behavior into source, and return to the same
-      feature and map context.
-- [ ] Refresh affected architecture scopes from the committed revision and keep
+- [x] Open a component or part, follow a resolved import or call into indexed
+      source, and return to the evidence and map.
+- [x] Refresh affected architecture scopes from the committed revision and keep
       the current selection when it remains valid.
+- [x] Explain empty indexes, isolated parts, and stale component links. Retry
+      failed loads and keep the last successful map after a failed refresh.
+- [x] Show when the connection evidence and source location lists are capped.
 
 See [V0 acceptance criteria](../../mycel_prd.md#minimum-v0-scope).
 
@@ -115,5 +118,5 @@ See [V0 acceptance criteria](../../mycel_prd.md#minimum-v0-scope).
 
 ## Done when
 
-- A user can open the architecture map, trace a feature to its source, return
-  to the map, and see architecture changes as edits commit.
+- A user can open the architecture map, follow a connection to its source,
+  return to the map, and see architecture changes as edits commit.

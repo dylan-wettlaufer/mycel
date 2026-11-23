@@ -15,6 +15,8 @@ import { captureRepository } from "./indexer.js";
 export interface ComputeConnectionsOptions {
   /** Optional cap on stored evidence items per connection; counts stay exact. */
   evidenceLimit?: number;
+  /** Observe each distinct link, including links outside the retained evidence. */
+  onEvidence?(connectionId: string, item: ArchitectureConnectionEvidence): void;
 }
 
 export interface ArchitectureConnectionsSnapshot {
@@ -114,7 +116,7 @@ export function computeArchitectureConnections(
   links: readonly CrossFileLink[],
   options: ComputeConnectionsOptions = {},
 ): ArchitectureConnection[] {
-  const { evidenceLimit } = options;
+  const { evidenceLimit, onEvidence } = options;
   if (
     evidenceLimit !== undefined &&
     (!Number.isSafeInteger(evidenceLimit) || evidenceLimit < 1)
@@ -172,7 +174,16 @@ export function computeArchitectureConnections(
     const key = evidenceKey(item);
     if (group.seen.has(key)) continue;
     group.seen.add(key);
+    onEvidence?.(id, item);
     group.evidence.push(item);
+    // Prune in batches to keep collection bounded without sorting on every insert.
+    if (
+      evidenceLimit !== undefined &&
+      group.evidence.length / 2 >= evidenceLimit
+    ) {
+      group.evidence.sort(compareEvidence);
+      group.evidence.length = evidenceLimit;
+    }
     if (item.kind === "import") group.importCount++;
     else group.callCount++;
   }
@@ -180,21 +191,20 @@ export function computeArchitectureConnections(
   const connections: ArchitectureConnection[] = [];
   for (const [id, group] of groups) {
     group.evidence.sort(compareEvidence);
-    const truncated =
-      evidenceLimit !== undefined && group.evidence.length > evidenceLimit;
-    const evidence = truncated
-      ? group.evidence.slice(0, evidenceLimit)
-      : group.evidence;
+    const count = group.importCount + group.callCount;
+    if (evidenceLimit !== undefined && group.evidence.length > evidenceLimit) {
+      group.evidence.length = evidenceLimit;
+    }
 
     connections.push({
       id,
       sourcePartId: group.sourcePartId,
       targetPartId: group.targetPartId,
-      count: group.importCount + group.callCount,
+      count,
       importCount: group.importCount,
       callCount: group.callCount,
-      evidence,
-      truncated,
+      evidence: group.evidence,
+      truncated: count > group.evidence.length,
     });
   }
 

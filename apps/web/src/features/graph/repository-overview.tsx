@@ -1,4 +1,5 @@
 import { GraphCanvas } from "./graph-canvas";
+import { GraphNotice } from "./graph-notice";
 import { useMemo, useState } from "react";
 import type { ArchitecturePartWithChanges, GraphNode } from "@mycel/shared";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ export function RepositoryOverview({
   part,
   activePart,
   architectureError,
+  architectureLoading,
+  onRetryArchitecture,
   onFiles,
 }: {
   revision: number;
@@ -27,12 +30,15 @@ export function RepositoryOverview({
   part?: string | undefined;
   activePart: ArchitecturePartWithChanges | undefined;
   architectureError: string | undefined;
+  architectureLoading: boolean;
+  onRetryArchitecture: () => void;
   onFiles: (folder?: string) => void;
 }) {
-  const { data, error } = useResource(
+  const { data, error, loading, retry } = useResource(
     "/api/graph/repository",
     isRepositoryGraph,
     revision,
+    true,
   );
   const [depth, setDepth] = useState(2);
   const [selection, setSelection] = useState<{
@@ -62,6 +68,7 @@ export function RepositoryOverview({
     [data, scoped, depth, files],
   );
   const scopeLabel = activePart?.name ?? part ?? folder;
+  const ready = data && (!part || activePart);
   return (
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
@@ -77,9 +84,11 @@ export function RepositoryOverview({
             title={scopeLabel}
           >
             {scopeLabel ? `${scopeLabel} · ` : ""}
-            {data
+            {ready
               ? `${files && scoped ? scoped.files.length : data.files.length} files · ${files && scoped ? scoped.dependencies.length : data.dependencies.length} imports`
-              : "Loading…"}
+              : (part && architectureLoading) || loading
+                ? "Loading…"
+                : "File dependencies unavailable"}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap justify-end gap-1">
@@ -109,39 +118,85 @@ export function RepositoryOverview({
           )}
         </div>
       </div>
-      {part && architectureError ? (
-        <p role="alert">Component files unavailable. {architectureError}</p>
-      ) : error ? (
-        <p role="alert">Repository overview unavailable. {error}</p>
-      ) : (
-        data &&
-        (data.files.length === 0 ? (
-          <p>No indexed TypeScript files yet.</p>
-        ) : (
-          <>
-            {files && scoped?.files.length === 0 ? (
-              <p>No files in this folder.</p>
-            ) : (
-              <GraphCanvas
-                key={scope}
-                nodes={layout.nodes}
-                edges={layout.edges}
-                selectedId={selectedId}
-                onSelect={(id) => setSelection({ scope, id })}
-                onClear={() => setSelection(null)}
-                onOpen={(id) => {
-                  if (!files) onFiles(id);
-                  else {
-                    const file = data.files.find((file) => file.id === id);
-                    if (file) onSelect(file);
-                  }
-                }}
-                openLabel={files ? "Open file" : "Open files"}
-              />
-            )}
-          </>
-        ))
+      {part && architectureError && (
+        <GraphNotice
+          error
+          title={
+            activePart
+              ? "Could not refresh part files"
+              : "Part files unavailable"
+          }
+          detail={architectureError}
+        >
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={onRetryArchitecture}
+            disabled={architectureLoading}
+          >
+            {architectureLoading ? "Retrying…" : "Retry part"}
+          </Button>
+        </GraphNotice>
       )}
+      {part && !activePart && !architectureError && !architectureLoading && (
+        <GraphNotice
+          title="Part unavailable"
+          detail="This part may have been renamed or removed. Use All file dependencies to browse the current index."
+        />
+      )}
+      {error && (
+        <GraphNotice
+          error
+          title={
+            data
+              ? "Could not refresh file dependencies"
+              : "File dependencies unavailable"
+          }
+          detail={error}
+        >
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={retry}
+            disabled={loading}
+          >
+            {loading ? "Retrying…" : "Retry files"}
+          </Button>
+        </GraphNotice>
+      )}
+      {ready &&
+        (data.files.length === 0 ? (
+          <GraphNotice
+            title="No indexed source files"
+            detail="Add a TypeScript, TSX, or Python file in an indexed path. File dependencies update when Mycel indexes the save."
+          />
+        ) : files && scoped?.files.length === 0 ? (
+          <GraphNotice
+            title={
+              part
+                ? "No indexed files in this part"
+                : "No indexed files in this folder"
+            }
+            detail="Use All file dependencies to browse the current index."
+          />
+        ) : (
+          <GraphCanvas
+            key={scope}
+            nodes={layout.nodes}
+            edges={layout.edges}
+            selectedId={selectedId}
+            onSelect={(id) => setSelection({ scope, id })}
+            onClear={() => setSelection(null)}
+            onOpen={(id) => {
+              if (!files) onFiles(id);
+              else {
+                const file = data.files.find((file) => file.id === id);
+                if (file) onSelect(file);
+              }
+            }}
+            openLabel={files ? "Open file" : "Open files"}
+          />
+        ))}
     </section>
   );
 }

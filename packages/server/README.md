@@ -67,6 +67,16 @@ available. CLI/dev startup uses `startIndexedServer` to attach queries automatic
 
 ## Graph routes
 
+`GET /api/architecture` returns parts, resolved connections, Git highlights,
+and recent relationship changes. Use `window` to select `uncommitted`, `branch`
+(the default), `7d`, or `30d`. Pass `component` with a part ID to open its
+responsibilities. An unavailable component breakdown returns HTTP 404.
+
+`evidenceLimit` caps the number of links returned for each directed connection
+(default 100, range 1–500). The `truncated` flag indicates omitted links.
+Counts and Git highlights reflect all backing links. Each retained link
+includes up to 20 source locations. If more exist, `siteCount` gives the total.
+
 | GET route | Query parameters | Response |
 | --- | --- | --- |
 | `/api/graph/repository` | None | Complete `RepositoryGraph` of files and directed imports, including isolated files |

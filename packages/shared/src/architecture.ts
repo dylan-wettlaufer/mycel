@@ -96,7 +96,9 @@ export interface ArchitectureConnectionEvidence {
   line: number;
   /** Other indexed lines for the same relationship, in source order. */
   additionalLines?: number[];
-  /** Indexed import locations that contain only type imports for this target. */
+  /** Total indexed locations when the map only returns the first few. */
+  siteCount?: number;
+  /** Returned import locations that contain only type imports for this target. */
   typeOnlyImportLines?: number[];
   /** The index only has the enclosing file or declaration location. */
   approximate?: boolean;

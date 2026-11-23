@@ -7,6 +7,7 @@ import type {
   ArchitectureChangeStatus,
   ArchitectureChangeWindow,
   ArchitectureConnection,
+  ArchitectureConnectionEvidence,
   ArchitectureConnectionWithChanges,
   ArchitectureGitChanges,
   ArchitecturePartWithChanges,
@@ -413,6 +414,37 @@ export async function collectGitChanges(
   };
 }
 
+interface ConnectionEndpointChanges {
+  anyChanged: boolean;
+  allNew: boolean;
+  uncommitted: boolean;
+}
+
+/** Track change status across all links, including evidence discarded by the cap. */
+export function trackConnectionEndpoints(gitChanges: ArchitectureGitChanges) {
+  const added = new Set(gitChanges.addedFiles);
+  const modified = new Set(gitChanges.modifiedFiles);
+  const uncommitted = new Set(gitChanges.uncommittedFiles);
+  const byConnection = new Map<string, ConnectionEndpointChanges>();
+  return {
+    byConnection,
+    record(id: string, { file, targetFile }: ArchitectureConnectionEvidence) {
+      const change = byConnection.get(id) ?? {
+        anyChanged: false,
+        allNew: true,
+        uncommitted: false,
+      };
+      const newEndpoint = added.has(file) || added.has(targetFile);
+      change.allNew &&= newEndpoint;
+      change.anyChanged ||=
+        newEndpoint || modified.has(file) || modified.has(targetFile);
+      change.uncommitted ||=
+        uncommitted.has(file) || uncommitted.has(targetFile);
+      byConnection.set(id, change);
+    },
+  };
+}
+
 /**
  * Annotate assigned architecture parts and cross-part connections with recent
  * git change status (`new`, `changed`, or `unchanged`) and uncommitted flags.
@@ -422,6 +454,7 @@ export function applyGitChangesToArchitecture(
   connections: readonly ArchitectureConnection[],
   gitChanges: ArchitectureGitChanges,
   deletedFileOwners?: Readonly<Record<string, string>>,
+  endpointChanges?: ReadonlyMap<string, ConnectionEndpointChanges>,
 ): {
   parts: ArchitecturePartWithChanges[];
   connections: ArchitectureConnectionWithChanges[];
@@ -501,43 +534,30 @@ export function applyGitChangesToArchitecture(
     };
   });
 
+  const tracker = endpointChanges
+    ? undefined
+    : trackConnectionEndpoints(gitChanges);
   const annotatedConnections: ArchitectureConnectionWithChanges[] =
     connections.map((connection) => {
       const sourceStatus = partStatusById.get(connection.sourcePartId);
       const targetStatus = partStatusById.get(connection.targetPartId);
 
-      let hasAnyChangedEndpoint = false;
-      let allEvidenceHasNewEndpoint = connection.evidence.length > 0;
-      let uncommitted = false;
-
-      for (const item of connection.evidence) {
-        const fileAdded = addedSet.has(item.file);
-        const targetAdded = addedSet.has(item.targetFile);
-        const fileModified = modifiedSet.has(item.file);
-        const targetModified = modifiedSet.has(item.targetFile);
-
-        if (fileAdded || targetAdded || fileModified || targetModified) {
-          hasAnyChangedEndpoint = true;
-        }
-        if (!fileAdded && !targetAdded) {
-          allEvidenceHasNewEndpoint = false;
-        }
-        if (
-          uncommittedSet.has(item.file) ||
-          uncommittedSet.has(item.targetFile)
-        ) {
-          uncommitted = true;
-        }
+      if (tracker) {
+        for (const item of connection.evidence)
+          tracker.record(connection.id, item);
       }
+      const endpoints = (endpointChanges ?? tracker?.byConnection)?.get(
+        connection.id,
+      );
 
       let status: ArchitectureChangeStatus;
       if (
         sourceStatus === "new" ||
         targetStatus === "new" ||
-        allEvidenceHasNewEndpoint
+        endpoints?.allNew
       ) {
         status = "new";
-      } else if (hasAnyChangedEndpoint) {
+      } else if (endpoints?.anyChanged) {
         status = "changed";
       } else {
         status = "unchanged";
@@ -547,7 +567,7 @@ export function applyGitChangesToArchitecture(
         ...connection,
         change: {
           status,
-          uncommitted,
+          uncommitted: endpoints?.uncommitted ?? false,
         },
       };
     });

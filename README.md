@@ -72,19 +72,29 @@ CLI and compiled dashboard must remain in the checkout together.
 
 ## Current experience
 
-- **Graph**, the landing view, maps architecture parts and their resolved
-  imports and calls. Open a connection to inspect its evidence. Mycel keeps
-  open evidence aligned with the indexed source as you save edits. The map
-  surfaces recent relationship additions and removals, including small links.
-  Use **Open files** to inspect file dependencies, symbols, and source.
-  Use **Only connections** to narrow the graph or **Focus selection** to
-  frame a node and its neighbors.
+- **Graph** opens on the architecture map. Select a part to see its files and
+  connections. Use **Open component** when the part has named responsibilities,
+  or **Open files** to drill down to file dependencies, symbols, and source.
+  Use **Only connections** to narrow the graph or **Focus selection** to frame
+  a node and its neighbors.
+- Select a connection to inspect the imports and calls behind it. Select a
+  line to read the corresponding indexed source, or **Open source** to see the
+  whole file. Counts cover all resolved links. The inspector shows up to 100
+  links per direction and the first 20 source locations per link, with totals
+  shown when evidence is capped. The map refreshes as you save and highlights
+  recent relationship additions and removals, including minor connections.
 - **Explorer** searches indexed files and symbols. **Activity** groups
   edits by file and indexed save, including uncommitted edits. Each entry
   shows a source diff and the symbols that changed. **Relationships** shows
   added and removed calls and imports, with links to the recorded source.
   Graph and change selections can be reopened through browser history or
   hash links.
+
+If the map is empty, save a TypeScript, TSX, or Python file in an indexed path.
+An invalid architecture file keeps the fallback map available and shows a
+validation message. Use **Retry** if the map fails to load. A failed refresh
+keeps the last loaded map visible, and unavailable component links offer a way
+back to the repository map.
 
 The Hono backend serves the dashboard and project-scoped graph, captured source,
 history, and SSE APIs. Mycel starts watching during the initial index and
@@ -128,8 +138,8 @@ pnpm test:workflow
 
 The workflows use disposable Git repositories and a real server, watcher,
 SQLite database, and Chromium browser. They cover structural navigation,
-source and diffs, live updates and SSE recovery, and feature behavior
-navigation. See the [workflow guide](docs/testing/dashboard-workflow.md)
+source and diffs, live updates and SSE recovery, and architecture connection
+and relationship review. See the [workflow guide](docs/testing/dashboard-workflow.md)
 for the dashboard checks and an external coding agent mode.
 
 Code quality commands run across the workspace:

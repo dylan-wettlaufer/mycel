@@ -141,8 +141,8 @@ Unknown keys are rejected, so declared connections are invalid by construction.
 | 6. API and live updates                         | Done   |
 | 7. Architecture map as the landing view         | Done   |
 | 8. Agent skill and `mycel architecture` command | Done   |
-| 9. Python imports                               | To do  |
-| 10. Polish and documentation                    | To do  |
+| 9. Python imports                               | Done   |
+| 10. Polish and documentation                    | Done   |
 
 1. **Architecture file format.** Versioned schema with zod validation and tests
    for valid and invalid files.
@@ -164,9 +164,9 @@ Unknown keys are rejected, so declared connections are invalid by construction.
    the file, index, or git state changes.
 7. **Architecture map as the landing view.** Part cards with name, purpose,
    kind, and file count; evidence-backed arrows; new and changed highlights
-   with a window toggle; the fallback banner; drill-down into a part's files,
-   its behaviour graph where available, and source. Reuses the behaviour graph's
-   layout and edge work, with an end-to-end test.
+   with a window toggle; the fallback banner; drill-down into named component
+   responsibilities, file dependencies, and source. An end-to-end test covers
+   the map and its drill-downs.
 8. **Agent skill and CLI command.** A skill that tells an agent how to choose
    about 5–15 parts and write the file, plus `mycel architecture` to validate it
    and print unassigned files and tie warnings. The skill ships in
@@ -174,8 +174,12 @@ Unknown keys are rejected, so declared connections are invalid by construction.
    `.agents/skills` and `.claude/skills`.
 9. **Python imports.** Add the Tree-sitter Python grammar with file-level
    imports, so a Python fixture repository gets a correct map.
-10. **Polish and documentation.** Empty and error states, evidence caps for
-    large repositories, and updates to the README and task lists.
+10. **Polish and documentation.** Show distinct states for an empty index,
+    parts without resolved cross-part links, and unavailable scopes. Retry a
+    failed load and keep the last successful map visible during refresh
+    failures. Retain up to 100 evidence links per directed connection by default
+    and 20 source locations per link while counting all links and computing Git
+    highlights across all backing files.
 
 Steps 1–7 deliver a working map with change highlights using the fallback.
 Steps 8 and 9 make it meaningful and multi-language.

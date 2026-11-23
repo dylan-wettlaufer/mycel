@@ -12,6 +12,7 @@ import {
 import type { SqliteDatabase } from "@mycel/db";
 import type {
   ArchitectureChangeWindow,
+  ArchitectureConnectionEvidence,
   ArchitectureFile,
   ArchitectureIssue,
   ArchitectureMap,
@@ -32,10 +33,32 @@ import type { FallbackArchitectureOptions } from "./architecture-fallback.js";
 import {
   applyGitChangesToArchitecture,
   collectGitChanges,
+  trackConnectionEndpoints,
 } from "./architecture-git.js";
 import { isMissing, readRepositoryText } from "./files.js";
 
 const execFileAsync = promisify(execFile);
+const evidenceSiteLimit = 20;
+
+function limitEvidenceSites(
+  item: ArchitectureConnectionEvidence,
+): ArchitectureConnectionEvidence {
+  const { additionalLines, typeOnlyImportLines } = item;
+  if (!additionalLines || additionalLines.length < evidenceSiteLimit)
+    return item;
+
+  const lastLine = additionalLines[evidenceSiteLimit - 2]!;
+  return {
+    ...item,
+    siteCount: additionalLines.length + 1,
+    additionalLines: additionalLines.slice(0, evidenceSiteLimit - 1),
+    ...(typeOnlyImportLines && {
+      typeOnlyImportLines: typeOnlyImportLines
+        .slice(0, evidenceSiteLimit)
+        .filter((line) => line <= lastLine),
+    }),
+  };
+}
 
 export interface LoadedProjectArchitecture {
   architecture: ArchitectureFile;
@@ -160,14 +183,6 @@ export async function loadProjectArchitecture(
 export async function buildArchitectureMap(
   options: BuildArchitectureMapOptions,
 ): Promise<ArchitectureMap> {
-  const { evidenceLimit } = options;
-  if (
-    evidenceLimit !== undefined &&
-    (!Number.isSafeInteger(evidenceLimit) || evidenceLimit < 1)
-  ) {
-    throw new RangeError("evidenceLimit must be a safe integer >= 1");
-  }
-
   const repository = getRepositoryGraph(options.database, options.projectId);
   const linksSnapshot = getCrossFileLinks(options.database, options.projectId);
   const filePaths = repository.files.map((file) => file.path);
@@ -207,18 +222,25 @@ export async function buildArchitectureMap(
   const inside = (id: string) =>
     parent !== undefined && id.startsWith(`${parent.id}:`);
 
-  // Compute full connections before applying git status so evidence caps cannot hide changes.
-  const fullConnections = computeArchitectureConnections(
+  const endpoints = trackConnectionEndpoints(gitChanges);
+  const retainedConnections = computeArchitectureConnections(
     assignment,
     linksSnapshot.links,
+    {
+      ...(options.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: options.evidenceLimit }),
+      onEvidence: endpoints.record,
+    },
   ).filter(
     (edge) => !parent || inside(edge.sourcePartId) || inside(edge.targetPartId),
   );
   const annotated = applyGitChangesToArchitecture(
     assignment,
-    fullConnections,
+    retainedConnections,
     gitChanges,
     parent ? assignment.fileToPart : undefined,
+    endpoints.byConnection,
   );
 
   const indexedPaths = new Set(filePaths);
@@ -278,14 +300,9 @@ export async function buildArchitectureMap(
   }
   const connections = annotated.connections.map((connection) => {
     const ids = changesByConnection.get(connection.id);
-    const truncated =
-      evidenceLimit !== undefined && connection.evidence.length > evidenceLimit;
     return {
       ...connection,
-      evidence: truncated
-        ? connection.evidence.slice(0, evidenceLimit)
-        : connection.evidence,
-      truncated,
+      evidence: connection.evidence.map(limitEvidenceSites),
       change: {
         ...connection.change,
         ...(ids ? { relationshipChangeIds: ids } : {}),

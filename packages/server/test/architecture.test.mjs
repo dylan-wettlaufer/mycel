@@ -331,6 +331,59 @@ test("GET /api/architecture serves fallback, agent file, invalid file fallback, 
   assert.equal(coreAfterCommit.change.uncommitted, false);
 });
 
+test("caps evidence and source locations while counting links and tracking hidden changes", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "mycel-architecture-evidence-"));
+  const root = join(dir, "repo");
+  await mkdir(root);
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  await writeFiles(root, {
+    "app/early.ts": [
+      'import { run } from "../lib/shared.js";',
+      ...Array.from(
+        { length: 24 },
+        (_, index) =>
+          `import type { Item as T${index} } from "../lib/shared.js";`,
+      ),
+      "export function start() { run(); }",
+    ].join("\n"),
+    "app/late.ts": 'import "../lib/shared.js";\n',
+    "lib/shared.ts": "export type Item = string; export function run() {}\n",
+  });
+  await git(root, ["init", "-b", "main"]);
+  await git(root, ["add", "."]);
+  await git(root, ["commit", "-m", "initial"]);
+  await writeFiles(root, {
+    "app/late.ts": 'import "../lib/shared.js";\n// Edited\n',
+  });
+
+  const server = await startIndexedServer(0, {
+    project: { name: "demo", root },
+    databasePath: join(dir, "graph.sqlite"),
+  });
+  t.after(() => closeServer(server));
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/architecture?window=uncommitted&evidenceLimit=1`,
+  );
+  assert.equal(response.status, 200);
+  const map = await response.json();
+  assert.equal(map.connections.length, 1);
+  const [connection] = map.connections;
+  assert.equal(connection.importCount, 2);
+  assert.equal(connection.callCount, 1);
+  assert.equal(connection.count, 3);
+  assert.equal(connection.truncated, true);
+  assert.equal(connection.change.status, "changed");
+  assert.equal(connection.change.uncommitted, true);
+  assert.equal(connection.evidence.length, 1);
+  const [item] = connection.evidence;
+  const visibleLines = Array.from({ length: 19 }, (_, index) => index + 2);
+  assert.equal(item.file, "app/early.ts");
+  assert.equal(item.line, 1);
+  assert.equal(item.siteCount, 25);
+  assert.deepEqual(item.additionalLines, visibleLines);
+  assert.deepEqual(item.typeOnlyImportLines, visibleLines);
+});
+
 test("component scope keeps ownership, boundary evidence, and git changes", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "mycel-component-api-"));
   const root = join(dir, "repo");

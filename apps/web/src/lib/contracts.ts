@@ -295,6 +295,14 @@ export function isArchitectureMap(
         typeof value.component.name !== "string")) ||
     !Array.isArray(value.parts) ||
     !Array.isArray(value.connections) ||
+    (value.fileIssues !== undefined &&
+      (!Array.isArray(value.fileIssues) ||
+        !value.fileIssues.every(
+          (issue) =>
+            isRecord(issue) &&
+            typeof issue.path === "string" &&
+            typeof issue.message === "string",
+        ))) ||
     (value.relationshipChanges !== undefined &&
       (!Array.isArray(value.relationshipChanges) ||
         !value.relationshipChanges.every(
@@ -381,6 +389,10 @@ export function isArchitectureMap(
           typeof item.line === "number" &&
           (item.additionalLines === undefined ||
             isSourceLineArray(item.additionalLines)) &&
+          (item.siteCount === undefined ||
+            (typeof item.siteCount === "number" &&
+              Number.isSafeInteger(item.siteCount) &&
+              item.siteCount > 1 + (item.additionalLines?.length ?? 0))) &&
           (item.typeOnlyImportLines === undefined ||
             isSourceLineArray(item.typeOnlyImportLines)) &&
           (item.approximate === undefined ||

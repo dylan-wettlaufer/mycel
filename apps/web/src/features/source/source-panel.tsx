@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import type { GraphNode } from "@mycel/shared";
+import { Button } from "@/components/ui/button";
 import { useResource } from "@/hooks/use-resource";
 import { isFileContent } from "@/lib/contracts";
 import type { SourceWorkspaceOptions } from "./monaco-view";
@@ -17,7 +18,7 @@ export function SourcePanel({
   workspace?: SourceWorkspaceOptions;
   expectedRevision?: number;
 }) {
-  const { data, error } = useResource(
+  const { data, error, loading, retry } = useResource(
     `/api/files/content?path=${encodeURIComponent(node.path)}${expectedRevision === undefined ? "" : `&revision=${expectedRevision}`}`,
     isFileContent,
     expectedRevision === undefined ? revision : 0,
@@ -45,10 +46,21 @@ export function SourcePanel({
           </p>
         </div>
       )}
-      {error ? (
-        <p role="alert" className="p-4">
-          Source unavailable. {error}
-        </p>
+      {error || (data && !source) ? (
+        <div className="space-y-2 p-4">
+          <p role="alert">
+            Source unavailable.{" "}
+            {error ?? "The server returned a different indexed revision."}
+          </p>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={retry}
+            disabled={loading}
+          >
+            {loading ? "Retrying…" : "Retry source"}
+          </Button>
+        </div>
       ) : !source ? (
         <p className="p-4">Loading source…</p>
       ) : (

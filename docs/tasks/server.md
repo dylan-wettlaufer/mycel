@@ -40,6 +40,16 @@ See [architecture](../ARCHITECTURE.md#http-api).
       on shutdown and failed startup through `startIndexedServer`.
 - [x] Add `GET /api/graph/stats` for the dashboard cards.
 
+### V0 architecture map
+
+- [x] Serve `GET /api/architecture` with Git windows, an optional component
+      scope, and a per-connection evidence limit.
+- [x] Return exact link counts, truncated evidence, and source locations scoped
+      to the indexed map revision. Return an error when a requested component
+      breakdown is unavailable.
+- [x] Notify the dashboard via SSE when index, Git, or architecture file
+      changes affect the map.
+
 ### Phase 4: history and events
 
 - [x] `GET /api/changes` with cursor pagination.
