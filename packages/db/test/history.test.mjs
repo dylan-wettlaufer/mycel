@@ -86,6 +86,33 @@ test("history pagination is exclusive, bounded and project scoped", async (t) =>
   assert.throws(() => listChanges(db, "p", undefined, 1001), /limit/);
 });
 
+test("file activity omits duplicate edits with identical source snapshots before paginating", (t) => {
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  commitChangeSet(db, changeSet());
+
+  const set = changeSet();
+  const edited = { ...node, contentHash: "1".repeat(64) };
+  set.graph.nodes = [edited];
+  set.sources.set(node.path, "edited source");
+  set.changes[0] = {
+    ...set.changes[0],
+    action: "modified",
+    before: node,
+    after: edited,
+  };
+  const [edit] = commitChangeSet(db, set).events;
+  const [duplicate] = commitChangeSet(db, set).events;
+
+  const page = listChanges(db, "p", undefined, 1, { kind: "files" });
+  assert.deepEqual(
+    page.items.map(({ id }) => id),
+    [edit.id],
+  );
+  assert.equal(page.cursor, null);
+  assert.equal(getChange(db, "p", duplicate.id)?.id, duplicate.id);
+});
+
 test("coalesced observations from different agents stay ambiguous even when only the last hash matches", (t) => {
   const db = openDatabase({ databasePath: ":memory:" });
   t.after(() => db.close());

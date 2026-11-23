@@ -6,6 +6,7 @@ import {
   startMonitoringSession,
   endMonitoringSession,
 } from "@mycel/db";
+import type { ChangeSet } from "@mycel/db";
 import { diffGraph } from "./history.js";
 import type { ChangeEvent, Diagnostic } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
@@ -114,15 +115,21 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       [...files.values()],
       captured.resolution,
     );
-    const initialChanges = diffGraph(
-      readGraphState(options.database, project.id),
-      initialGraph,
-    );
-    const initialCommit = commitChangeSet(options.database, {
+    // Concurrent watchers must compare against the same revision they replace.
+    const commitGraph = options.database.transaction(
+      (set: Omit<ChangeSet, "changes">) =>
+        commitChangeSet(options.database, {
+          ...set,
+          changes: diffGraph(
+            readGraphState(options.database, project.id),
+            set.graph,
+          ),
+        }),
+    ).immediate;
+    const initialCommit = commitGraph({
       sessionId,
       graph: initialGraph,
       sources: new Map([...files].map(([path, file]) => [path, file.source])),
-      changes: initialChanges,
     });
     publish(initialCommit.events);
     let failures = new Map<string, Diagnostic[]>();
@@ -201,17 +208,13 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           ...[...nextFailures.values()].flat(),
         ];
         const resolvedAt = performance.now();
-        const { revision, events } = commitChangeSet(options.database, {
+        const { revision, events } = commitGraph({
           sessionId: sessionId!,
           graph,
           sources: new Map(
             [...next].map(([path, file]) => [path, file.source]),
           ),
           fileCaptureTimes: batch.fileCaptureTimes,
-          changes: diffGraph(
-            readGraphState(options.database, project.id),
-            graph,
-          ),
         });
         const completedAt = performance.now();
         files = next;

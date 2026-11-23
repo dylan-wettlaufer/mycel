@@ -427,7 +427,20 @@ export function listChanges(
   const clause =
     filter.kind === "files"
       ? `AND entity_type = 'node' AND ${entityKind} = 'file' AND ${changeRevision} > 1
-      AND (action <> 'modified' OR json_extract(before_entity, '$.contentHash') <> json_extract(after_entity, '$.contentHash'))`
+      AND (action <> 'modified' OR (
+        json_extract(before_entity, '$.contentHash') <> json_extract(after_entity, '$.contentHash')
+        AND NOT EXISTS (
+          SELECT 1 FROM snapshots AS after_snapshot
+          JOIN snapshots AS before_snapshot
+            ON before_snapshot.project_id = after_snapshot.project_id
+            AND before_snapshot.path = after_snapshot.path
+            AND before_snapshot.revision = after_snapshot.revision - 1
+          WHERE after_snapshot.project_id = change_events.project_id
+            AND after_snapshot.path = change_events.path
+            AND after_snapshot.revision = change_events.after_revision
+            AND before_snapshot.content = after_snapshot.content
+        )
+      ))`
       : filter.kind === "relationships"
         ? `AND entity_type = 'edge' AND action IN ('created', 'deleted')
         AND ${entityKind} IN ('CALLS', 'IMPORTS') AND ${changeRevision} > 1`
