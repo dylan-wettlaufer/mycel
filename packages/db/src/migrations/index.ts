@@ -2,6 +2,7 @@ import { semanticSchema } from "./003-semantic.js";
 import { historySchema } from "./002-history.js";
 import { initialSchema } from "./001-initial.js";
 import { agentSchema } from "./009-agents.js";
+import { agentObservationSchema } from "./010-agent-observations.js";
 
 export interface Migration {
   version: number;
@@ -48,4 +49,9 @@ export const migrations: readonly Migration[] = [
         ON change_events(project_id, path, COALESCE(after_revision, before_revision + 1));`,
   },
   { version: 9, name: "agent tool evidence", sql: agentSchema },
+  {
+    version: 10,
+    name: "completed agent file observations",
+    sql: agentObservationSchema,
+  },
 ];

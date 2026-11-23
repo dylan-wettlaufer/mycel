@@ -1,16 +1,36 @@
-export type AgentProvider = "claude-code";
+export const agentProviders = ["claude-code", "codex", "cursor"] as const;
+export type AgentProvider = (typeof agentProviders)[number];
+
+export interface AgentHookSetup {
+  provider: AgentProvider;
+  state: "configured" | "error";
+  message?: string;
+}
+
+export interface AgentHookStatus extends AgentHookSetup {
+  lastReceivedAt?: number;
+}
+
+export function isAgentProvider(value: unknown): value is AgentProvider {
+  return agentProviders.some((provider) => provider === value);
+}
 
 /** Normalized metadata from a provider hook. Times are epoch milliseconds. */
-export interface AgentToolEvent {
+interface AgentToolMetadata {
   provider: AgentProvider;
   sessionId: string;
   toolUseId: string;
   tool: "Edit" | "Write";
   timestamp: number;
   path: string;
-  phase: "started" | "succeeded" | "failed";
   expectedHash?: string;
 }
+
+export type AgentToolEvent = AgentToolMetadata &
+  (
+    | { phase: "started" | "succeeded" | "failed" }
+    | { phase: "observed"; observedHash: string | null }
+  );
 
 export interface ChangeAttribution {
   status: "confirmed" | "inferred" | "unknown";

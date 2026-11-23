@@ -1,6 +1,30 @@
-import type { GraphNode, SearchResult, SourceRange } from "@mycel/shared";
+import type {
+  AgentHookStatus,
+  GraphNode,
+  SearchResult,
+  SourceRange,
+} from "@mycel/shared";
+import { isAgentProvider } from "@mycel/shared";
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+export function isAgentHookStatuses(
+  value: unknown,
+): value is AgentHookStatus[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (hook: unknown) =>
+        isRecord(hook) &&
+        isAgentProvider(hook.provider) &&
+        (hook.state === "configured" || hook.state === "error") &&
+        (hook.message === undefined || typeof hook.message === "string") &&
+        (hook.lastReceivedAt === undefined ||
+          (typeof hook.lastReceivedAt === "number" &&
+            Number.isFinite(new Date(hook.lastReceivedAt).getTime()))),
+    )
+  );
 }
 export function isSourceRange(value: unknown): value is SourceRange {
   return (
@@ -144,7 +168,7 @@ export function isChangeEvent(
           String(value.attribution.status),
         ) &&
         (value.attribution.provider === undefined ||
-          value.attribution.provider === "claude-code") &&
+          isAgentProvider(value.attribution.provider)) &&
         (value.attribution.sessionId === undefined ||
           typeof value.attribution.sessionId === "string"))) &&
     (value.beforeRevision === null ||

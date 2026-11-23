@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DiffPanel } from "@/features/source/diff-panel";
 import { HistoricalSource } from "@/features/source/historical-source";
+import { formatRecordedTime } from "@/lib/format";
 import { relationshipCountText } from "./change-presentation";
 import { AgentAttribution } from "./agent-attribution";
 import { eventNode } from "./event-node";
@@ -52,7 +53,19 @@ export function ChangeDetails({
               {owner ?? (file ? "File change" : "Relationship change")}
             </p>
             <h3 className="text-base font-semibold break-words">{title}</h3>
-            <AgentAttribution attribution={event.attribution} />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                Indexed{" "}
+                <time dateTime={event.timestamp}>
+                  {formatRecordedTime(event.timestamp)}
+                </time>
+              </span>
+              {event.attribution ? (
+                <AgentAttribution attribution={event.attribution} />
+              ) : file ? (
+                <span>Agent attribution unavailable</span>
+              ) : null}
+            </div>
             <p className="font-mono text-xs break-words text-muted-foreground">
               {event.path}
               {relationship && !relationship.approximate

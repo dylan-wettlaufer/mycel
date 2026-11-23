@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { openDatabase } from "@mycel/db";
 import { startIndexedServer } from "@mycel/server";
-import { runClaudeCodeHook } from "../dist/agent-hook.js";
+import { runAgentHook } from "../dist/agent-hook.js";
+import { setManagedHooks } from "../dist/setup-agent-hooks.js";
 
 async function readChanges(url, expected) {
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -67,7 +75,8 @@ test("Claude hook attribution reaches file Activity, including late and overlapp
   const url = `http://127.0.0.1:${server.address().port}`;
 
   function hook(name, session, id, tool, path, content = captured) {
-    return runClaudeCodeHook(
+    return runAgentHook(
+      "claude-code",
       [
         Buffer.from(
           JSON.stringify({
@@ -171,6 +180,182 @@ test("Claude hook attribution reaches file Activity, including late and overlapp
     assert.equal(records.length, tools.length + 1);
     assert.ok(!JSON.stringify(records).includes("transcript.jsonl"));
     assert.ok(!JSON.stringify(records).includes(captured));
+  } finally {
+    db.close();
+  }
+});
+
+test("Codex multi-file patches and Cursor edits match indexed saves across hook timing", async (t) => {
+  const state = await realpath(
+    await mkdtemp(join(tmpdir(), "mycel-providers-state-")),
+  );
+  const root = await realpath(
+    await mkdtemp(join(tmpdir(), "mycel-providers-repo-")),
+  );
+  t.after(() =>
+    Promise.all(
+      [root, state].map((path) => rm(path, { recursive: true, force: true })),
+    ),
+  );
+  execFileSync("git", ["init", "-q", root]);
+  const nested = join(root, "src");
+  await mkdir(nested);
+  const databasePath = join(state, "index.sqlite");
+  const initial = "export const value = 0;\n";
+  const edited = "export const value = 1;\n";
+  const files = [
+    "modify.ts",
+    "delete.ts",
+    "cursor.ts",
+    "shared.ts",
+    "manual.ts",
+  ];
+  await Promise.all(
+    files.map((path) => writeFile(join(nested, path), initial)),
+  );
+  const server = await startIndexedServer(0, {
+    project: { name: "providers", root },
+    databasePath,
+    agentHooks: [{ provider: "codex", state: "configured" }],
+  });
+  t.after(
+    () =>
+      new Promise((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+  );
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const record = (provider, payload, managed = false) =>
+    runAgentHook(
+      provider,
+      [Buffer.from(JSON.stringify(payload))],
+      state,
+      databasePath,
+      managed,
+    );
+  const codexHook = {
+    hook_event_name: "PostToolUse",
+    tool_name: "apply_patch",
+    tool_use_id: "patch-call",
+    session_id: "codex-session",
+    cwd: nested,
+  };
+  const cursorHook = {
+    hook_event_name: "afterFileEdit",
+    conversation_id: "cursor-session",
+    generation_id: "generation",
+    workspace_roots: [join(root, ".."), root],
+    edits: [{ old_string: initial, new_string: edited }],
+  };
+  const attribution = (items, path) =>
+    items.find((item) => item.path === `src/${path}`)?.attribution;
+  const success = "Success. Updated the following files:\n";
+
+  await Promise.all([
+    writeFile(join(nested, "new file.ts"), edited),
+    writeFile(join(nested, "modify.ts"), edited),
+    rm(join(nested, "delete.ts")),
+  ]);
+  const beforeHooks = await readChanges(url, 3);
+  assert.equal(attribution(beforeHooks, "new file.ts"), undefined);
+  const patchCall = {
+    ...codexHook,
+    tool_input: {
+      command: [
+        "*** Begin Patch",
+        "*** Add File: new file.ts",
+        "+" + edited.trimEnd(),
+        "*** Update File: modify.ts",
+        "@@",
+        "-" + initial.trimEnd(),
+        "+" + edited.trimEnd(),
+        "*** Delete File: delete.ts",
+        "*** End Patch",
+      ].join("\n"),
+    },
+    tool_response: success + "A new file.ts\nM modify.ts\nD delete.ts\n",
+  };
+  await record("codex", patchCall, true);
+  assert.equal(
+    attribution(await readChanges(url, 3), "new file.ts"),
+    undefined,
+  );
+  await setManagedHooks(root, true, databasePath);
+  await record("codex", patchCall, true);
+  await record("codex", patchCall, true);
+  const withCodex = await readChanges(url, 3);
+  for (const [path, status] of [
+    ["new file.ts", "confirmed"],
+    ["modify.ts", "inferred"],
+    ["delete.ts", "inferred"],
+  ]) {
+    assert.deepEqual(attribution(withCodex, path), {
+      status,
+      provider: "codex",
+      sessionId: "codex-session",
+    });
+  }
+  const hooks = await fetch(`${url}/api/agent-hooks`).then((response) =>
+    response.json(),
+  );
+  assert.equal(hooks[0].provider, "codex");
+  assert.ok(hooks[0].lastReceivedAt > 0);
+  await setManagedHooks(root, false, databasePath);
+
+  await writeFile(join(nested, "cursor.ts"), edited);
+  await record("cursor", {
+    ...cursorHook,
+    file_path: join(nested, "cursor.ts"),
+  });
+  const withCursor = await readChanges(url, 4);
+  assert.deepEqual(attribution(withCursor, "cursor.ts"), {
+    status: "inferred",
+    provider: "cursor",
+    sessionId: "cursor-session",
+  });
+
+  await writeFile(join(nested, "shared.ts"), edited);
+  await readChanges(url, 5);
+  await record("codex", {
+    ...codexHook,
+    tool_use_id: "overlap",
+    tool_response: success + "M shared.ts\n",
+  });
+  await record("cursor", {
+    ...cursorHook,
+    file_path: join(nested, "shared.ts"),
+  });
+  assert.deepEqual(attribution(await readChanges(url, 5), "shared.ts"), {
+    status: "unknown",
+  });
+
+  await writeFile(join(nested, "manual.ts"), edited);
+  await record(
+    "codex",
+    {
+      ...codexHook,
+      tool_use_id: "disabled",
+      tool_response: success + "M manual.ts\n",
+    },
+    true,
+  );
+  await record("codex", {
+    ...codexHook,
+    tool_use_id: "failed",
+    tool_response: "Failed to patch manual.ts",
+  });
+  await record("cursor", {
+    ...cursorHook,
+    hook_event_name: "afterTabFileEdit",
+    file_path: join(nested, "manual.ts"),
+  });
+  assert.equal(attribution(await readChanges(url, 6), "manual.ts"), undefined);
+  const db = openDatabase({ projectRoot: root, databasePath });
+  try {
+    assert.equal(
+      db.prepare("SELECT count(*) AS count FROM agent_tool_events").get().count,
+      6,
+    );
   } finally {
     db.close();
   }

@@ -85,6 +85,40 @@ test("history pagination is exclusive, bounded and project scoped", async (t) =>
   assert.throws(() => listChanges(db, "p", "-1"), /cursor/);
   assert.throws(() => listChanges(db, "p", undefined, 1001), /limit/);
 });
+
+test("coalesced observations from different agents stay ambiguous even when only the last hash matches", (t) => {
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  commitChangeSet(db, changeSet());
+  const record = db.prepare(`INSERT INTO agent_tool_events
+    (project_id, provider, session_id, tool_use_id, tool, path, started_at, finished_at,
+     outcome, is_observation, observed_hash)
+    VALUES ('p', ?, ?, ?, 'Edit', 'a.ts', ?, ?, 'succeeded', 1, ?)`);
+  const after = { ...node, contentHash: "2".repeat(64) };
+  record.run(
+    "cursor",
+    "conversation",
+    "edit-1",
+    10_000,
+    10_000,
+    "1".repeat(64),
+  );
+  record.run("codex", "session", "edit-2", 10_025, 10_025, after.contentHash);
+  const set = changeSet();
+  set.graph.nodes = [after];
+  set.changes[0] = {
+    ...set.changes[0],
+    action: "modified",
+    before: node,
+    after,
+  };
+  set.fileCaptureTimes = new Map([["a.ts", 10_050]]);
+  const { events } = commitChangeSet(db, set);
+  assert.deepEqual(events[0].attribution, { status: "unknown" });
+  assert.deepEqual(getChange(db, "p", events[0].id).attribution, {
+    status: "unknown",
+  });
+});
 test("replay returns chronological events after an exclusive cursor", async (t) => {
   const { getEventsAfter } = await import("../dist/index.js");
   const db = openDatabase({ databasePath: ":memory:" });

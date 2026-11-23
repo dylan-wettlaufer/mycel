@@ -1,5 +1,11 @@
-import type { ChangeAttribution } from "@mycel/shared";
+import type { AgentProvider, ChangeAttribution } from "@mycel/shared";
 import { Badge } from "@/components/ui/badge";
+
+export const agentNames: Record<AgentProvider, string> = {
+  "claude-code": "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+};
 
 export function AgentAttribution({
   attribution,
@@ -10,7 +16,9 @@ export function AgentAttribution({
   if (attribution.status === "unknown") {
     return <Badge variant="outline">Agent unknown</Badge>;
   }
-  const name = attribution.provider === "claude-code" ? "Claude Code" : "Agent";
+  const name = attribution.provider
+    ? agentNames[attribution.provider]
+    : "Agent";
   return (
     <Badge
       variant={attribution.status === "confirmed" ? "secondary" : "outline"}

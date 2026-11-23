@@ -53,4 +53,4 @@ export type { SseMessage } from "./history.js";
 export * from "./semantic.js";
 export * from "./behaviour.js";
 export type * from "./architecture.js";
-export type * from "./agents.js";
+export * from "./agents.js";

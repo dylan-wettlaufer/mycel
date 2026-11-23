@@ -67,6 +67,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
         if (!included.has(path)) {
           if (hashes.has(path)) {
             files.set(path, null);
+            fileCaptureTimes.set(path, Date.now());
             nextHashes.set(path, null);
           }
           continue;
@@ -78,6 +79,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
           if (!isMissing(error)) throw error;
           if (hashes.has(path)) {
             files.set(path, null);
+            fileCaptureTimes.set(path, Date.now());
             nextHashes.set(path, null);
           }
           continue;

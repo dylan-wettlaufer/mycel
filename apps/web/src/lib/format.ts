@@ -1,4 +1,12 @@
 const relativeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const recordedTimeFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "long",
+});
+
+export function formatRecordedTime(iso: string): string {
+  return recordedTimeFormat.format(new Date(iso));
+}
 
 /** Formats an ISO timestamp as a short relative time such as "5 minutes ago". */
 export function formatRelativeTime(

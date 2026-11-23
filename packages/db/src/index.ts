@@ -31,7 +31,7 @@ export { getEventsAfter } from "./history.js";
 export { getDiff } from "./history.js";
 export { pruneHistory } from "./history.js";
 export { startMonitoringSession, endMonitoringSession } from "./sessions.js";
-export { recordAgentToolEvent } from "./agents.js";
+export { recordAgentToolEvents, getAgentHookActivity } from "./agents.js";
 
 export {
   getSemanticGraph,

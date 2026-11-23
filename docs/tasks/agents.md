@@ -16,7 +16,7 @@ architecture remains usable without a provider-specific adapter.
 
 ## Post-V0 session attribution
 
-The opt-in Claude Code integration shows session attribution for indexed file
+The opt-in Claude Code, Codex, and Cursor integrations show session attribution for indexed file
 changes in Activity. The watcher remains the source of recorded file changes.
 
 ### Tasks
@@ -26,6 +26,8 @@ changes in Activity. The watcher remains the source of recorded file changes.
 - [x] Define an adapter interface independent of the indexer that normalizes
       hook input to tool events with a session ID, path, and timestamp.
 - [x] Implement Claude Code capture using supported edit and write tool hooks.
+- [x] Implement Codex attribution from successful native `apply_patch` calls.
+- [x] Implement Cursor attribution from completed Agent file edits.
 - [x] Store tool events with provider session IDs and optional content hashes
       in a dedicated database table.
 - [x] Correlate tool events with observed file changes by path and capture
@@ -37,8 +39,6 @@ changes in Activity. The watcher remains the source of recorded file changes.
 - [ ] Record explicit agent session lifecycle events if session review needs
       them.
 - [ ] Flag overlapping changes to the same file or symbol by different agents.
-- [ ] Investigate Codex and Cursor integration mechanisms before building
-      adapters for them.
 
 ### Tests
 

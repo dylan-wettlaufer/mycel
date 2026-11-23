@@ -317,8 +317,8 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
         snapshot.run(projectId, path, revision, content);
       const timestamp = new Date().toISOString();
       const insert = db.prepare(`INSERT INTO change_events
-      (project_id, timestamp, entity_type, entity_id, action, path, before_revision, after_revision, before_entity, after_entity, session_id, relationship)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (project_id, timestamp, entity_type, entity_id, action, path, before_revision, after_revision, before_entity, after_entity, session_id, relationship, captured_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       const events = set.changes.map((change) => {
         const beforeRevision = change.before === null ? null : previous;
         const afterRevision = change.after === null ? null : revision;
@@ -332,6 +332,10 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
             : { ...change.after, revision: afterRevision! };
         const relationship =
           removed?.get(change.entityId) ?? added?.get(change.entityId);
+        const fileChange = (after ?? before)?.kind === "file";
+        const capturedAt = fileChange
+          ? set.fileCaptureTimes?.get(change.path)
+          : undefined;
         const result = insert.run(
           projectId,
           timestamp,
@@ -345,17 +349,17 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
           after === null ? null : JSON.stringify(after),
           set.sessionId ?? null,
           relationship ? JSON.stringify(relationship) : null,
+          capturedAt ?? null,
         );
-        const capturedAt = set.fileCaptureTimes?.get(change.path);
         const attribution =
-          after?.kind === "file" && capturedAt !== undefined
+          capturedAt !== undefined
             ? attributeFileChange(
                 db,
                 projectId,
                 change.path,
                 capturedAt,
                 result.lastInsertRowid,
-                after.contentHash,
+                after?.kind === "file" ? after.contentHash : null,
               )
             : undefined;
         const event: ChangeEvent = {
