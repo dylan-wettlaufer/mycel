@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   ChangeAction,
   ChangeEvent,
@@ -310,11 +311,18 @@ export function commitChangeSet(db: SqliteDatabase, set: ChangeSet) {
         previous > 0
           ? recordRelationships(db, projectId, set.changes, "after")
           : undefined;
-      const snapshot = db.prepare(
-        "INSERT INTO snapshots (project_id, path, revision, content) VALUES (?, ?, ?, ?)",
+      const storeContent = db.prepare(
+        `INSERT INTO snapshot_contents(project_id, digest, content) VALUES (?, ?, ?)
+         ON CONFLICT(project_id, digest) DO NOTHING`,
       );
-      for (const [path, content] of set.sources)
-        snapshot.run(projectId, path, revision, content);
+      const snapshot = db.prepare(
+        "INSERT INTO snapshot_versions (project_id, path, revision, digest) VALUES (?, ?, ?, ?)",
+      );
+      for (const [path, content] of set.sources) {
+        const digest = createHash("sha256").update(content).digest();
+        storeContent.run(projectId, digest, content);
+        snapshot.run(projectId, path, revision, digest);
+      }
       const timestamp = new Date().toISOString();
       const insert = db.prepare(`INSERT INTO change_events
       (project_id, timestamp, entity_type, entity_id, action, path, before_revision, after_revision, before_entity, after_entity, session_id, relationship, captured_at)
@@ -430,15 +438,15 @@ export function listChanges(
       AND (action <> 'modified' OR (
         json_extract(before_entity, '$.contentHash') <> json_extract(after_entity, '$.contentHash')
         AND NOT EXISTS (
-          SELECT 1 FROM snapshots AS after_snapshot
-          JOIN snapshots AS before_snapshot
+          SELECT 1 FROM snapshot_versions AS after_snapshot
+          JOIN snapshot_versions AS before_snapshot
             ON before_snapshot.project_id = after_snapshot.project_id
             AND before_snapshot.path = after_snapshot.path
             AND before_snapshot.revision = after_snapshot.revision - 1
           WHERE after_snapshot.project_id = change_events.project_id
             AND after_snapshot.path = change_events.path
             AND after_snapshot.revision = change_events.after_revision
-            AND before_snapshot.content = after_snapshot.content
+            AND before_snapshot.digest = after_snapshot.digest
         )
       ))`
       : filter.kind === "relationships"
@@ -542,11 +550,59 @@ export function pruneHistory(
       projectId,
       cutoff,
     );
-    db.prepare(
-      `DELETE FROM snapshots AS s WHERE s.project_id = ?
+    pruneUnreferencedSources(db, projectId);
+  }).immediate();
+}
+
+function pruneUnreferencedSources(db: SqliteDatabase, projectId: string): void {
+  db.prepare(
+    `DELETE FROM snapshot_versions AS s WHERE s.project_id = ?
       AND s.revision <> (SELECT MAX(revision) FROM revisions WHERE project_id = s.project_id)
       AND NOT EXISTS (SELECT 1 FROM change_events e WHERE e.project_id = s.project_id AND e.path = s.path
         AND s.revision IN (COALESCE(e.after_revision, e.before_revision + 1), COALESCE(e.after_revision, e.before_revision + 1) - 1))`,
-    ).run(projectId);
-  }).immediate();
+  ).run(projectId);
+  db.prepare(
+    `DELETE FROM snapshot_contents AS c WHERE c.project_id = ?
+     AND NOT EXISTS (SELECT 1 FROM snapshot_versions AS v
+       WHERE v.project_id = c.project_id AND v.digest = c.digest)`,
+  ).run(projectId);
+}
+
+/** Project maintenance is serialized with watcher and hook writes. */
+export function manageProjectHistory(
+  db: SqliteDatabase,
+  root: string,
+  action: "status" | "clear",
+) {
+  const operation = db.transaction(() => {
+    const project = db
+      .prepare<[string], { id: string }>(
+        "SELECT id FROM projects WHERE root = ?",
+      )
+      .get(root);
+    if (!project) return undefined;
+    if (action === "clear") {
+      db.prepare("DELETE FROM change_events WHERE project_id = ?").run(
+        project.id,
+      );
+      db.prepare("DELETE FROM agent_tool_events WHERE project_id = ?").run(
+        project.id,
+      );
+      db.prepare(
+        "DELETE FROM sessions WHERE project_id = ? AND ended_at IS NOT NULL",
+      ).run(project.id);
+      pruneUnreferencedSources(db, project.id);
+    }
+    return db
+      .prepare<
+        { projectId: string },
+        { eventCount: number; sourceBytes: number; uniqueSources: number }
+      >(
+        `SELECT (SELECT count(*) FROM change_events WHERE project_id = @projectId) AS eventCount,
+       count(*) AS uniqueSources, COALESCE(sum(octet_length(content)), 0) AS sourceBytes
+       FROM snapshot_contents WHERE project_id = @projectId`,
+      )
+      .get({ projectId: project.id });
+  });
+  return action === "clear" ? operation.immediate() : operation();
 }

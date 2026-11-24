@@ -31,6 +31,11 @@ export function migrateDatabase(
   });
   if (database.inTransaction)
     throw new Error("Migrations require their own transaction");
+  database.function(
+    "mycel_source_digest",
+    { deterministic: true },
+    (source: string) => createHash("sha256").update(source).digest(),
+  );
   database.pragma("foreign_keys = ON");
 
   return database

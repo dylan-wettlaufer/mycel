@@ -1,3 +1,4 @@
+import { sourceContentSchema } from "./011-source-content.js";
 import { semanticSchema } from "./003-semantic.js";
 import { historySchema } from "./002-history.js";
 import { initialSchema } from "./001-initial.js";
@@ -53,5 +54,10 @@ export const migrations: readonly Migration[] = [
     version: 10,
     name: "completed agent file observations",
     sql: agentObservationSchema,
+  },
+  {
+    version: 11,
+    name: "deduplicated source snapshots",
+    sql: sourceContentSchema,
   },
 ];

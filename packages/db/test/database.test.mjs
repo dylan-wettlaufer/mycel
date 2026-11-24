@@ -157,7 +157,8 @@ test("initializes a strict, indexed schema with foreign keys and a busy timeout"
     "semantic_relationships",
     "semantic_sources",
     "sessions",
-    "snapshots",
+    "snapshot_contents",
+    "snapshot_versions",
     "sqlite_sequence",
   ]);
   for (const table of tables.filter((name) => name !== "sqlite_sequence"))
@@ -636,4 +637,28 @@ test("invalid connection options fail before creating files", async (t) => {
     /absolute/,
   );
   assert.equal(existsSync(paths.databasePath), false);
+});
+
+test("upgrades version 10 history without losing exact source membership or duplicating content", (t) => {
+  const db = new Database(":memory:");
+  t.after(() => db.close());
+  migrateDatabase(db, migrations.slice(0, 10));
+  insertProject(db);
+  db.prepare(
+    "INSERT INTO revisions(project_id, revision) VALUES ('p', 2)",
+  ).run();
+  const insert = db.prepare("INSERT INTO snapshots VALUES ('p', ?, ?, ?)");
+  insert.run("before.ts", 1, "shared 🚀");
+  insert.run("after.ts", 2, "shared 🚀");
+  insert.run("empty.ts", 2, "");
+  const rows = () =>
+    db.prepare("SELECT * FROM snapshots ORDER BY path, revision").all();
+  const original = rows();
+  migrateDatabase(db);
+  assert.deepEqual(rows(), original);
+  assert.equal(
+    db.prepare("SELECT count(*) FROM snapshot_contents").pluck().get(),
+    2,
+  );
+  assert.deepEqual(db.pragma("foreign_key_check"), []);
 });
