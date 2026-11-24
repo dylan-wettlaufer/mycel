@@ -6,7 +6,11 @@ import open from "open";
 import type { IndexProgress } from "@mycel/shared";
 
 import { resolveRepository } from "./repository.js";
-import { setManagedHooks, setupAgentHooks } from "./setup-agent-hooks.js";
+import {
+  isTemporaryHookInstall,
+  setManagedHooks,
+  setupAgentHooks,
+} from "./setup-agent-hooks.js";
 
 interface LaunchOptions {
   cwd?: string;
@@ -49,12 +53,17 @@ export async function launchDashboard({
     ...(databasePath === undefined ? {} : { databasePath }),
     ...(hookSetup === undefined ? {} : { agentHooks: hookSetup }),
   });
-  if (agentHooks && databasePath === undefined) {
+  const captureConfigured = hookSetup?.some(
+    ({ state }) => state === "configured",
+  );
+  if (
+    databasePath === undefined &&
+    (agentHooks === "disabled" ||
+      (agentHooks === "enabled" &&
+        (!isTemporaryHookInstall || captureConfigured)))
+  ) {
     try {
-      await setManagedHooks(
-        project.root,
-        Boolean(hookSetup?.some(({ state }) => state === "configured")),
-      );
+      await setManagedHooks(project.root, Boolean(captureConfigured));
     } catch (error) {
       for (const hook of hookSetup ?? []) {
         if (hook.state !== "configured") continue;

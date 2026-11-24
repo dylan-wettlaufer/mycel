@@ -340,6 +340,29 @@ try {
     flow.getByText("Create Order Record", { exact: true }),
   ).toBeVisible();
 
+  const schemaPath = join(root, "prisma/schema.prisma");
+  const schema = await readFile(schemaPath, "utf8");
+  const health = async () => (await fetch(`${base}/api/health`)).json();
+  const beforeSchemaChange = (await health()).index.revision;
+  await writeFile(
+    schemaPath,
+    schema.replace("model Order {", "model Purchase {"),
+  );
+  await expect
+    .poll(async () => (await health()).index.revision)
+    .toBeGreaterThan(beforeSchemaChange);
+  await expect(
+    flow.getByText("Create Order Record", { exact: true }),
+  ).toHaveCount(0);
+  await expect(submit).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    flow.getByText("Handle POST Request", { exact: true }),
+  ).toBeVisible();
+  await writeFile(schemaPath, schema);
+  await expect(
+    flow.getByText("Create Order Record", { exact: true }),
+  ).toBeVisible();
+
   const requestPath = join(root, "submit.ts");
   const request = await readFile(requestPath, "utf8");
   await writeFile(

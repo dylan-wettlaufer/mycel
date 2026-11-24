@@ -64,8 +64,9 @@ To remove all indexed project data, close the dashboards for that
 repository and run `mycel project remove`. It deletes the current graph,
 source archive, activity, and managed capture marker, then compacts the
 SQLite file. The remaining database contains the schema so Mycel can
-create a fresh index on the next launch. Your working files stay in the
-repository.
+create a fresh index on the next launch. If SQLite reports corruption,
+the command removes the managed database and its SQLite sidecars so the
+next launch can rebuild it. Your working files stay in the repository.
 
 For partial retention, `pruneHistory(database, projectId, beforeId)` deletes
 events before an exclusive ID. It preserves current source and both source

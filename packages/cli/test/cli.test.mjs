@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
 import {
+  link,
   mkdir,
   mkdtemp,
   readFile,
@@ -11,7 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -48,6 +49,24 @@ async function dashboardFixture(t) {
     '<!doctype html><div id="root">Mycel</div>',
   );
   return webDistPath;
+}
+
+async function managedStorage(t, root) {
+  const home = await fixture(t);
+  const dataDirectory =
+    process.platform === "darwin"
+      ? join(home, "Library", "Application Support", "Mycel")
+      : join(home, process.platform === "win32" ? "Mycel" : "mycel");
+  return {
+    databasePath: resolveDatabasePath(root, dataDirectory),
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      XDG_DATA_HOME: home,
+      LOCALAPPDATA: home,
+    },
+  };
 }
 
 function closeAfter(t, server) {
@@ -287,19 +306,7 @@ test("help and version work without launching, and obsolete subcommands are reje
 
 test("local data commands inspect, clear, and remove only the selected repository index", async (t) => {
   const { root, nested } = await repository(t);
-  const home = await fixture(t);
-  const dataDirectory =
-    process.platform === "darwin"
-      ? join(home, "Library", "Application Support", "Mycel")
-      : join(home, process.platform === "win32" ? "Mycel" : "mycel");
-  const databasePath = resolveDatabasePath(root, dataDirectory);
-  const env = {
-    ...process.env,
-    HOME: home,
-    USERPROFILE: home,
-    XDG_DATA_HOME: home,
-    LOCALAPPDATA: home,
-  };
+  const { databasePath, env } = await managedStorage(t, root);
   const run = async (action, command = "history") =>
     (
       await execFileAsync(process.execPath, [binary, command, action], {
@@ -374,6 +381,46 @@ test("local data commands inspect, clear, and remove only the selected repositor
   assert.match(await run("status"), /No history recorded/);
   await assert.rejects(readFile(marker), { code: "ENOENT" });
   assert.equal(await readFile(firstPath, "utf8"), currentSource);
+});
+
+test("project remove recovers a corrupt index without removing unrelated files", async (t) => {
+  const { root, nested } = await repository(t);
+  const { databasePath, env } = await managedStorage(t, root);
+  const run = (...args) =>
+    execFileAsync(process.execPath, [binary, ...args], { cwd: nested, env });
+  const source = join(root, "sample.ts");
+  const otherIndex = join(dirname(databasePath), "another-project.sqlite");
+  const broken = "This is not a SQLite database.\n";
+  await mkdir(dirname(databasePath), { recursive: true });
+  await writeFile(source, "export const sample = 1;\n");
+  await writeFile(databasePath, broken);
+  await writeFile(otherIndex, "other index");
+
+  const wal = databasePath + "-wal";
+  await link(otherIndex, wal);
+  await assert.rejects(run("project", "remove"), /regular, unshared/);
+  assert.equal(await readFile(databasePath, "utf8"), broken);
+  await rm(wal);
+  for (const suffix of ["-wal", "-shm", "-journal", ".agent-hooks"])
+    await writeFile(databasePath + suffix, "");
+
+  const { stdout } = await run("project", "remove");
+  assert.match(stdout, /Removed the corrupt local index and history/);
+  for (const suffix of ["", "-wal", "-shm", "-journal", ".agent-hooks"])
+    await assert.rejects(readFile(databasePath + suffix), { code: "ENOENT" });
+  assert.equal(await readFile(otherIndex, "utf8"), "other index");
+  assert.equal(await readFile(source, "utf8"), "export const sample = 1;\n");
+  assert.match((await run("history", "status")).stdout, /No history recorded/);
+
+  const reindexed = await openIndexedProject({
+    project: { name: basename(root), root },
+    databasePath,
+  });
+  try {
+    assert.equal(reindexed.getIndexProgress().indexedFiles, 1);
+  } finally {
+    reindexed.close();
+  }
 });
 
 test("architecture validates the file and diagnoses working-tree assignments", async (t) => {
