@@ -104,6 +104,14 @@ test("search exposes ranked, bounded results for the selected project", async (t
   assert.deepEqual(ids(result), ["node:save", "file:save"]);
   assert.equal(result.truncated, true);
   assert.ok(result.nodes.every((n) => n.projectId === project.id));
+  const files = await app.request(
+    "/api/graph/search?q=save&limit=1&kind=files",
+  );
+  assert.deepEqual(ids(await files.json()), ["file:save"]);
+  for (const kind of ["unknown", "files&kind=symbols"]) {
+    const response = await app.request("/api/graph/search?q=save&kind=" + kind);
+    assert.equal(response.status, 400);
+  }
   const empty = await app.request("/api/graph/search?q=does-not-exist");
   assert.deepEqual(await empty.json(), {
     projectId: project.id,
