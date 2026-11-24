@@ -16,6 +16,9 @@ import { resolveDatabasePath } from "@mycel/db";
 import type { AgentHookSetup, AgentProvider } from "@mycel/shared";
 
 const cliPath = fileURLToPath(new URL("./bin.js", import.meta.url));
+// npm exec installs transient packages under <cache>/_npx/<key>/node_modules.
+export const isTemporaryHookInstall =
+  /[\\/]_npx[\\/][^\\/]+[\\/]node_modules[\\/]/.test(cliPath);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -73,7 +76,10 @@ function hookEvents(provider: AgentProvider): string[] {
       : ["PreToolUse", "PostToolUse", "PostToolUseFailure"];
 }
 
-function isManagedCommand(entry: unknown, provider: AgentProvider): boolean {
+function isManagedCommand(
+  entry: unknown,
+  provider: AgentProvider,
+): entry is { command: string } {
   if (!isObject(entry) || typeof entry.command !== "string") return false;
   const suffix = ` agent-hook ${provider} --managed`;
   if (!entry.command.endsWith(suffix)) return false;
@@ -82,7 +88,7 @@ function isManagedCommand(entry: unknown, provider: AgentProvider): boolean {
   return (
     entry.command === hookCommand(provider) ||
     executable === "mycel" ||
-    /^'(?:[^']|'"'"')+' '(?:[^']|'"'"')*\/(?:packages\/cli|@mycel\/cli)\/dist\/bin\.js'$/.test(
+    /^'(?:[^']|'"'"')+' '(?:[^']|'"'"')*\/(?:packages\/cli|@mycel\/cli|node_modules\/mycel)\/dist\/bin\.js'$/.test(
       executable,
     )
   );
@@ -91,7 +97,7 @@ function isManagedCommand(entry: unknown, provider: AgentProvider): boolean {
 function managedHooks(
   config: Record<string, unknown>,
   provider: AgentProvider,
-  remove: boolean,
+  remove?: (command: string, event: string) => boolean,
 ): number {
   if (config.hooks === undefined) return 0;
   if (!isObject(config.hooks))
@@ -103,8 +109,11 @@ function managedHooks(
     if (!Array.isArray(entries)) throw new Error(`${event} must be an array`);
     const before = count;
     const remaining: unknown[] = [];
+    const matches = (entry: unknown) =>
+      isManagedCommand(entry, provider) &&
+      (remove?.(entry.command, event) ?? true);
     for (const entry of entries) {
-      if (provider === "cursor" && isManagedCommand(entry, provider)) {
+      if (provider === "cursor" && matches(entry)) {
         count++;
         continue;
       }
@@ -114,7 +123,7 @@ function managedHooks(
         Array.isArray(entry.hooks)
       ) {
         const handlers: unknown[] = entry.hooks.filter(
-          (handler: unknown) => !isManagedCommand(handler, provider),
+          (handler: unknown) => !matches(handler),
         );
         const removed = entry.hooks.length - handlers.length;
         count += removed;
@@ -136,6 +145,16 @@ function managedHooks(
   return count;
 }
 
+function hasHook(entries: unknown[], provider: AgentProvider, command: string) {
+  return entries.some((entry) =>
+    provider === "cursor"
+      ? hasCommand(entry, provider, command)
+      : isObject(entry) &&
+        Array.isArray(entry.hooks) &&
+        entry.hooks.some((handler) => hasCommand(handler, provider, command)),
+  );
+}
+
 function addHooks(
   config: Record<string, unknown>,
   provider: AgentProvider,
@@ -151,21 +170,17 @@ function addHooks(
 
   const hooks = (config.hooks ?? {}) as Record<string, unknown>;
   const command = hookCommand(provider);
-  let changed = false;
+  const keptEvents = new Set<string>();
+  let changed =
+    managedHooks(config, provider, (registered, event) => {
+      if (registered !== command || keptEvents.has(event)) return true;
+      keptEvents.add(event);
+      return false;
+    }) > 0;
   for (const name of hookEvents(provider)) {
     const existing = hooks[name] ?? [];
     if (!Array.isArray(existing)) throw new Error(`${name} must be an array`);
-    const alreadyConfigured = existing.some((entry: unknown) => {
-      if (provider === "cursor") return hasCommand(entry, provider, command);
-      return (
-        isObject(entry) &&
-        Array.isArray(entry.hooks) &&
-        entry.hooks.some((handler: unknown) =>
-          hasCommand(handler, provider, command),
-        )
-      );
-    });
-    if (alreadyConfigured) continue;
+    if (hasHook(existing, provider, command)) continue;
     hooks[name] = [
       ...existing,
       provider === "cursor"
@@ -237,7 +252,19 @@ export async function hasProjectAgentHooks(
   );
   try {
     const local: unknown = JSON.parse(await readFile(localSettings, "utf8"));
-    return isObject(local) && !addHooks(local, provider);
+    if (!isObject(local) || !isObject(local.hooks)) return false;
+    if (
+      provider === "cursor" &&
+      local.version !== undefined &&
+      local.version !== 1
+    )
+      return false;
+    const { hooks } = local;
+    const command = hookCommand(provider);
+    return hookEvents(provider).every((event) => {
+      const entries = hooks[event];
+      return Array.isArray(entries) && hasHook(entries, provider, command);
+    });
   } catch {
     return false;
   }
@@ -318,6 +345,13 @@ export async function setupAgentHooks(
         try {
           if (await hasProjectAgentHooks(root, provider))
             return { provider, state: "configured" };
+          if (isTemporaryHookInstall)
+            return {
+              provider,
+              state: "error",
+              message:
+                "Automatic hook setup requires a persistent Mycel installation.",
+            };
           await updateSettings(join(directory, file), (config) =>
             addHooks(config, provider),
           );
@@ -350,7 +384,11 @@ export async function manageAgentHooks(
     try {
       let count = 0;
       await updateSettings(path, (config) => {
-        count = managedHooks(config, provider, action === "uninstall");
+        count = managedHooks(
+          config,
+          provider,
+          action === "uninstall" ? () => true : undefined,
+        );
         return action === "uninstall" && count > 0;
       });
       results.push({ provider, path, count });

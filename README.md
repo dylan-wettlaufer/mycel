@@ -79,6 +79,8 @@ coding agents it detects (Codex, Claude Code, Cursor) and enables capture for
 this repository when setup succeeds. Run `mycel --no-agent-hooks` to skip
 registration and disable Mycel-managed capture for this repository. Use
 `mycel hooks uninstall` to remove managed registrations from user settings.
+Mycel refreshes its managed hook commands when you launch it after moving
+an installation. Temporary `npx` installs skip automatic hook registration.
 A later normal launch can enable capture again. See [agent setup](#see-which-agent-made-a-change).
 
 ## First walkthrough
