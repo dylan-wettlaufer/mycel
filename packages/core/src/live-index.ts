@@ -287,7 +287,8 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           writeMs: completedAt - resolvedAt,
         });
         publish(events);
-        if (events.length > 0) notifyCommit(revision);
+        // Metadata can change walkthroughs without producing activity events.
+        notifyCommit(revision);
       },
     });
     // Recheck the startup snapshot even if OS events have not arrived yet.
