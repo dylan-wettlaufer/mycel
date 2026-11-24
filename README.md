@@ -43,7 +43,7 @@ connections from module-level imports.
 
 ### Requirements
 
-- Node.js 22 or newer
+- Node.js 22.x (22.22.2+), 24.x (24.15.0+), or 26.x
 - pnpm 10.34.7 (or run `npx pnpm@10.34.7` in place of `pnpm`)
 - Git
 
