@@ -1,3 +1,4 @@
+import { lstatSync, rmSync, type Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 import {
   manageProjectHistory,
@@ -6,7 +7,7 @@ import {
   type SqliteDatabase,
 } from "@mycel/db";
 import { resolveRepository } from "./repository.js";
-import { setManagedHooks } from "./setup-agent-hooks.js";
+import { managedHookMarker, setManagedHooks } from "./setup-agent-hooks.js";
 
 export async function historyCommand(action: "status" | "clear") {
   const { root } = await resolveRepository();
@@ -55,19 +56,7 @@ function compactDatabase(database: SqliteDatabase): void {
     throw new Error("SQLite could not truncate the write-ahead log");
 }
 
-export async function removeProjectData(): Promise<void> {
-  const { root } = await resolveRepository();
-  const path = resolveDatabasePath(root);
-  try {
-    await stat(path);
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
-      throw error;
-    await setManagedHooks(root, false);
-    console.info(`No local index for ${root}`);
-    return;
-  }
-
+async function removeIndexedProjectData(root: string): Promise<void> {
   const database = openDatabase({ projectRoot: root, busyTimeoutMs: 250 });
   try {
     database.pragma("locking_mode = EXCLUSIVE");
@@ -101,5 +90,56 @@ export async function removeProjectData(): Promise<void> {
     console.info(`Removed the local index and history for ${root}`);
   } finally {
     database.close();
+  }
+}
+
+function isSqliteCorruption(error: unknown): boolean {
+  while (error instanceof Error) {
+    if (
+      "code" in error &&
+      typeof error.code === "string" &&
+      /^SQLITE_(?:CORRUPT|NOTADB)(?:_|$)/.test(error.code)
+    )
+      return true;
+    error = error.cause;
+  }
+  return false;
+}
+
+function removeCorruptIndex(root: string, original: Stats): void {
+  const path = resolveDatabasePath(root);
+  const current = lstatSync(path, { throwIfNoEntry: false });
+  if (current?.dev !== original.dev || current.ino !== original.ino)
+    throw new Error(
+      "The local index changed during removal. Retry project remove.",
+    );
+
+  // Preflight all entries and remove the database last so failures can be retried.
+  const files = [path + "-wal", path + "-shm", path + "-journal", path];
+  for (const file of files) {
+    const entry = lstatSync(file, { throwIfNoEntry: false });
+    if (entry && (!entry.isFile() || entry.nlink !== 1))
+      throw new Error(`Expected a regular, unshared database file: ${file}`);
+  }
+  rmSync(managedHookMarker(root, path), { force: true });
+  for (const file of files) rmSync(file, { force: true });
+}
+
+export async function removeProjectData(): Promise<void> {
+  const { root } = await resolveRepository();
+  const path = resolveDatabasePath(root);
+  const original = lstatSync(path, { throwIfNoEntry: false });
+  if (!original) {
+    await setManagedHooks(root, false);
+    console.info(`No local index for ${root}`);
+    return;
+  }
+
+  try {
+    await removeIndexedProjectData(root);
+  } catch (cause) {
+    if (!isSqliteCorruption(cause)) throw cause;
+    removeCorruptIndex(root, original);
+    console.info(`Removed the corrupt local index and history for ${root}`);
   }
 }
