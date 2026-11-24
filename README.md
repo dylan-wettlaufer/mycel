@@ -151,6 +151,8 @@ Hooks you configured manually are controlled in the agent's own settings.
 | `mycel install-skill` | Add the `mycel-architecture` skill for Codex and Claude Code |
 | `mycel architecture` | Validate `.mycel/architecture.json`; exits 1 if it is missing or invalid, or a pattern matches nothing |
 | `mycel architecture --component <name-or-id>` | Show a part's files, connections, and responsibility assignments |
+| `mycel history status` | Show recorded history and source storage for this repository |
+| `mycel history clear` | Remove past history, reclaim SQLite space, and keep the current index |
 | `mycel --help`, `mycel --version` | Show usage or version |
 
 ## Privacy and local data

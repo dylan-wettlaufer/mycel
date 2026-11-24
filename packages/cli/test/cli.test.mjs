@@ -15,7 +15,8 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
-import { resolveDatabasePath } from "@mycel/db";
+import { openIndexedProject } from "@mycel/core";
+import { getFileContent, openDatabase, resolveDatabasePath } from "@mycel/db";
 
 import { launchDashboard, resolveRepository } from "../dist/index.js";
 
@@ -277,6 +278,83 @@ test("help and version work without launching, and obsolete subcommands are reje
       return true;
     },
   );
+});
+
+test("history commands from a nested folder report deduplicated storage and reclaim old source", async (t) => {
+  const { root, nested } = await repository(t);
+  const home = await fixture(t);
+  const dataDirectory =
+    process.platform === "darwin"
+      ? join(home, "Library", "Application Support", "Mycel")
+      : join(home, process.platform === "win32" ? "Mycel" : "mycel");
+  const databasePath = resolveDatabasePath(root, dataDirectory);
+  const env = {
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    XDG_DATA_HOME: home,
+    LOCALAPPDATA: home,
+  };
+  const run = async (action) =>
+    (
+      await execFileAsync(process.execPath, [binary, "history", action], {
+        cwd: nested,
+        env,
+      })
+    ).stdout;
+  assert.match(await run("status"), /No history recorded/);
+
+  const oldSource = `// ${"archived source ".repeat(8_192)}\nexport const value = 1;\n`;
+  const currentSource = "export const value = 2;\n";
+  const firstPath = join(root, "one.ts");
+  const secondPath = join(root, "two.ts");
+  await writeFile(firstPath, oldSource);
+  await writeFile(secondPath, oldSource);
+  const options = { project: { name: basename(root), root }, databasePath };
+  const first = await openIndexedProject(options);
+  first.close();
+
+  await writeFile(firstPath, currentSource);
+  const second = await openIndexedProject(options);
+  second.close();
+
+  await rm(secondPath);
+  const third = await openIndexedProject(options);
+  third.close();
+  const { id } = third.project;
+  const database = openDatabase({ projectRoot: root, databasePath });
+  try {
+    assert.equal(getFileContent(database, id, "two.ts", 1).content, oldSource);
+    assert.equal(getFileContent(database, id, "two.ts", 2).content, oldSource);
+    assert.equal(getFileContent(database, id, "two.ts", 3), undefined);
+  } finally {
+    database.close();
+  }
+
+  const before = await run("status");
+  assert.ok(before.includes(databasePath));
+  assert.match(before, /Unique source contents: 2/);
+  assert.ok(
+    before.includes(
+      `Stored source bytes (including current files): ${Buffer.byteLength(oldSource + currentSource)}`,
+    ),
+  );
+
+  const cleared = await run("clear");
+  assert.match(cleared, /Cleared recorded history/);
+  assert.match(cleared, /Recorded events: 0/);
+  assert.match(cleared, /Unique source contents: 1/);
+  const bytes = (output) =>
+    Number(output.match(/SQLite database bytes: (\d+)/)?.[1]);
+  assert.ok(bytes(cleared) > 0 && bytes(cleared) < bytes(before));
+
+  const reopened = openDatabase({ projectRoot: root, databasePath });
+  try {
+    assert.equal(getFileContent(reopened, id, "two.ts", 1), undefined);
+    assert.equal(getFileContent(reopened, id, "one.ts").content, currentSource);
+  } finally {
+    reopened.close();
+  }
 });
 
 test("architecture validates the file and diagnoses working-tree assignments", async (t) => {
