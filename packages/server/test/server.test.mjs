@@ -111,3 +111,26 @@ test("project endpoint reports when no repository has been selected", async () =
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: "No repository selected" });
 });
+
+test("validates the local authority and any supplied browser origin", async () => {
+  const app = createApp();
+  const url = "http://localhost:4321/api/project";
+  const env = { incoming: { socket: { localPort: 4321 } } };
+  const request = (host, origin) =>
+    app.request(url, { headers: { host, ...(origin && { origin }) } }, env);
+  assert.equal(
+    (await request("localhost:4321", "http://localhost:4321")).status,
+    503,
+  );
+  assert.equal((await request("127.0.0.1:4321")).status, 503);
+  for (const host of ["example.test:4321", "localhost:4322", "127.0.0.1"]) {
+    assert.equal((await request(host)).status, 403);
+  }
+  for (const origin of [
+    "null",
+    "http://localhost:4322",
+    "https://example.test",
+  ]) {
+    assert.equal((await request("localhost:4321", origin)).status, 403);
+  }
+});
