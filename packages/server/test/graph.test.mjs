@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
 import { createGraphQueries } from "@mycel/core";
-import { openDatabase, replaceProjectGraph } from "@mycel/db";
+import { commitChangeSet, openDatabase, replaceProjectGraph } from "@mycel/db";
 import { createApp, startServer } from "../dist/index.js";
 
 const project = {
@@ -65,16 +65,15 @@ const diagnostic = {
   message: "Could not resolve a call",
 };
 
-function fixture(t) {
+function fixture(t, sources = new Map()) {
   const database = openDatabase({ databasePath: ":memory:" });
   t.after(() => {
     if (database.open) database.close();
   });
-  replaceProjectGraph(database, {
-    project,
-    nodes,
-    edges,
-    diagnostics: [diagnostic],
+  commitChangeSet(database, {
+    graph: { project, nodes, edges, diagnostics: [diagnostic] },
+    sources,
+    changes: [],
   });
   replaceProjectGraph(database, {
     project: { ...project, id: "project:other", root: "/projects/other" },
@@ -320,12 +319,8 @@ test("graph queries are served over loopback HTTP alongside the existing API", a
 });
 
 test("source route serves committed captures and rejects paths outside the indexed project", async (t) => {
-  const { app, database } = fixture(t);
-  database
-    .prepare(
-      "INSERT INTO snapshots (project_id, path, revision, content) VALUES (?, ?, ?, ?)",
-    )
-    .run(project.id, "src/save.ts", 1, "export function save() {}\n");
+  const content = "export function save() {}\n";
+  const { app } = fixture(t, new Map([["src/save.ts", content]]));
   const response = await app.request("/api/files/content?path=src%2Fsave.ts");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
@@ -333,7 +328,7 @@ test("source route serves committed captures and rejects paths outside the index
     revision: 1,
     path: "src/save.ts",
     language: "typescript",
-    content: "export function save() {}\n",
+    content,
     contentHash: "a".repeat(64),
   });
   for (const path of [
