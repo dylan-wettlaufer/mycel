@@ -2,278 +2,202 @@
 
 > Mycel helps developers understand what their AI agents are building and how it fits into the rest of their application.
 
-Mycel is a local-first tool for keeping a mental model of an application as
-its code evolves. The V0 experience starts with a living architecture map of
-features and subsystems such as Orders, Payments, and persistence. A developer
-can open Orders, follow a source-backed connection to Payments, and inspect
-the exact handler behind it. The map updates as developers and agents edit
-the code.
+Mycel is a local-first architecture map for your repository. Run it in a
+project and it opens a live dashboard showing the parts of your application
+and how they connect. Click a connection to see the exact imports and calls
+behind it. As you or a coding agent save changes, the map updates and
+**Activity** shows what changed, which relationships were added or removed,
+and which agent made the edit.
 
-See the [product vision and V0 requirements](mycel_prd.md) and
-[system architecture](docs/ARCHITECTURE.md).
+**Status:** V0, pre-release. Mycel installs from source; there is no npm
+package yet. It indexes TypeScript, TSX, and Python.
 
-## Open a repository
+- [Features](#features)
+- [Quickstart](#quickstart)
+- [First walkthrough](#first-walkthrough)
+- [Name your subsystems](#name-your-subsystems)
+- [See which agent made a change](#see-which-agent-made-a-change)
+- [Commands](#commands)
+- [Privacy and local data](#privacy-and-local-data)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
 
-Run `mycel` from a repository or any of its subdirectories:
+## Features
 
-```sh
-cd /path/to/your/repository
-mycel
-```
+- **Graph: how do the parts of my app connect?** An architecture map of
+  packages or named subsystems. Select a connection to inspect the imports and
+  calls behind it, then drill down to files, symbols, and source.
+- **Activity: what just changed?** Every save, including uncommitted edits,
+  with a source diff, the symbols that changed, and the relationships that
+  were added or removed.
+- **Agent attribution: who changed it?** Edits from Codex, Claude Code, and
+  Cursor are labeled with the agent and session that made them.
+- **Explorer: where is it?** Search indexed files and symbols.
+- **Live updates.** The map refreshes as files are saved and highlights recent
+  relationship changes.
 
-Mycel resolves the Git working-tree root, indexes the repository, starts one local server, and opens the
-dashboard in your default browser. Outside Git, it opens the current folder.
-The dashboard shows the selected repository's name and absolute path. The
-terminal stays running; press Ctrl+C to stop the server and close its database.
-
-Mycel indexes TypeScript, TSX, and Python. Python maps show file-to-file
+TypeScript and TSX show imports, calls, and symbols. Python shows file-to-file
 connections from module-level imports.
 
-Each launch uses an available port on `127.0.0.1` and prints the dashboard URL.
-Use `mycel --no-open` when you want to open the URL yourself, or `mycel --help`
-for usage. No subcommand is required.
+## Quickstart
 
-### Describe your architecture with an agent
+### Requirements
 
-Without `.mycel/architecture.json`, the map shows one part per workspace
-package or top-level folder. To name real subsystems, install the agent skill
-and ask Codex or Claude Code to use it:
-
-```sh
-mycel install-skill   # writes .agents/skills and .claude/skills
-mycel architecture    # validates the file the agent wrote
-```
-
-`mycel architecture` lists unassigned files, tie warnings, and patterns that
-match no indexed file. It exits with status 1 when the file is missing or
-invalid, or when a pattern matches nothing.
-
-To extend a specific part of the map, ask your coding agent to use the skill
-for that component, for example “Add a Mycel drill-down for Repository
-indexing.” The first responsibility in the resulting breakdown is the opening
-focus. Use `mycel architecture --component indexer` to inspect owned files,
-indexed callers and dependencies, overlaps, and files grouped under
-**Other files**.
+- Node.js 22 or newer
+- pnpm 10.34.7 (or run `npx pnpm@10.34.7` in place of `pnpm`)
+- Git
 
 ### Install from source
 
-Requires Node.js 22 or newer and pnpm 10.34.7. From the Mycel workspace:
-
 ```sh
+git clone https://github.com/dylan-wettlaufer/mycel.git
+cd mycel
 pnpm install
 pnpm build
 npx pnpm@10.34.7 link --global ./packages/cli
 ```
 
-If pnpm reports that its global bin directory is missing from PATH, run
-`pnpm setup`, restart your shell, and retry the link command. Linking keeps the
-command connected to this checkout; rebuild after changing source code. The
-CLI and compiled dashboard must remain in the checkout together.
+Linking keeps the `mycel` command connected to this checkout, so rebuild after
+pulling changes. If pnpm reports that its global bin directory is missing from
+`PATH`, run `pnpm setup`, restart your shell, and retry the link command.
 
-## Current experience
+### Run it
 
-- **Graph** opens on the architecture map. Select a part to see its files and
-  connections. Use **Open component** when the part has named responsibilities,
-  or **Open files** to drill down to file dependencies, symbols, and source.
-  Use **Only connections** to narrow the graph or **Focus selection** to frame
-  a node and its neighbors.
-- Select a connection to inspect the imports and calls behind it. Select a
-  line to read the corresponding indexed source, or **Open source** to see the
-  whole file. Counts cover all resolved links. The inspector shows up to 100
-  links per direction and the first 20 source locations per link, with totals
-  shown when evidence is capped. The map refreshes as you save and highlights
-  recent relationship additions and removals, including minor connections.
-- **Explorer** searches indexed files and symbols. **Activity** groups
-  edits by file and indexed save, including uncommitted edits. Each entry
-  shows a source diff and the symbols that changed. **Relationships** shows
-  added and removed calls and imports, with links to the recorded source.
-  Graph and change selections can be reopened through browser history or
-  hash links.
+```sh
+cd /path/to/your/project
+mycel
+```
 
-If the map is empty, save a TypeScript, TSX, or Python file in an indexed path.
-An invalid architecture file keeps the fallback map available and shows a
-validation message. Use **Retry** if the map fails to load. A failed refresh
-keeps the last loaded map visible, and unavailable component links offer a way
-back to the repository map.
+Mycel finds the Git root, indexes the repository, and opens the dashboard in
+your browser at the URL it prints. It keeps watching for saves until you press
+Ctrl+C. Outside a Git repository it uses the current folder.
 
-The Hono backend serves the dashboard and project-scoped graph, captured source,
-history, and SSE APIs. Mycel starts watching during the initial index and
-continues watching while it runs. The header shows backend health and live-stream
-connection state separately. See [server usage](packages/server/README.md).
+On launch, Mycel also registers attribution hooks in the user settings of any
+coding agents it detects (Codex, Claude Code, Cursor) and enables capture for
+this repository. Run `mycel --no-agent-hooks` to turn that off for the
+repository. See [See which agent made a change](#see-which-agent-made-a-change).
 
-### Attribute file changes to coding agents
+## First walkthrough
 
-Mycel sets up attribution automatically when you run `mycel` in a repository.
-It registers hooks once in the user settings of detected agents and enables
-capture for the repository you opened. Existing Mycel project hooks are reused.
-Use `mycel --no-agent-hooks` to turn off automatically installed capture for
-that repository. Manually configured hooks are controlled by the agent’s settings.
+1. **Read the map.** The dashboard opens on **Graph**. Until you
+   [name your subsystems](#name-your-subsystems), the map shows one part per
+   workspace package or top-level folder.
+2. **Follow a connection.** Select a part to see its files and connections.
+   Select a connection to list the imports and calls behind it, then select a
+   line to read that source, or choose **Open source** for the whole file.
+3. **Drill down.** Use **Open files** to see file dependencies and symbols, or
+   **Open component** when a part has named responsibilities. **Only
+   connections** narrows the graph; **Focus selection** frames a node and its
+   neighbors.
+4. **Make a change.** Add an import or function call between two files and
+   save. The map highlights the new relationship.
+5. **Review it.** Open **Activity**. **Files** shows the save with its diff and
+   changed symbols; **Relationships** shows the added call or import with a
+   link to its source.
 
-**Activity → Files** shows the hook setup status and the last event Mycel
-received from each configured agent. After a supported edit, its row and diff
-show the provider, session, and confidence.
+Graph and change selections are kept in the URL, so browser back and forward
+reopen them.
 
-- **Codex** requires a one-time review of the Mycel hook in **Settings → Hooks**
-  or `/hooks` in the CLI. It reports successful native `apply_patch` operations.
-  An addition with exact content evidence is **confirmed**. Other matches
-  are **inferred**. [Codex hooks reference](https://learn.chatgpt.com/docs/hooks)
-- **Cursor** reports completed Agent file edits and Mycel matches them to
-  indexed saves. [Cursor hooks reference](https://cursor.com/docs/hooks)
-- **Claude Code** reports its `Edit` and `Write` tool calls. Exact content
-  matches for `Write` are **confirmed**. [Claude Code hook reference](https://code.claude.com/docs/en/hooks)
+## Name your subsystems
 
-Competing evidence for the same indexed save shows **Agent unknown**. Shell
-writes, Cursor Tab completions, and ordinary saves appear as file changes.
-Mycel keeps attribution metadata and hashes in its local database.
+The default map groups code by package or folder. To see real subsystems such
+as Orders, Payments, or persistence, have a coding agent write
+`.mycel/architecture.json` for you:
 
-## Workspace
+```sh
+mycel install-skill   # adds the skill to .agents/skills and .claude/skills
+```
 
-| Directory | Package | Responsibility |
+Then ask Codex or Claude Code to use the `mycel-architecture` skill. Check the
+result with:
+
+```sh
+mycel architecture
+```
+
+This lists unassigned files, tie warnings, and patterns that match no indexed
+file. To break one part down further, ask your agent something like "Add a
+Mycel drill-down for Repository indexing", then inspect it with
+`mycel architecture --component <name-or-id>`. See the
+[architecture file format](docs/ARCHITECTURE_MAP.md#architecture-file-format).
+
+If the file is invalid, the dashboard keeps the default map and shows a
+validation message.
+
+## See which agent made a change
+
+**Activity → Files** shows the hook status for each detected agent and the
+last event it sent. After a supported edit, the file row and diff show the
+provider, session, and a confidence level: **confirmed** when Mycel matched the
+exact content, otherwise **inferred**.
+
+| Agent | What it reports | Setup |
 | --- | --- | --- |
-| `packages/cli` | `@mycel/cli` | Command-line entry point and application lifecycle |
-| `packages/agents` | `@mycel/agents` | Provider hook adapters for local attribution |
-| `packages/server` | `@mycel/server` | Local HTTP API, events, and static asset serving |
-| `packages/core` | `@mycel/core` | Indexing, watching, semantic extraction, and change coordination |
-| `packages/parser` | `@mycel/parser` | Source structure extraction |
-| `packages/db` | `@mycel/db` | SQLite persistence and queries |
-| `packages/shared` | `@mycel/shared` | Shared contracts and utilities |
-| `apps/web` | `@mycel/web` | Browser dashboard and source exploration |
+| Codex | Successful `apply_patch` edits | Approve the Mycel hook once in **Settings → Hooks** or `/hooks` ([reference](https://learn.chatgpt.com/docs/hooks)) |
+| Claude Code | `Edit` and `Write` tool calls | Automatic ([reference](https://code.claude.com/docs/en/hooks)) |
+| Cursor | Completed Agent file edits | Automatic ([reference](https://cursor.com/docs/hooks)) |
 
-See the [package task lists](docs/tasks/) for remaining work.
+Shell writes, Cursor Tab completions, and ordinary saves appear as unattributed
+file changes. When evidence for one save conflicts, it shows **Agent unknown**.
+Hooks you configured manually are controlled in the agent's own settings.
 
-## Development
+## Commands
 
-Requires Node.js 22 or newer and pnpm 10.34.7 (pinned in `package.json`).
-If pnpm is unavailable, run `npx pnpm@10.34.7` in place of `pnpm` below.
+| Command | What it does |
+| --- | --- |
+| `mycel` | Index the current repository and open the dashboard |
+| `mycel --no-open` | Start without opening a browser; open the printed URL yourself |
+| `mycel --no-agent-hooks` | Turn off automatic agent attribution for this repository |
+| `mycel install-skill` | Add the `mycel-architecture` skill for Codex and Claude Code |
+| `mycel architecture` | Validate `.mycel/architecture.json`; exits 1 if it is missing or invalid, or a pattern matches nothing |
+| `mycel architecture --component <name-or-id>` | Show a part's files, connections, and responsibility assignments |
+| `mycel --help`, `mycel --version` | Show usage or version |
 
-```sh
-pnpm install
-pnpm build
-pnpm typecheck
-pnpm test
-```
+## Privacy and local data
 
-### Browser workflow tests
+Mycel runs entirely on your machine. The dashboard server listens only on
+`127.0.0.1`, on an available port chosen at each launch. The index, change
+history, and attribution metadata are stored in a SQLite database outside your
+repository:
 
-Install Chromium once, then run the full dashboard workflow:
+- macOS: `~/Library/Application Support/Mycel`
+- Linux: `$XDG_DATA_HOME/mycel`, or `~/.local/share/mycel`
+- Windows: `%LOCALAPPDATA%\Mycel`
 
-```sh
-pnpm exec playwright install chromium
-pnpm test:workflow
-```
+The only files Mycel writes to your repository are the ones you ask for:
+`.mycel/architecture.json` (written by your agent) and the skill files from
+`mycel install-skill`. Attribution hooks go in each agent's user settings.
 
-The workflows use disposable Git repositories and a real server, watcher,
-SQLite database, and Chromium browser. They cover structural navigation,
-source and diffs, live updates and SSE recovery, and architecture connection
-and relationship review. See the [workflow guide](docs/testing/dashboard-workflow.md)
-for the dashboard checks and an external coding agent mode.
+## Troubleshooting
 
-Code quality commands run across the workspace:
+- **`mycel: command not found`.** Run `pnpm setup`, restart your shell, and
+  repeat the link step in [Install from source](#install-from-source).
+- **The browser didn't open.** Copy the URL printed in the terminal, or start
+  with `mycel --no-open`.
+- **The map is empty.** Save a TypeScript, TSX, or Python file in a path that
+  isn't ignored by `.gitignore`.
+- **The map failed to load.** Use **Retry**. A failed refresh keeps the last
+  loaded map visible.
+- **Codex edits show no agent.** Approve the Mycel hook in Codex under
+  **Settings → Hooks** or `/hooks`.
 
-```sh
-pnpm lint          # Check JavaScript, TypeScript, and React hooks
-pnpm lint:fix      # Apply safe automatic lint fixes
-pnpm format        # Format source code and configuration files
-pnpm format:check  # Check formatting without changing files
-```
+## Documentation
 
-ESLint checks code correctness; Prettier handles consistent formatting.
-Formatting covers TypeScript, JavaScript, JSON, YAML, CSS, and HTML. Generated
-build output, dependencies, coverage, and the lockfile are excluded. Markdown
-documents are not automatically reformatted. Run linting and the formatting
-check alongside `pnpm typecheck` and `pnpm test` before committing.
+- [Product vision and V0 requirements](mycel_prd.md)
+- [System architecture](docs/ARCHITECTURE.md)
+- [Architecture map and `architecture.json`](docs/ARCHITECTURE_MAP.md)
+- [Local HTTP API](packages/server/README.md)
+- [Semantic graph](docs/SEMANTIC_GRAPH.md),
+  [feature discovery](docs/FEATURE_DISCOVERY.md), and
+  [behaviour tracing](docs/BEHAVIOUR_TRACING.md) (experimental, API only)
 
-Build runs in dependency order and emits JavaScript, declarations, and source
-maps into each package's `dist/` directory. Typecheck builds first so workspace
-imports can resolve dependency declarations, then checks each package without
-emitting additional files.
+## Contributing
 
-Internal dependencies use `workspace:*` and imports use package names such as
-`@mycel/shared`. The CLI uses server and core to launch the dashboard, and
-agents and db to record hooks. Server depends on core, and core depends on
-parser and db. Shared is available to every consumer, and web
-depends only on shared to keep backend modules out of the browser.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, tests, and the
+workspace layout. Remaining work is tracked in the
+[package task lists](docs/tasks/).
 
-For development with hot reload, run these commands in separate terminals:
+## License
 
-```sh
-pnpm dev:server
-pnpm dev:web
-```
-
-Open http://127.0.0.1:5173. Vite proxies `/api` requests to Hono at
-http://127.0.0.1:3000, so the frontend always uses relative API URLs. The
-standalone development server selects the Mycel workspace itself.
-
-To launch Mycel directly from the workspace without globally linking it:
-
-```sh
-pnpm build
-pnpm start
-```
-
-This is the same default launch as `mycel`: the browser opens automatically at
-the URL printed in the terminal. One Node.js process serves both `/api` and the
-compiled Vite application in `apps/web/dist`; a Vite process is not needed.
-Static paths are resolved relative to the server module, independent of the
-working directory. Browser navigation to client routes serves `index.html`; unknown
-API routes and missing assets return 404.
-
-The connection badge starts at **Checking…**, then displays **Connected** only
-after a successful health response. It checks again every five seconds and
-shows **Disconnected** on errors or after a three-second request timeout.
-
-Check that the process is responding:
-
-```sh
-curl 'http://127.0.0.1:<port>/api/health'
-# {"status":"ok"}
-```
-
-Replace `<port>` with the port printed by `mycel` (or use port 3000 for
-`pnpm dev:server`). The health endpoint currently checks process liveness.
-Startup completes an initial index before listening. Each restart rescans the
-repository and watches source changes while running. Progress reporting remains planned. The server binds
-only to the loopback interface. Stop it with Ctrl+C.
-
-For a fixed-port server without browser launch, build first with `pnpm build`,
-then run `pnpm --filter @mycel/server start` at http://127.0.0.1:3000. The server
-package exports `createApp(options)` for in-process requests and
-`startIndexedServer(port, options)` for startup with indexing, and
-`startServer(port = 3000, options)` for callers supplying their own graph queries. Importing either the server or
-CLI package does not start a listener or open a browser.
-
-Query the indexed graph using the dev server (port 3000) or the CLI's printed port:
-
-```sh
-curl 'http://127.0.0.1:3000/api/graph/search?q=indexRepository&limit=10'
-```
-
-Use an ID from `nodes` to request `/api/graph/nodes/<id>` or
-`/api/graph/nodes/<id>/neighborhood?depth=2&limit=50`. See
-[graph route parameters](packages/server/README.md#graph-routes) for limits.
-
-Semantic application graphs are indexed alongside the structural graph. Query
-`/api/graph/semantic?limit=100` and
-`/api/graph/semantic/<id>/neighborhood?depth=4&limit=100` for supported React/TSX
-and Next.js applications. See [semantic extraction rules and source annotations](docs/SEMANTIC_GRAPH.md)
-for the supported scope and fixture path. Automatic candidates and their memberships
-are available at `/api/graph/semantic/features?status=candidate` and
-`/api/graph/semantic/features/<id>`. See [feature discovery rules](docs/FEATURE_DISCOVERY.md)
-for confidence, explicit overrides, and limitations.
-
-Evidence-backed behaviour traces are available at `/api/graph/behaviour/entries`
-and `/api/graph/behaviour/<id>?direction=forward&maxDepth=12&maxPaths=20`.
-Use `direction=reverse` with a selected structural function ID for supported callers.
-See [behaviour tracing scope and boundaries](docs/BEHAVIOUR_TRACING.md) for the
-React → native fetch → Next App Router → Prisma path.
-
-Add shadcn/ui components from `apps/web`, for example
-`pnpm dlx shadcn@latest add dialog`. Generated components land in
-`apps/web/src/components/ui`.
-
-To build one package and its dependencies:
-
-```sh
-pnpm --filter @mycel/core... build
-```
+Mycel does not have a license yet. Choosing one is tracked in the
+[release tasks](docs/tasks/tooling-and-release.md).

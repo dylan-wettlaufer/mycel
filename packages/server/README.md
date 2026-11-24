@@ -29,6 +29,25 @@ startup helper. It returns a listening server with graph routes ready. Use
 `databasePath: ":memory:"` for a temporary index, or an absolute path outside
 the repository for custom storage. Calling `server.close()` also closes storage.
 
+## Health and static serving
+
+```sh
+curl 'http://127.0.0.1:<port>/api/health'
+# {"status":"ok"}
+```
+
+Use the port printed by `mycel`, or 3000 for `pnpm dev:server`. The health
+endpoint reports process liveness only. Startup completes the initial index
+before listening, so a healthy response means the graph is ready. The
+dashboard's connection badge shows **Checking…**, then **Connected** after a
+successful response. It polls every five seconds and shows **Disconnected** on
+errors or after a three-second timeout.
+
+When `webDistPath` is set, the same process serves the compiled dashboard.
+Navigation to client routes returns `index.html`; unknown API routes and
+missing assets return 404. Importing the server or CLI package never starts a
+listener or opens a browser.
+
 ## Attach graph queries
 
 `createApp({ project, graph, webDistPath? })` supports in-process requests.
@@ -148,6 +167,15 @@ and project/health behavior.
   recorded change, the stream sends an ID-less `attribution` notice so Activity
   can refetch history without advancing its change cursor.
 
+
+### Semantic graph queries
+
+`GET /api/graph/semantic?limit=100` and
+`GET /api/graph/semantic/:id/neighborhood?depth=4&limit=100` return the semantic
+application graph for supported React/TSX and Next.js applications. It is
+indexed alongside the structural graph. See
+[semantic extraction rules](../../docs/SEMANTIC_GRAPH.md) for scope, source
+annotations, and the fixture.
 
 ### Feature discovery queries
 
