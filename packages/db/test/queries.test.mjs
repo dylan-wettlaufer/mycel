@@ -417,6 +417,20 @@ test("node details find related files independently of truncated caller lists", 
   assert.equal(getNodeDetails(db, "missing-project", "root"), undefined);
 });
 
+test("file and symbol filters apply before the search limit", (t) => {
+  const files = Array.from({ length: 105 }, (_, i) =>
+    node("file-" + i, "match" + i + ".ts", { kind: "file" }),
+  );
+  const db = fixture(t, [...files, node("symbol", "zmatch")]);
+  const symbols = searchSymbols(db, project.id, "match", 100, "symbols");
+  assert.deepEqual(ids(symbols), ["symbol"]);
+  assert.equal(symbols.truncated, false);
+  assert.equal(
+    searchSymbols(db, project.id, "match", 100, "files").truncated,
+    true,
+  );
+});
+
 test("default limits bound search, relationship lists, and wide neighborhoods", (t) => {
   const children = Array.from({ length: 105 }, (_, i) =>
     node(`child-${String(i).padStart(3, "0")}`),

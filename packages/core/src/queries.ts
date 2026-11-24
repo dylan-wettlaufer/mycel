@@ -92,8 +92,8 @@ export function createGraphQueries(
     getStats: () => getGraphStats(database, projectId),
     getFileContent: (path, revision) =>
       getFileContent(database, projectId, path, revision),
-    searchSymbols: ({ q, limit }) =>
-      searchSymbols(database, projectId, q, limit),
+    searchSymbols: ({ q, limit, kind }) =>
+      searchSymbols(database, projectId, q, limit, kind),
     getNodeDetails: (id, { limit } = {}) =>
       getNodeDetails(database, projectId, id, limit),
     getNeighborhood: (id, { depth, limit } = {}) =>

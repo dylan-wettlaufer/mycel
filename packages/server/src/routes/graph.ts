@@ -210,8 +210,18 @@ export function createGraphRoutes(graph?: GraphQueries) {
       throw new HTTPException(400, {
         message: "q must be a nonempty string of at most 1000 characters",
       });
+    const kinds = context.req.queries("kind");
+    const kind = kinds?.[0];
+    if (
+      kinds &&
+      (kinds.length !== 1 || (kind !== "files" && kind !== "symbols"))
+    )
+      throw new HTTPException(400, {
+        message: "kind must be files or symbols",
+      });
     const query: SearchQuery = {
       q,
+      ...(kind === "files" || kind === "symbols" ? { kind } : {}),
       limit: integerParameter(
         context.req.queries("limit"),
         "limit",
