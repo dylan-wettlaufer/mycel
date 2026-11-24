@@ -25,10 +25,18 @@ async function main() {
     command === "history" &&
     positionals.length === 2 &&
     (provider === "status" || provider === "clear");
+  const isProjectRemoval =
+    command === "project" && provider === "remove" && positionals.length === 2;
+  const isHooks =
+    command === "hooks" &&
+    positionals.length === 2 &&
+    (provider === "status" || provider === "uninstall");
   if (
     positionals.length &&
     !isAgentHook &&
     !isHistory &&
+    !isProjectRemoval &&
+    !isHooks &&
     (!["architecture", "install-skill"].includes(command ?? "") ||
       positionals.length !== 1)
   )
@@ -42,6 +50,8 @@ async function main() {
     console.info(`Usage: mycel [options]
        mycel architecture [--component <name-or-id>]
        mycel history <status|clear>
+       mycel project remove
+       mycel hooks <status|uninstall>
        mycel install-skill
        mycel agent-hook <claude-code|codex|cursor>
 
@@ -55,6 +65,8 @@ Commands:
                  and responsibility assignments.
   history        Inspect source storage and event counts, or clear past history
                  while retaining the current index.
+  project remove Remove this repository's local index and history.
+  hooks          Inspect or uninstall Mycel-managed user-level agent hooks.
   install-skill  Add the mycel-architecture agent skill to .agents/skills
                  (Codex) and .claude/skills (Claude Code) in this repository.
   agent-hook     Record coding agent hook metadata from stdin for local attribution.
@@ -96,6 +108,32 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
     return;
   }
 
+  if (isProjectRemoval) {
+    const { removeProjectData } = await import("./history.js");
+    await removeProjectData();
+    return;
+  }
+
+  if (isHooks) {
+    const { manageAgentHooks } = await import("./setup-agent-hooks.js");
+    const { resolveRepository } = await import("./repository.js");
+    const { root } = await resolveRepository();
+    const { captureEnabled, results } = await manageAgentHooks(provider, root);
+    console.info(
+      `Managed capture for this repository: ${captureEnabled ? "enabled" : "disabled"}`,
+    );
+    for (const result of results) {
+      const status =
+        result.error ??
+        (provider === "uninstall"
+          ? `removed ${result.count}`
+          : `${result.count} registered`);
+      console.info(`${result.provider}: ${status} · ${result.path}`);
+    }
+    if (results.some((result) => result.error)) process.exitCode = 1;
+    return;
+  }
+
   if (isAgentHook) {
     const { runAgentHook } = await import("./agent-hook.js");
     await runAgentHook(
@@ -110,6 +148,12 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
 
   const { launchDashboard } = await import("./launch.js");
   const { server, project, url } = await launchDashboard({
+    onInitialProgress: ({ message, indexedFiles, totalFiles }) =>
+      console.info(
+        totalFiles === null
+          ? message
+          : `${message} (${indexedFiles}/${totalFiles})`,
+      ),
     agentHooks: values["no-agent-hooks"] ? "disabled" : "enabled",
     ...(values["no-open"] ? { openBrowser: async () => {} } : {}),
   });
@@ -139,9 +183,3 @@ main().catch((error: unknown) => {
   );
   process.exitCode = 1;
 });
-    onInitialProgress: ({ message, indexedFiles, totalFiles }) =>
-      console.info(
-        totalFiles === null
-          ? message
-          : `${message} (${indexedFiles}/${totalFiles})`,
-      ),

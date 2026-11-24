@@ -285,7 +285,7 @@ test("help and version work without launching, and obsolete subcommands are reje
   );
 });
 
-test("history commands from a nested folder report deduplicated storage and reclaim old source", async (t) => {
+test("local data commands inspect, clear, and remove only the selected repository index", async (t) => {
   const { root, nested } = await repository(t);
   const home = await fixture(t);
   const dataDirectory =
@@ -300,9 +300,9 @@ test("history commands from a nested folder report deduplicated storage and recl
     XDG_DATA_HOME: home,
     LOCALAPPDATA: home,
   };
-  const run = async (action) =>
+  const run = async (action, command = "history") =>
     (
-      await execFileAsync(process.execPath, [binary, "history", action], {
+      await execFileAsync(process.execPath, [binary, command, action], {
         cwd: nested,
         env,
       })
@@ -357,9 +357,23 @@ test("history commands from a nested folder report deduplicated storage and recl
   try {
     assert.equal(getFileContent(reopened, id, "two.ts", 1), undefined);
     assert.equal(getFileContent(reopened, id, "one.ts").content, currentSource);
+    await assert.rejects(
+      run("remove", "project"),
+      /Close any running Mycel dashboards/,
+    );
+    assert.equal(getFileContent(reopened, id, "one.ts").content, currentSource);
   } finally {
     reopened.close();
   }
+  const marker = databasePath + ".agent-hooks";
+  await writeFile(marker, "");
+  assert.match(
+    await run("remove", "project"),
+    /Removed the local index and history/,
+  );
+  assert.match(await run("status"), /No history recorded/);
+  await assert.rejects(readFile(marker), { code: "ENOENT" });
+  assert.equal(await readFile(firstPath, "utf8"), currentSource);
 });
 
 test("architecture validates the file and diagnoses working-tree assignments", async (t) => {

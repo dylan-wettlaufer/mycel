@@ -20,8 +20,9 @@ On a normal `mycel` launch, the CLI registers hooks in the user settings of
 detected Claude Code, Codex, and Cursor installations as needed, then enables
 managed capture for the current repository when setup succeeds. Run
 `mycel --no-agent-hooks` to skip registration and disable managed capture for
-that repository. To remove a registered hook, delete it in the agent's
-settings. A later normal launch can enable capture again.
+that repository. Use `mycel hooks status` to inspect managed registrations
+and `mycel hooks uninstall` to remove them from user settings. A later normal
+launch can register hooks again.
 
 The watcher records file changes. Hooks supply session evidence for those
 changes in Activity. See [agent setup and attribution](../../README.md#see-which-agent-made-a-change).
@@ -44,6 +45,7 @@ changes in Activity. See [agent setup and attribution](../../README.md#see-which
 - [x] Expose attribution through history queries and signal updates over SSE.
 - [x] Set up hooks for detected agents on normal CLI launch and provide a
       per-repository opt-out for managed capture.
+- [x] Inspect and uninstall managed registrations through the CLI.
 - [ ] Add agent session filters once users have sessions to review.
 - [ ] Record explicit agent session lifecycle events if session review needs
       them.
