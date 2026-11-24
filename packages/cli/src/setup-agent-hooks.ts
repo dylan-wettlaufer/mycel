@@ -65,6 +65,77 @@ function hasCommand(
   );
 }
 
+function hookEvents(provider: AgentProvider): string[] {
+  return provider === "cursor"
+    ? ["afterFileEdit"]
+    : provider === "codex"
+      ? ["PostToolUse"]
+      : ["PreToolUse", "PostToolUse", "PostToolUseFailure"];
+}
+
+function isManagedCommand(entry: unknown, provider: AgentProvider): boolean {
+  if (!isObject(entry) || typeof entry.command !== "string") return false;
+  const suffix = ` agent-hook ${provider} --managed`;
+  if (!entry.command.endsWith(suffix)) return false;
+  const executable = entry.command.slice(0, -suffix.length);
+  // Recognize Mycel registrations from an earlier checkout or install location.
+  return (
+    entry.command === hookCommand(provider) ||
+    executable === "mycel" ||
+    /^'(?:[^']|'"'"')+' '(?:[^']|'"'"')*\/(?:packages\/cli|@mycel\/cli)\/dist\/bin\.js'$/.test(
+      executable,
+    )
+  );
+}
+
+function managedHooks(
+  config: Record<string, unknown>,
+  provider: AgentProvider,
+  remove: boolean,
+): number {
+  if (config.hooks === undefined) return 0;
+  if (!isObject(config.hooks))
+    throw new Error("The hooks setting must be an object");
+  let count = 0;
+  for (const event of hookEvents(provider)) {
+    const entries = config.hooks[event];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) throw new Error(`${event} must be an array`);
+    const before = count;
+    const remaining: unknown[] = [];
+    for (const entry of entries) {
+      if (provider === "cursor" && isManagedCommand(entry, provider)) {
+        count++;
+        continue;
+      }
+      if (
+        provider !== "cursor" &&
+        isObject(entry) &&
+        Array.isArray(entry.hooks)
+      ) {
+        const handlers: unknown[] = entry.hooks.filter(
+          (handler: unknown) => !isManagedCommand(handler, provider),
+        );
+        const removed = entry.hooks.length - handlers.length;
+        count += removed;
+        if (remove && removed) {
+          if (
+            handlers.length ||
+            Object.keys(entry).some(
+              (key) => key !== "hooks" && key !== "matcher",
+            )
+          )
+            remaining.push({ ...entry, hooks: handlers });
+          continue;
+        }
+      }
+      remaining.push(entry);
+    }
+    if (remove && count !== before) config.hooks[event] = remaining;
+  }
+  return count;
+}
+
 function addHooks(
   config: Record<string, unknown>,
   provider: AgentProvider,
@@ -80,14 +151,8 @@ function addHooks(
 
   const hooks = (config.hooks ?? {}) as Record<string, unknown>;
   const command = hookCommand(provider);
-  const names =
-    provider === "cursor"
-      ? ["afterFileEdit"]
-      : provider === "codex"
-        ? ["PostToolUse"]
-        : ["PreToolUse", "PostToolUse", "PostToolUseFailure"];
   let changed = false;
-  for (const name of names) {
+  for (const name of hookEvents(provider)) {
     const existing = hooks[name] ?? [];
     if (!Array.isArray(existing)) throw new Error(`${name} must be an array`);
     const alreadyConfigured = existing.some((entry: unknown) => {
@@ -120,7 +185,10 @@ function addHooks(
   return changed;
 }
 
-async function register(path: string, provider: AgentProvider): Promise<void> {
+async function updateSettings(
+  path: string,
+  update: (config: Record<string, unknown>) => boolean,
+): Promise<void> {
   let original: string | undefined;
   let mode = 0o600;
   try {
@@ -135,7 +203,7 @@ async function register(path: string, provider: AgentProvider): Promise<void> {
   const config: unknown = original === undefined ? {} : JSON.parse(original);
   if (!isObject(config))
     throw new Error("The settings file must contain an object");
-  if (!addHooks(config, provider)) return;
+  if (!update(config)) return;
 
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.mycel-${randomUUID()}`;
@@ -150,7 +218,7 @@ async function register(path: string, provider: AgentProvider): Promise<void> {
     });
     if (latest !== original)
       throw new Error(
-        "The settings changed while Mycel was updating them. Restart Mycel to retry",
+        "The settings changed while Mycel was updating them. Run the command again to retry",
       );
     await rename(temporary, path);
   } finally {
@@ -175,18 +243,16 @@ export async function hasProjectAgentHooks(
   }
 }
 
-/** Register one user-level hook per detected provider, without touching repository files. */
-export async function setupAgentHooks(
-  root: string,
-  home = homedir(),
-  environment = process.env,
-): Promise<AgentHookSetup[]> {
-  const agents: {
-    provider: AgentProvider;
-    directory: string;
-    file: string;
-    commands: string[];
-  }[] = [
+function settingsTargets(
+  home: string,
+  environment: NodeJS.ProcessEnv,
+): {
+  provider: AgentProvider;
+  directory: string;
+  file: string;
+  commands: string[];
+}[] {
+  return [
     {
       provider: "codex",
       directory:
@@ -213,11 +279,19 @@ export async function setupAgentHooks(
       commands: ["claude"],
     },
   ];
+}
+
+/** Register one user-level hook per detected provider, without touching repository files. */
+export async function setupAgentHooks(
+  root: string,
+  home = homedir(),
+  environment = process.env,
+): Promise<AgentHookSetup[]> {
   const directories = (environment.PATH ?? "")
     .split(delimiter)
     .filter(isAbsolute);
   const found = await Promise.all(
-    agents.map(
+    settingsTargets(home, environment).map(
       async ({
         provider,
         directory,
@@ -244,7 +318,9 @@ export async function setupAgentHooks(
         try {
           if (await hasProjectAgentHooks(root, provider))
             return { provider, state: "configured" };
-          await register(join(directory, file), provider);
+          await updateSettings(join(directory, file), (config) =>
+            addHooks(config, provider),
+          );
           return { provider, state: "configured" };
         } catch (error) {
           return {
@@ -257,4 +333,39 @@ export async function setupAgentHooks(
     ),
   );
   return found.filter((result) => result !== undefined);
+}
+
+export async function manageAgentHooks(
+  action: "status" | "uninstall",
+  root: string,
+  home = homedir(),
+  environment = process.env,
+) {
+  const results = [];
+  for (const { provider, directory, file } of settingsTargets(
+    home,
+    environment,
+  )) {
+    const path = join(directory, file);
+    try {
+      let count = 0;
+      await updateSettings(path, (config) => {
+        count = managedHooks(config, provider, action === "uninstall");
+        return action === "uninstall" && count > 0;
+      });
+      results.push({ provider, path, count });
+    } catch (error) {
+      results.push({
+        provider,
+        path,
+        count: 0,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (action === "uninstall") await setManagedHooks(root, false);
+  return {
+    captureEnabled: await exists(managedHookMarker(root)),
+    results,
+  };
 }

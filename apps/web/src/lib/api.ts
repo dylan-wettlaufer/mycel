@@ -1,6 +1,24 @@
-import type { HealthResponse, ProjectInfo } from "@mycel/shared";
+import type { HealthResponse, IndexProgress, ProjectInfo } from "@mycel/shared";
 
 export type ConnectionStatus = "checking" | "connected" | "disconnected";
+
+function isIndexProgress(index: unknown): index is IndexProgress {
+  return (
+    typeof index === "object" &&
+    index !== null &&
+    "status" in index &&
+    (index.status === "ready" || index.status === "error") &&
+    "indexedFiles" in index &&
+    typeof index.indexedFiles === "number" &&
+    "totalFiles" in index &&
+    typeof index.totalFiles === "number" &&
+    "revision" in index &&
+    typeof index.revision === "number" &&
+    "committedAt" in index &&
+    typeof index.committedAt === "string" &&
+    (!("message" in index) || typeof index.message === "string")
+  );
+}
 
 export async function fetchHealth(
   signal: AbortSignal,
@@ -30,7 +48,14 @@ export async function fetchHealth(
   ) {
     throw new Error("Invalid source warnings");
   }
-  return { status: body.status, ...(warnings && { sourceWarnings: warnings }) };
+  const index = "index" in body ? body.index : undefined;
+  if (index !== undefined && !isIndexProgress(index))
+    throw new Error("Invalid index status");
+  return {
+    status: body.status,
+    ...(warnings && { sourceWarnings: warnings }),
+    ...(index && { index }),
+  };
 }
 
 export async function fetchProject(signal: AbortSignal): Promise<ProjectInfo> {

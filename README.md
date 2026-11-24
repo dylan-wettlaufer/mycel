@@ -69,15 +69,17 @@ mycel
 ```
 
 Mycel finds the Git root, indexes the repository, and opens the dashboard in
-your browser at the URL it prints. It keeps watching for saves until you press
-Ctrl+C. Outside a Git repository it uses the current folder.
+your browser at the URL it prints. The terminal reports initial indexing
+progress. The dashboard shows the last committed index revision and lists
+unreadable files with steps to check. Mycel keeps watching for saves until you
+press Ctrl+C. Outside a Git repository it uses the current folder.
 
 On launch, Mycel also registers attribution hooks in the user settings of any
 coding agents it detects (Codex, Claude Code, Cursor) and enables capture for
 this repository when setup succeeds. Run `mycel --no-agent-hooks` to skip
-registration and disable Mycel-managed capture for this repository. To remove
-a registered hook, delete it in the agent's settings. A later normal launch
-can enable capture again. See [agent setup](#see-which-agent-made-a-change).
+registration and disable Mycel-managed capture for this repository. Use
+`mycel hooks uninstall` to remove managed registrations from user settings.
+A later normal launch can enable capture again. See [agent setup](#see-which-agent-made-a-change).
 
 ## First walkthrough
 
@@ -142,6 +144,10 @@ exact content, otherwise **inferred**.
 Shell writes, Cursor Tab completions, and ordinary saves appear as unattributed
 file changes. When evidence for one save conflicts, it shows **Agent unknown**.
 Hooks you configured manually are controlled in the agent's own settings.
+`mycel hooks status` lists managed registrations in user settings and capture
+status for the current repository. `mycel hooks uninstall` removes those
+user-level registrations and disables capture for the current repository.
+A later normal launch can register hooks again.
 
 ## Commands
 
@@ -155,6 +161,9 @@ Hooks you configured manually are controlled in the agent's own settings.
 | `mycel architecture --component <name-or-id>` | Show a part's files, connections, and responsibility assignments |
 | `mycel history status` | Show recorded history and source storage for this repository |
 | `mycel history clear` | Remove past history, reclaim SQLite space, and keep the current index |
+| `mycel project remove` | Remove this repository's local index and history after closing its dashboards |
+| `mycel hooks status` | Show managed hooks and whether capture is enabled for this repository |
+| `mycel hooks uninstall` | Remove managed user-level registrations and disable capture for this repository |
 | `mycel --help`, `mycel --version` | Show usage or version |
 
 ## Privacy and local data

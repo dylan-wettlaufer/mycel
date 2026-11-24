@@ -3,7 +3,12 @@ import type { HistoryQueries } from "./history-queries.js";
 import { createArchitectureQueries } from "./architecture-map.js";
 import type { ArchitectureQueries } from "./architecture-map.js";
 import { openDatabase } from "@mycel/db";
-import type { IndexingSettings, Project, ProjectInfo } from "@mycel/shared";
+import type {
+  IndexingSettings,
+  IndexProgress,
+  Project,
+  ProjectInfo,
+} from "@mycel/shared";
 import type { GraphUpdateTiming } from "./live-index.js";
 import { watchRepository } from "./live-index.js";
 import { createGraphQueries } from "./queries.js";
@@ -16,6 +21,7 @@ export interface IndexedProjectOptions {
   indexing?: Partial<IndexingSettings>;
   debounceMs?: number;
   onError?(error: unknown): void;
+  onInitialProgress?(progress: IndexProgress): void;
 }
 
 export interface IndexedProject {
@@ -25,6 +31,7 @@ export interface IndexedProject {
   architecture: ArchitectureQueries;
   readonly lastUpdate: GraphUpdateTiming | undefined;
   getSourceWarnings(): string[];
+  getIndexProgress(): IndexProgress;
   flush(): Promise<void>;
   close(): void;
 }
@@ -42,6 +49,9 @@ export async function openIndexedProject(
   try {
     const live = await watchRepository({
       project: options.project,
+      ...(options.onInitialProgress && {
+        onInitialProgress: options.onInitialProgress,
+      }),
       database,
       onError:
         options.onError ??
@@ -78,6 +88,7 @@ export async function openIndexedProject(
         return live.lastUpdate;
       },
       getSourceWarnings: live.getSourceWarnings,
+      getIndexProgress: live.getIndexProgress,
       flush: live.flush,
       close: () => {
         shutdown.abort();

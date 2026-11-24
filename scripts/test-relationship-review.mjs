@@ -3,6 +3,7 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
+  rename,
   readFile,
   readdir,
   rm,
@@ -52,7 +53,13 @@ try {
           name: "Orders",
           purpose: "Accepts orders.",
           kind: "app",
-          paths: ["app/**", "OrderForm.tsx", "submit.ts", "services/**"],
+          paths: [
+            "app/**",
+            "OrderForm.tsx",
+            "components/**",
+            "submit.ts",
+            "services/**",
+          ],
         },
         {
           id: "payments",
@@ -237,6 +244,113 @@ try {
   });
   await expect(old.getByRole("heading")).toContainText("services/orders.ts:7");
   await expect(old.locator(".view-lines")).toContainText("authorizePayment();");
+
+  await page.goto(base);
+  await page.getByTestId("rf__node-orders").click();
+  await sidebar.getByRole("button", { name: "Walk through a flow" }).click();
+  const flow = sidebar.getByRole("region", { name: "Flow walkthrough" });
+  const submit = flow.getByRole("button", { name: /Trace .*onSubmit/ });
+  await submit.click();
+  await expect(
+    flow.getByText("Handle POST Request", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    flow.getByText("Create Order Record", { exact: true }),
+  ).toBeVisible();
+  const postPath = flow
+    .getByRole("region", { name: /Trace path/ })
+    .filter({ hasText: "Create Order Record" });
+  await expect(
+    postPath.getByText("Reached a persistence operation."),
+  ).toBeVisible();
+  await flow
+    .getByRole("button", { name: "View source for Handle POST Request" })
+    .click();
+  await expect(
+    flow.getByRole("region", { name: "Source code" }).getByRole("heading"),
+  ).toHaveText(/app\/api\/orders\/route.ts:\d+/);
+  await flow.getByRole("button", { name: "Back to flow" }).click();
+  await expect(
+    sidebar.getByRole("heading", { name: "Orders", exact: true }),
+  ).toBeVisible();
+  await expect(submit).toHaveAttribute("aria-pressed", "true");
+  await flow
+    .getByRole("button", { name: "View source for Create Order Record" })
+    .click();
+  await expect(
+    flow.getByRole("region", { name: "Source code" }).getByRole("heading"),
+  ).toHaveText(/services\/orders.ts:\d+/);
+  await flow.getByRole("button", { name: "Back to flow" }).click();
+
+  await writeFile(
+    join(root, "payments/gateway.ts"),
+    "export function authorizePayment() {}\n",
+  );
+  await mkdir(join(root, "components"));
+  await rename(
+    join(root, "OrderForm.tsx"),
+    join(root, "components/OrderForm.tsx"),
+  );
+  const moved = join(root, "components/OrderForm.tsx");
+  await writeFile(
+    moved,
+    (await readFile(moved, "utf8")).replace(
+      "from './submit'",
+      "from '../submit'",
+    ),
+  );
+  const pagePath = join(root, "app/orders/page.tsx");
+  await writeFile(
+    pagePath,
+    (await readFile(pagePath, "utf8")).replace(
+      "../../OrderForm",
+      "../../components/OrderForm",
+    ),
+  );
+  const proposalFile = join(root, ".mycel/agent-proposals.json");
+  await writeFile(
+    proposalFile,
+    JSON.stringify({
+      version: 1,
+      proposals: [
+        {
+          part: "orders",
+          agent: "Fixture agent",
+          label: "Order submission",
+          path: "components/OrderForm.tsx",
+          line: 10,
+          calls: "payments",
+        },
+      ],
+    }),
+  );
+  await expect(
+    sidebar.getByRole("heading", { name: "Orders", exact: true }),
+  ).toBeVisible();
+  await expect(submit).toContainText("components/OrderForm.tsx");
+  await expect(
+    flow.getByText("Source matched", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    flow.getByText("Unsupported call claim to payments"),
+  ).toBeVisible();
+  await expect(liveEdge).toHaveCount(0);
+  await submit.click();
+  await expect(
+    flow.getByText("Create Order Record", { exact: true }),
+  ).toBeVisible();
+
+  const requestPath = join(root, "submit.ts");
+  const request = await readFile(requestPath, "utf8");
+  await writeFile(
+    requestPath,
+    request.replaceAll("fetch('/api/orders'", "fetch(String('/api/orders')"),
+  );
+  await expect(
+    flow
+      .getByText("Tracing stopped at an unsupported step.", { exact: false })
+      .first(),
+  ).toBeVisible();
 
   console.log("PASS: relationship changes, live source, and review workflow");
 } finally {

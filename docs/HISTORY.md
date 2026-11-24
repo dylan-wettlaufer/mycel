@@ -60,6 +60,13 @@ concurrent connection blocks compaction, close other Mycel sessions for the
 repository and run the command again. A running watcher can record subsequent
 edits. Reload open dashboards to discard activity already loaded in memory.
 
+To remove all indexed project data, close the dashboards for that
+repository and run `mycel project remove`. It deletes the current graph,
+source archive, activity, and managed capture marker, then compacts the
+SQLite file. The remaining database contains the schema so Mycel can
+create a fresh index on the next launch. Your working files stay in the
+repository.
+
 For partial retention, `pruneHistory(database, projectId, beforeId)` deletes
 events before an exclusive ID. It preserves current source and both source
 sides of retained events. Cursor replay resumes with retained events.

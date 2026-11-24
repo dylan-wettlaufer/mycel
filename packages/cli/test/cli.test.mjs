@@ -134,7 +134,10 @@ test("starts the dashboard and selected project before opening the browser", asy
     openBrowser: async (url) => {
       openedUrl = url;
       const health = await fetch(`${url}/api/health`);
-      assert.deepEqual(await health.json(), { status: "ok" });
+      const { status, index } = await health.json();
+      assert.equal(status, "ok");
+      assert.equal(index.revision, 1);
+      assert.equal(index.indexedFiles, 1);
       const response = await fetch(`${url}/api/project`);
       assert.deepEqual(await response.json(), { name: basename(root), root });
       const search = await fetch(`${url}/api/graph/search?q=sample`);
@@ -242,6 +245,8 @@ test(
         reject(new Error(`CLI exited with ${code}: ${errors}`));
       });
     });
+    assert.match(output, /Discovering source files/);
+    assert.match(output, /Reading and parsing source \(0\/1\)/);
     assert.ok(output.includes(`Repository: ${root}`));
     const project = await fetch(`${url}/api/project`);
     assert.deepEqual(await project.json(), { name: basename(root), root });
@@ -280,7 +285,7 @@ test("help and version work without launching, and obsolete subcommands are reje
   );
 });
 
-test("history commands from a nested folder report deduplicated storage and reclaim old source", async (t) => {
+test("local data commands inspect, clear, and remove only the selected repository index", async (t) => {
   const { root, nested } = await repository(t);
   const home = await fixture(t);
   const dataDirectory =
@@ -295,9 +300,9 @@ test("history commands from a nested folder report deduplicated storage and recl
     XDG_DATA_HOME: home,
     LOCALAPPDATA: home,
   };
-  const run = async (action) =>
+  const run = async (action, command = "history") =>
     (
-      await execFileAsync(process.execPath, [binary, "history", action], {
+      await execFileAsync(process.execPath, [binary, command, action], {
         cwd: nested,
         env,
       })
@@ -352,9 +357,23 @@ test("history commands from a nested folder report deduplicated storage and recl
   try {
     assert.equal(getFileContent(reopened, id, "two.ts", 1), undefined);
     assert.equal(getFileContent(reopened, id, "one.ts").content, currentSource);
+    await assert.rejects(
+      run("remove", "project"),
+      /Close any running Mycel dashboards/,
+    );
+    assert.equal(getFileContent(reopened, id, "one.ts").content, currentSource);
   } finally {
     reopened.close();
   }
+  const marker = databasePath + ".agent-hooks";
+  await writeFile(marker, "");
+  assert.match(
+    await run("remove", "project"),
+    /Removed the local index and history/,
+  );
+  assert.match(await run("status"), /No history recorded/);
+  await assert.rejects(readFile(marker), { code: "ENOENT" });
+  assert.equal(await readFile(firstPath, "utf8"), currentSource);
 });
 
 test("architecture validates the file and diagnoses working-tree assignments", async (t) => {

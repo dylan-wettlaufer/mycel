@@ -54,7 +54,7 @@ export function App() {
     useState<ArchitectureChangeWindow>("branch");
   const activity = useActivity();
   const historyRevision = activity.revision + activity.attributionRevision;
-  const { connection, sourceWarnings } = useBackendHealth();
+  const { connection, sourceWarnings, index } = useBackendHealth();
   const { project, error } = useProject(connection);
   const architecture = useResource(
     (view === "Graph" && ((!nodeId && !files) || component || part)) ||
@@ -121,6 +121,19 @@ export function App() {
       connection={connection}
       liveConnection={activity.connection}
     >
+      {index?.committedAt && (
+        <p
+          className="mb-2 shrink-0 text-xs text-muted-foreground"
+          aria-label="Index freshness"
+        >
+          Revision {index.revision} · {index.indexedFiles} indexed files ·{" "}
+          <time dateTime={index.committedAt}>
+            {new Date(index.committedAt).toLocaleTimeString()}
+          </time>
+          {connection === "disconnected" && " · Last known revision"}
+          {index.message && ` · ${index.message}`}
+        </p>
+      )}
       {sourceWarnings.length > 0 && (
         <details className="mb-2 max-h-32 shrink-0 overflow-y-auto rounded border border-warning p-2 text-sm">
           <summary>
@@ -221,7 +234,7 @@ export function App() {
           ) : (
             <Suspense fallback={<p>Loading architecture map…</p>}>
               <ArchitectureMapView
-                revision={activity.revision}
+                revision={activity.revision + activity.architectureRevision}
                 map={architecture.data}
                 mapError={architecture.error}
                 mapLoading={architecture.loading}

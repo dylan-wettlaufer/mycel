@@ -75,6 +75,29 @@ test("reconciles ignore changes and retries failed batches without advancing has
   assert.deepEqual([...batches[2].files], [["main.ts", "changed"]]);
 });
 
+test("recovers read and commit failures on a scheduled retry without another notification", async (t) => {
+  const batches = [];
+  let fail = true;
+  const { root, queue, enqueue, errors } = await fixture(t, async (batch) => {
+    if (batch.files.size && fail) {
+      fail = false;
+      throw new Error("temporarily busy");
+    }
+    batches.push(batch);
+  });
+  const path = join(root, "main.ts");
+  await writeFile(path, Buffer.from([0xff]));
+  enqueue();
+  await queue.flush();
+  assert.equal(batches[0].readErrors.size, 1);
+  await writeFile(path, "recovered");
+  const deadline = Date.now() + 4000;
+  while (batches.length < 2 && Date.now() < deadline) await setTimeout(20);
+  assert.equal(batches[1].files.get("main.ts"), "recovered");
+  assert.equal(batches[1].readErrors.size, 0);
+  assert.equal(errors.length, 1);
+});
+
 test("serializes batches arriving during a commit and stops pending work on close", async (t) => {
   let release;
   let entered;

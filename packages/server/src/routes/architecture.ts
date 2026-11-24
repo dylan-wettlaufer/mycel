@@ -44,6 +44,21 @@ function parseEvidenceLimit(values: string[] | undefined): number | undefined {
   return parsed;
 }
 
+function parseComponent(components: string[] | undefined): string | undefined {
+  const componentId = components?.[0];
+  if (
+    components &&
+    (components.length !== 1 ||
+      !componentId ||
+      !/^[a-z0-9][a-z0-9-]{0,63}$/.test(componentId))
+  ) {
+    throw new HTTPException(400, {
+      message: "component must be a top-level part id",
+    });
+  }
+  return componentId;
+}
+
 export function createArchitectureRoutes(architecture?: ArchitectureQueries) {
   const routes = new Hono();
 
@@ -66,18 +81,7 @@ export function createArchitectureRoutes(architecture?: ArchitectureQueries) {
     const evidenceLimit = parseEvidenceLimit(
       context.req.queries("evidenceLimit"),
     );
-    const components = context.req.queries("component");
-    const componentId = components?.[0];
-    if (
-      components &&
-      (components.length !== 1 ||
-        !componentId ||
-        !/^[a-z0-9][a-z0-9-]{0,63}$/.test(componentId))
-    ) {
-      throw new HTTPException(400, {
-        message: "component must be a top-level part id",
-      });
-    }
+    const componentId = parseComponent(context.req.queries("component"));
     if (!architecture) {
       return context.json(
         { error: "Architecture queries unavailable" } satisfies ErrorResponse,
@@ -95,6 +99,19 @@ export function createArchitectureRoutes(architecture?: ArchitectureQueries) {
       });
     }
     return context.json(map);
+  });
+
+  routes.get("/parts/:id/walkthrough", async (context) => {
+    const component = parseComponent(context.req.queries("component"));
+    if (!architecture?.getPartWalkthrough)
+      return context.json({ error: "Walkthrough unavailable" }, 503);
+    const result = await architecture.getPartWalkthrough(
+      context.req.param("id"),
+      component,
+    );
+    return result
+      ? context.json(result)
+      : context.json({ error: "Part not found" }, 404);
   });
 
   return routes;

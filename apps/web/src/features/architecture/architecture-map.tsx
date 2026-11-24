@@ -564,6 +564,7 @@ export function ArchitectureMapView({
                 missingConnection ? (
                   <ArchitectureDetails
                     map={map}
+                    revision={revision}
                     selectedPart={selectedPart}
                     selectedConnection={selectedConnection}
                     missingConnection={missingConnection}

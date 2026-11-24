@@ -686,6 +686,29 @@ try {
     ),
     "mobile page must not overflow horizontally",
   );
+  const previousRevision = (await (await fetch(`${base}/api/health`)).json())
+    .index.revision;
+  await writeFile(join(root, "legacy.ts"), Buffer.from([0xff, 0xfe]));
+  const healthyPath = join(root, "math.ts");
+  await writeFile(
+    healthyPath,
+    (await readFile(healthyPath, "utf8")) +
+      "\nexport function freshnessProof() {}\n",
+  );
+  await expect(
+    page.getByText("Index incomplete", { exact: false }),
+  ).toBeVisible({ timeout: 10_000 });
+  await page.getByText("Index incomplete", { exact: false }).click();
+  await expect(page.getByText(/legacy.ts: Skipped file/)).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Search files and symbols" })
+    .fill("freshnessProof");
+  await expect(page.getByText("freshnessProof", { exact: true })).toBeVisible();
+  const next = (await (await fetch(`${base}/api/health`)).json()).index;
+  assert.ok(next.revision > previousRevision);
+  await expect(page.getByLabel("Index freshness")).toContainText(
+    `Revision ${next.revision}`,
+  );
   assert.deepEqual(errors, [], "browser runtime errors");
   assert.deepEqual(
     offOrigin,
