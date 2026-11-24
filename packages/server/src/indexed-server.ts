@@ -23,6 +23,7 @@ export async function startIndexedServer(
     server = startServer(port, {
       project: options.project,
       graph: indexed.graph,
+      getSourceWarnings: indexed.getSourceWarnings,
       history: indexed.history,
       architecture: indexed.architecture,
       ...(options.agentHooks === undefined

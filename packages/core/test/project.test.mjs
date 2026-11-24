@@ -70,10 +70,21 @@ test("failed startup closes storage and preserves the previous committed graph",
   const indexed = await openIndexedProject(options);
   const projectId = indexed.project.id;
   indexed.close();
-  await writeFile(join(options.project.root, "bad.ts"), Buffer.from([0xff]));
+  const previous = openDatabase({
+    projectRoot: options.project.root,
+    databasePath: options.databasePath,
+  });
+  try {
+    previous.exec(`
+      CREATE TRIGGER fail_startup BEFORE INSERT ON revisions
+      BEGIN SELECT RAISE(ABORT, 'startup index write failed'); END;
+    `);
+  } finally {
+    previous.close();
+  }
   await assert.rejects(
     openIndexedProject(options),
-    /Could not read repository source: bad.ts/,
+    /startup index write failed/,
   );
   assert.equal(existsSync(`${options.databasePath}-wal`), false);
   const database = openDatabase({

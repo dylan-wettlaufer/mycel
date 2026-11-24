@@ -49,6 +49,36 @@ async function fixture(t, sources, extra = {}) {
   return { root, db, live, parsed, errors, nodes, revision };
 }
 
+test("isolates unreadable files, retains the last good source, and clears recovered or deleted warnings", async (t) => {
+  const invalid = Buffer.from([0xff, 0xfe]);
+  const original = "function original() {}";
+  const { root, live, nodes, errors } = await fixture(t, {
+    "legacy.ts": invalid,
+    "main.ts": original,
+    "other.ts": "function before() {}",
+  });
+  assert.match(live.getSourceWarnings()[0], /legacy.ts: Skipped file/);
+  await writeFile(join(root, "main.ts"), invalid);
+  await writeFile(join(root, "other.ts"), "function after() {}");
+  await until(
+    () =>
+      nodes().some((n) => n.name === "after") &&
+      live.getSourceWarnings().length === 2,
+  );
+  assert.ok(nodes().some((n) => n.name === "original"));
+  assert.ok(
+    live
+      .getSourceWarnings()
+      .some((message) =>
+        message.includes("main.ts: Showing the last indexed version"),
+      ),
+  );
+  await writeFile(join(root, "main.ts"), original);
+  await rm(join(root, "legacy.ts"));
+  await until(() => live.getSourceWarnings().length === 0);
+  assert.deepEqual(errors, []);
+});
+
 test("reparses only changed files and preserves unrelated node records", async (t) => {
   const { root, db, parsed, errors, nodes, revision } = await fixture(t, {
     "main.ts": "function before() {}",

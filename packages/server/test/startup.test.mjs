@@ -45,6 +45,46 @@ test("indexed startup exposes real repository queries immediately and closes sto
   assert.equal(existsSync(`${options.databasePath}-wal`), false);
 });
 
+test("restarting the server retains unreadable source and exposes index warnings", async (t) => {
+  const options = await fixture(t);
+  const original = "export function legacy() {}";
+  const legacy = join(options.project.root, "legacy.ts");
+  await writeFile(legacy, original);
+  await close(await startIndexedServer(0, options));
+
+  const invalid = Buffer.from("export const invalid = true;", "utf16le");
+  await writeFile(legacy, Buffer.concat([Buffer.from([0xff, 0xfe]), invalid]));
+  await writeFile(
+    join(options.project.root, "skipped.ts"),
+    Buffer.from([0xff]),
+  );
+  const healthy = "export function updated() {}";
+  await writeFile(join(options.project.root, "sample.ts"), healthy);
+
+  const server = await startIndexedServer(0, options);
+  t.after(() => close(server));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const health = await fetch(`${url}/api/health`);
+  assert.equal(health.status, 200);
+  const { status, sourceWarnings } = await health.json();
+  assert.equal(status, "ok");
+  assert.equal(sourceWarnings.length, 2);
+  assert.match(
+    sourceWarnings[0],
+    /^legacy\.ts: Showing the last indexed version/,
+  );
+  assert.match(sourceWarnings[1], /^skipped\.ts: Skipped file/);
+
+  const retained = await fetch(`${url}/api/files/content?path=legacy.ts`);
+  assert.equal(retained.status, 200);
+  assert.equal((await retained.json()).content, original);
+  const updated = await fetch(`${url}/api/files/content?path=sample.ts`);
+  assert.equal(updated.status, 200);
+  assert.equal((await updated.json()).content, healthy);
+  const skipped = await fetch(`${url}/api/files/content?path=skipped.ts`);
+  assert.equal(skipped.status, 404);
+});
+
 test("a busy port rejects startup and closes the indexed project's database", async (t) => {
   const options = await fixture(t);
   const busy = startServer(0);

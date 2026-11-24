@@ -197,6 +197,11 @@ diagnostic. A later valid save replaces retained structure and clears parser
 diagnostics; deletion removes both. The initial scan retains the full-index
 behavior described above; last-valid parse caches live for the watcher session.
 
+When a source file cannot be read or decoded as UTF-8, startup and live
+updates retain its previous indexed source when available. New unreadable files
+are skipped. A `source-read` diagnostic identifies the affected file until it
+can be read again or is removed.
+
 Every graph update reconciles nodes, edges, and diagnostics in one immediate
 SQLite transaction. Unchanged records keep their revisions and diagnostic IDs.
 

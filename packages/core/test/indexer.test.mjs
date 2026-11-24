@@ -380,19 +380,18 @@ test("empty and unsupported-only repositories produce valid empty graph revision
   assert.deepEqual(result.files, []);
 });
 
-test("read/encoding failures preserve the previous graph and project metadata", async (t) => {
+test("an unreadable source is diagnosed while healthy sources are indexed", async (t) => {
   const root = await repository(t, { "main.ts": "function original() {}" });
   const db = database(t);
-  await indexRepository(options(root, db));
-  const before = snapshot(db);
   await writeFile(join(root, "bad.ts"), Buffer.from([0xff, 0xfe]));
-  const input = options(root, db);
-  input.project.name = "changed";
-  await assert.rejects(
-    indexRepository(input),
-    /Could not read repository source: bad.ts/,
+  const result = await indexRepository(options(root, db));
+  assert.deepEqual(result.files, ["main.ts"]);
+  assert.equal(result.diagnosticCount, 1);
+  assert.equal(
+    db.prepare("SELECT path FROM diagnostics WHERE code = 'source-read'").get()
+      .path,
+    "bad.ts",
   );
-  assert.deepEqual(snapshot(db), before);
 });
 
 test("a database write failure rolls back graph replacement, revision, and metadata", async (t) => {

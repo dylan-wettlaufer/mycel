@@ -26,6 +26,7 @@ export interface AppOptions {
   webDistPath?: string;
   project?: ProjectInfo;
   graph?: GraphQueries;
+  getSourceWarnings?: () => string[];
   history?: HistoryQueries;
   architecture?: ArchitectureQueries;
   agentHooks?: readonly AgentHookSetup[];
@@ -35,6 +36,7 @@ export function createApp({
   webDistPath = defaultWebDistPath,
   project,
   graph,
+  getSourceWarnings,
   history,
   architecture,
   agentHooks,
@@ -68,6 +70,8 @@ export function createApp({
 
   app.get("/api/health", (context) => {
     const response: HealthResponse = { status: "ok" };
+    const warnings = getSourceWarnings?.();
+    if (warnings?.length) response.sourceWarnings = warnings;
     return context.json(response);
   });
 

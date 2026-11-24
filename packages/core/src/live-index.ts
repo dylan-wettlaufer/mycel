@@ -1,3 +1,4 @@
+import { sourceReadDiagnostic } from "./files.js";
 import { loadModuleResolver } from "./module-resolution.js";
 import { performance } from "node:perf_hooks";
 import {
@@ -115,6 +116,15 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       [...files.values()],
       captured.resolution,
     );
+    let failures = new Map<string, Diagnostic[]>();
+    for (const [path, reason] of captured.readErrors) {
+      const issue = sourceReadDiagnostic(path, reason, files.has(path));
+      failures.set(path, [issue]);
+    }
+    initialGraph.diagnostics = [
+      ...initialGraph.diagnostics,
+      ...[...failures.values()].flat(),
+    ];
     // Concurrent watchers must compare against the same revision they replace.
     const commitGraph = options.database.transaction(
       (set: Omit<ChangeSet, "changes">) =>
@@ -132,11 +142,11 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       sources: new Map([...files].map(([path, file]) => [path, file.source])),
     });
     publish(initialCommit.events);
-    let failures = new Map<string, Diagnostic[]>();
     let lastUpdate: GraphUpdateTiming | undefined;
     queue = createSourceChangeQueue({
       root: project.root,
       indexing: project.indexing,
+      initialReadErrors: captured.readErrors,
       initialHashes: new Map(
         captured.files.map((file) => [
           file.parsed.path,
@@ -189,6 +199,13 @@ export async function watchRepository(options: WatchRepositoryOptions) {
             if (previous) retainedPaths.push(path);
           }
         }
+        for (const [path, reason] of batch.readErrors) {
+          const retained = next.has(path);
+          nextFailures.set(path, [
+            sourceReadDiagnostic(path, reason, retained),
+          ]);
+          if (retained) retainedPaths.push(path);
+        }
         const parsedAt = performance.now();
         const resolution = await loadModuleResolver(
           project.root,
@@ -239,6 +256,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     // Recheck the startup snapshot even if OS events have not arrived yet.
     for (const path of [
       ...captured.paths,
+      ...captured.readErrors.keys(),
       ...captured.metadataPaths,
       ".gitignore",
     ])
@@ -265,6 +283,14 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         return () => {
           architectureFileListeners.delete(listener);
         };
+      },
+      getSourceWarnings(): string[] {
+        const warnings: string[] = [];
+        for (const [path, diagnostics] of failures) {
+          const issue = diagnostics.find((d) => d.code === "source-read");
+          if (issue) warnings.push(`${path}: ${issue.message}`);
+        }
+        return warnings;
       },
       get lastUpdate(): GraphUpdateTiming | undefined {
         return lastUpdate;
