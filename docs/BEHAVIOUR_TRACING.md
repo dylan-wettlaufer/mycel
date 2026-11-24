@@ -5,6 +5,43 @@ references through the semantic API.
 See [feature discovery](FEATURE_DISCOVERY.md) for how Mycel groups code into
 candidate areas.
 
+## Dashboard walkthrough
+
+Select a part such as **Orders** on the architecture map and choose
+**Walk through a flow**. Its entries come from UI event bindings in that
+part's indexed files. A trace lists the supported steps and explains the
+end of each path. Open a step's source at the trace revision and use
+**Back to flow** to return to the same selection.
+
+Give a declared architecture part a stable ID and update its matched paths
+when moving implementation files between directories. The dashboard keeps
+that part selected and refreshes the available entries and evidence.
+
+An agent can put contextual labels and optional call claims in
+`.mycel/agent-proposals.json`:
+
+```json
+{
+  "version": 1,
+  "proposals": [
+    {
+      "part": "orders",
+      "agent": "Codex",
+      "label": "Order submission",
+      "path": "components/OrderForm.tsx",
+      "line": 9,
+      "calls": "payments"
+    }
+  ]
+}
+```
+
+The walkthrough shows the supplied agent and label. Mycel checks that the
+path and line exist in the selected part's committed source. A `calls`
+claim separately requires a resolved cross-file call at that line into
+the named target part. Proposals are annotations. Graph edges and trace
+steps always come from indexed source evidence.
+
 ## Representation and scope
 
 The existing semantic schema is sufficient. `service_operation` records use a

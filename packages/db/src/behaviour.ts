@@ -20,16 +20,30 @@ export function getBehaviourEntries(
   db: SqliteDatabase,
   projectId: string,
   limit = 100,
+  paths?: readonly string[],
 ): BehaviourEntryList {
   integer(limit, 1, 500, "limit");
   return db.transaction(() => {
     const rows = db
-      .prepare<[string, number], { id: string }>(
-        `SELECT id FROM semantic_entities
-      WHERE project_id = ? AND kind = 'service_operation' AND json_extract(attributes, '$.traceRole') = 'ui_event'
-      ORDER BY id LIMIT ?`,
+      .prepare<
+        { projectId: string; limit: number; paths: string | null },
+        { id: string }
+      >(
+        `SELECT entity.id FROM semantic_entities entity
+      WHERE entity.project_id = @projectId AND entity.kind = 'service_operation'
+        AND json_extract(entity.attributes, '$.traceRole') = 'ui_event'
+        AND (@paths IS NULL OR EXISTS (
+          SELECT 1 FROM semantic_sources source
+          JOIN json_each(@paths) paths ON paths.value = source.path
+          WHERE source.project_id = entity.project_id AND source.entity_id = entity.id
+        ))
+      ORDER BY entity.id LIMIT @limit`,
       )
-      .all(projectId, limit + 1);
+      .all({
+        projectId,
+        limit: limit + 1,
+        paths: paths ? JSON.stringify(paths) : null,
+      });
     const graph = readSemanticSelection(
       db,
       projectId,

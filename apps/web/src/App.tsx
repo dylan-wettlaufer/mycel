@@ -234,7 +234,7 @@ export function App() {
           ) : (
             <Suspense fallback={<p>Loading architecture map…</p>}>
               <ArchitectureMapView
-                revision={activity.revision}
+                revision={activity.revision + activity.architectureRevision}
                 map={architecture.data}
                 mapError={architecture.error}
                 mapLoading={architecture.loading}

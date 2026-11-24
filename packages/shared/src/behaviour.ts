@@ -50,3 +50,19 @@ export interface FeatureBehaviour extends SemanticGraph {
   featureId: string;
   traces: BehaviourTrace[];
 }
+
+export interface AgentProposal {
+  id: number;
+  agent: string;
+  label: string;
+  path: string;
+  line: number;
+  sourceValid: boolean;
+  calls?: string;
+  callSupported?: boolean;
+}
+
+export interface PartWalkthrough extends BehaviourEntryList {
+  proposals: AgentProposal[];
+  proposalError?: string;
+}

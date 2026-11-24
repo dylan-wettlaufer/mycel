@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { watch } from "chokidar";
 import {
   currentRevision,
+  getBehaviourEntries,
   getCrossFileLinks,
   getRepositoryGraph,
   listRecentRelationships,
@@ -20,6 +21,7 @@ import type {
   ArchitectureSource,
   ArchitectureUpdateEvent,
   ArchitectureUpdateReason,
+  PartWalkthrough,
   ProjectId,
 } from "@mycel/shared";
 import { architectureFilePath, parseArchitectureFile } from "./architecture.js";
@@ -36,6 +38,10 @@ import {
   trackConnectionEndpoints,
 } from "./architecture-git.js";
 import { isMissing, readRepositoryText } from "./files.js";
+import {
+  loadAgentProposals,
+  validateAgentProposals,
+} from "./agent-proposals.js";
 
 const execFileAsync = promisify(execFile);
 const evidenceSiteLimit = 20;
@@ -91,6 +97,10 @@ export interface ArchitectureQueries {
   getArchitecture(
     options?: ArchitectureMapQueryOptions,
   ): Promise<ArchitectureMap>;
+  getPartWalkthrough?(
+    partId: string,
+    componentId?: string,
+  ): Promise<PartWalkthrough | undefined>;
   onUpdate(listener: (event: ArchitectureUpdateEvent) => void): () => void;
   signal: AbortSignal;
 }
@@ -509,6 +519,51 @@ export function createArchitectureQueries(
         database: options.database,
         ...queryOptions,
       });
+    },
+    async getPartWalkthrough(partId, componentId) {
+      const repository = getRepositoryGraph(
+        options.database,
+        options.projectId,
+      );
+      const filePaths = repository.files.map(({ path }) => path);
+      const [loaded, proposals] = await Promise.all([
+        loadProjectArchitecture(options.projectRoot, { filePaths }),
+        loadAgentProposals(options.projectRoot),
+      ]);
+      const topLevel = assignFilesToParts(loaded.architecture, filePaths, {
+        fallback: loaded.fallback,
+      });
+      const parent = topLevel.parts.find(
+        ({ id, subcomponents }) => id === componentId && subcomponents?.length,
+      );
+      if (componentId && !parent) return undefined;
+      const assignment = parent
+        ? assignComponentFiles(topLevel, parent, new Set(filePaths))
+        : topLevel;
+      const part = assignment.parts.find(({ id }) => id === partId);
+      if (!part) return undefined;
+
+      return options.database.transaction(() => {
+        const result = getBehaviourEntries(
+          options.database,
+          options.projectId,
+          100,
+          part.files,
+        );
+        if (result.revision !== repository.revision)
+          throw new Error("The index changed during the walkthrough query");
+        return {
+          ...result,
+          proposals: validateAgentProposals(
+            options.database,
+            result,
+            assignment.fileToPart,
+            partId,
+            proposals.records,
+          ),
+          ...(proposals.error && { proposalError: proposals.error }),
+        };
+      })();
     },
     onUpdate(listener) {
       if (closed) return () => {};

@@ -14,6 +14,7 @@ import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
 import { buildProjectGraph, hashContent } from "./graph.js";
 import { architectureFilePath } from "./architecture.js";
+import { agentProposalsPath } from "./agent-proposals.js";
 import { captureRepository } from "./indexer.js";
 import type { IndexRepositoryOptions } from "./indexer.js";
 import { watchSourceFiles } from "./watcher.js";
@@ -91,17 +92,20 @@ export async function watchRepository(options: WatchRepositoryOptions) {
   let sessionId: string | undefined;
   const startup: SourceChange[] = [];
   let queue: ReturnType<typeof createSourceChangeQueue> | undefined;
-  const watcher = watchSourceFiles({
   options.onInitialProgress?.({
     status: "indexing",
     indexedFiles: 0,
     totalFiles: null,
     message: "Discovering source files",
   });
+  const watcher = watchSourceFiles({
     root: options.project.root,
     ...(options.indexing === undefined ? {} : { indexing: options.indexing }),
     onChange: (change) => {
-      if (change.path === architectureFilePath) {
+      if (
+        change.path === architectureFilePath ||
+        change.path === agentProposalsPath
+      ) {
         notifyArchitectureFile();
         return;
       }
@@ -149,10 +153,6 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     });
     publish(initialCommit.events);
     let lastUpdate: GraphUpdateTiming | undefined;
-    queue = createSourceChangeQueue({
-      root: project.root,
-      indexing: project.indexing,
-      initialReadErrors: captured.readErrors,
     let latestIndex: IndexProgress = {
       status: "ready",
       indexedFiles: files.size,
@@ -162,6 +162,10 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       revision: initialCommit.revision,
       committedAt: new Date().toISOString(),
     };
+    queue = createSourceChangeQueue({
+      root: project.root,
+      indexing: project.indexing,
+      initialReadErrors: captured.readErrors,
       initialHashes: new Map(
         captured.files.map((file) => [
           file.parsed.path,
@@ -259,10 +263,6 @@ export async function watchRepository(options: WatchRepositoryOptions) {
         const completedAt = performance.now();
         files = next;
         failures = nextFailures;
-        lastUpdate = Object.freeze({
-          revision,
-          changedPaths: Object.freeze([...batch.files.keys()]),
-          retainedPaths: Object.freeze(retainedPaths),
         latestIndex = {
           status: "ready",
           indexedFiles: files.size,
@@ -273,6 +273,10 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           revision,
           committedAt: new Date().toISOString(),
         };
+        lastUpdate = Object.freeze({
+          revision,
+          changedPaths: Object.freeze([...batch.files.keys()]),
+          retainedPaths: Object.freeze(retainedPaths),
           observedAt: batch.observedAt,
           completedAt,
           latencyMs: completedAt - batch.observedAt,
@@ -298,11 +302,11 @@ export async function watchRepository(options: WatchRepositoryOptions) {
     await queue.flush();
     return {
       project,
+      getIndexProgress: () => latestIndex,
       sessionId,
       onEvent(listener: (event: ChangeEvent) => void) {
         listeners.add(listener);
         return () => {
-      getIndexProgress: () => latestIndex,
           listeners.delete(listener);
         };
       },

@@ -34,9 +34,11 @@ import {
   type PartConnectionRow,
 } from "./architecture-inspector-data";
 import { partKindLabel } from "./part-node";
+import { PartWalkthroughPanel } from "./part-walkthrough";
 
 interface ArchitectureDetailsProps {
   map: ArchitectureMap;
+  revision: number;
   selectedPart: ArchitecturePartWithChanges | undefined;
   selectedConnection: ArchitectureConnectionWithChanges | undefined;
   missingConnection?:
@@ -243,6 +245,15 @@ export function ArchitectureDetails(props: ArchitectureDetailsProps) {
       }
     >
       {componentDetails}
+      {!selectedPart.boundary &&
+        !selectedPart.unassigned &&
+        files.length > 0 && (
+          <PartWalkthroughPanel
+            partId={selectedPart.id}
+            component={map.component?.id}
+            revision={props.revision}
+          />
+        )}
       <section
         aria-label="Selected connections"
         className="space-y-3 border-b p-4"
