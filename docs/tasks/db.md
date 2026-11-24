@@ -47,15 +47,17 @@ See [architecture](../ARCHITECTURE.md#data-model).
 - [x] `getNeighborhood(id, depth, limit)`: a bounded subgraph with a truncation
       flag.
 - [x] `getCallers(id)` and `getDependencies(id)`.
-- [ ] `getStats()`: file, symbol, and edge counts for the dashboard.
+- [x] `getGraphStats(database, projectId)` returns file, symbol, edge, and
+      diagnostic counts for the project's committed revision.
 - [ ] `replaceFileGraph(path, nodes, edges, diagnostics)` inside one
       transaction.
 
 ### Phase 4: history
 
-- [x] Create tables: `snapshots` (path, revision, content), `change_events`
-      (monotonic integer id, timestamp, entity, action, before and after
-      revision, attribution), and `sessions`.
+- [x] Store revision membership in `snapshot_versions` and deduplicate
+      source in `snapshot_contents`. The `snapshots` view serves historical
+      lookups. Store events in `change_events` and monitoring sessions in
+      `sessions`.
 - [x] `commitChangeSet(...)`: one transaction that writes graph changes,
       snapshots, events, and the new revision, and returns the inserted events.
 - [x] `listChanges(cursor, limit)` for pagination.
@@ -87,7 +89,3 @@ See [architecture](../ARCHITECTURE.md#data-model).
   through these queries.
 - All writes for one change set happen in a single transaction.
 - The database file is never created inside the target repository.
-
-The schema/connection, full-project writes, and public graph queries are
-complete. Stats and per-file graph replacement remain
-unchecked above.

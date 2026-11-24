@@ -74,8 +74,10 @@ Ctrl+C. Outside a Git repository it uses the current folder.
 
 On launch, Mycel also registers attribution hooks in the user settings of any
 coding agents it detects (Codex, Claude Code, Cursor) and enables capture for
-this repository. Run `mycel --no-agent-hooks` to turn that off for the
-repository. See [See which agent made a change](#see-which-agent-made-a-change).
+this repository when setup succeeds. Run `mycel --no-agent-hooks` to skip
+registration and disable Mycel-managed capture for this repository. To remove
+a registered hook, delete it in the agent's settings. A later normal launch
+can enable capture again. See [agent setup](#see-which-agent-made-a-change).
 
 ## First walkthrough
 
@@ -147,7 +149,7 @@ Hooks you configured manually are controlled in the agent's own settings.
 | --- | --- |
 | `mycel` | Index the current repository and open the dashboard |
 | `mycel --no-open` | Start without opening a browser; open the printed URL yourself |
-| `mycel --no-agent-hooks` | Turn off automatic agent attribution for this repository |
+| `mycel --no-agent-hooks` | Skip hook registration and disable managed capture for this repository |
 | `mycel install-skill` | Add the `mycel-architecture` skill for Codex and Claude Code |
 | `mycel architecture` | Validate `.mycel/architecture.json`; exits 1 if it is missing or invalid, or a pattern matches nothing |
 | `mycel architecture --component <name-or-id>` | Show a part's files, connections, and responsibility assignments |

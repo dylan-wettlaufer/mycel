@@ -10,7 +10,8 @@ See [architecture](../ARCHITECTURE.md#http-api).
 
 - `createApp(options)` in `src/app.ts` and `startServer(port, options)` in
   `src/server.ts`. The server binds to `127.0.0.1`.
-- `GET /api/health` returns `{ status: "ok" }` (liveness only).
+- `GET /api/health` reports liveness and includes `sourceWarnings` when files
+  are unreadable.
 - `GET /api/project` returns the repository selected by the CLI, or 503.
 - Unknown `/api` routes return 404. Static files come from `apps/web/dist`, and
   HTML navigation falls back to `index.html`.
@@ -38,7 +39,8 @@ See [architecture](../ARCHITECTURE.md#http-api).
 - [ ] Extend `/api/health` with index and database status from the engine.
 - [x] Wire initial indexing and graph queries into CLI/dev startup; close storage
       on shutdown and failed startup through `startIndexedServer`.
-- [x] Add `GET /api/graph/stats` for the dashboard cards.
+- [x] Serve project-scoped counts from `GET /api/graph/stats` for the
+      committed revision.
 
 ### V0 architecture map
 
@@ -63,16 +65,18 @@ See [architecture](../ARCHITECTURE.md#http-api).
 
 ### Security
 
-- [ ] Reject API requests whose `Host` header is not `127.0.0.1:<port>` or
-      `localhost:<port>`, which guards against DNS rebinding.
-- [ ] Reject cross-origin API requests by checking `Origin`, and send no
-      permissive CORS headers.
+- [x] Require a loopback `Host` on the listener port to guard against DNS
+      rebinding.
+- [x] Require any supplied browser `Origin` to match the local dashboard.
+      The Vite proxy validates the original request before forwarding it.
 - [x] Keep the inspection APIs read-only.
 
 ### Phase 7: robustness
 
-- [ ] Clear error when the dev server's fixed port 3000 is already in use.
-- [ ] Graceful shutdown that closes SSE streams before the server closes.
+- [x] Report an occupied development port and release the project database
+      on failed startup.
+- [x] Abort active SSE streams during shutdown before waiting for HTTP
+      connections to close.
 
 ## Tests
 
@@ -81,7 +85,9 @@ See [architecture](../ARCHITECTURE.md#http-api).
 - [ ] Path traversal (`..`, absolute paths, symlinks out of the root) is
       rejected by `/api/files/content`.
 - [x] SSE delivers events in order and replays after `Last-Event-ID`.
-- [ ] Requests with a foreign `Host` or `Origin` are rejected.
+- [x] Requests with a foreign `Host` or `Origin` are rejected.
+- [x] Indexed server startup and shutdown tests cover an occupied port, storage
+      cleanup, and active SSE streams.
 
 ## Done when
 

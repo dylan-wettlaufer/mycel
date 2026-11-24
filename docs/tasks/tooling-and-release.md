@@ -9,7 +9,8 @@ release.
 - pnpm 10.34.7 workspace with `build`, `typecheck`, `test`, `start`,
   `dev:server`, and `dev:web` scripts.
 - Strict TypeScript base config in `tsconfig.json`.
-- Package tests for cli, server, and web. No continuous integration.
+- Package tests run in GitHub Actions on Ubuntu at the Node 22.22.2, 24.15.0,
+  and 26.0.0 support floors after a frozen-lockfile install.
 - ESLint and Prettier run through the root `lint` and `format` scripts.
 
 ## Tasks
@@ -18,8 +19,10 @@ release.
 
 - [x] Configure linting and formatting with root `lint` and `format` scripts.
 - [x] Add `pnpm.onlyBuiltDependencies` for SQLite and Tree-sitter.
-- [ ] Add continuous integration that runs install, build, typecheck, lint, and
-      test on macOS, Linux, and Windows with Node.js 22.
+- [x] Run frozen-lockfile installs and the package test suite in Linux CI at
+      each supported Node release floor.
+- [ ] Extend CI to macOS and Windows and add explicit build, typecheck,
+      and lint checks.
 
 ### Phase 7: testing
 

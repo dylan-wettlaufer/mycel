@@ -15,7 +15,11 @@ See [architecture](../ARCHITECTURE.md#runtime-flow).
   through core, starts the server on an OS-assigned port with graph queries,
   and opens the browser. If the browser cannot open, it
   prints the URL instead.
-- `SIGINT` and `SIGTERM` close the server and its database.
+- `SIGINT` and `SIGTERM` close the indexed server, which aborts SSE streams,
+  stops the watcher, and closes the database.
+- Normal launch sets up attribution hooks for detected agents. Use
+  `mycel --no-agent-hooks` to disable managed capture for this repository.
+  See [agent attribution](agents.md#post-v0-session-attribution).
 - Tests in `test/cli.test.mjs`.
 
 ## Tasks
@@ -28,8 +32,8 @@ See [architecture](../ARCHITECTURE.md#runtime-flow).
       index in the background so launch is not blocked.
 - [ ] Print a short indexing summary (files, symbols, duration, diagnostics)
       when the first index completes.
-- [ ] Stop the watcher and close the database on shutdown, after the server
-      closes.
+- [x] Stop the watcher and close the database through `startIndexedServer`
+      during CLI shutdown.
 - [x] Exit with a non-zero code and a clear message if the initial index fails to
       start.
 
@@ -51,10 +55,10 @@ See [architecture](../ARCHITECTURE.md#runtime-flow).
 
 ## Tests
 
-- [ ] Launch with a fixture repository and confirm `/api/health` reports the
-      index as ready.
-- [ ] Shutdown closes the server, watcher, and database without leaving the
-      process hanging.
+- [x] Launch with a fixture repository and confirm that `/api/health` responds
+      and the selected repository's graph is queryable.
+- [x] The CLI executable exits successfully on `SIGTERM` and stops serving
+      requests. Server tests cover storage and active-stream cleanup.
 
 ## Done when
 
