@@ -33,10 +33,17 @@ test("health responds with JSON over a loopback HTTP connection", async (t) => {
   assert.ok(address && typeof address === "object");
   assert.equal(address.address, "127.0.0.1");
 
-  const response = await fetch(`http://127.0.0.1:${address.port}/api/health`);
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type"), /application\/json/);
-  assert.deepEqual(await response.json(), { status: "ok" });
+  const origin = `http://127.0.0.1:${address.port}`;
+  const url = `${origin}/api/health`;
+  for (const headers of [{}, { origin }]) {
+    const response = await fetch(url, { headers });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /application\/json/);
+    assert.deepEqual(await response.json(), { status: "ok" });
+  }
+  const response = await fetch(url, { headers: { origin: "null" } });
+  assert.equal(response.status, 403);
+  await response.body?.cancel();
 });
 
 test("serves the frontend entry point and built assets from an absolute directory", async (t) => {
@@ -117,7 +124,11 @@ test("validates the local authority and any supplied browser origin", async () =
   const url = "http://localhost:4321/api/project";
   const env = { incoming: { socket: { localPort: 4321 } } };
   const request = (host, origin) =>
-    app.request(url, { headers: { host, ...(origin && { origin }) } }, env);
+    app.request(
+      url,
+      { headers: { host, ...(origin === undefined ? {} : { origin }) } },
+      env,
+    );
   assert.equal(
     (await request("localhost:4321", "http://localhost:4321")).status,
     503,
@@ -127,6 +138,7 @@ test("validates the local authority and any supplied browser origin", async () =
     assert.equal((await request(host)).status, 403);
   }
   for (const origin of [
+    "",
     "null",
     "http://localhost:4322",
     "https://example.test",
