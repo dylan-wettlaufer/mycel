@@ -16,8 +16,15 @@ architecture remains usable without a provider-specific adapter.
 
 ## Post-V0 session attribution
 
-The opt-in Claude Code, Codex, and Cursor integrations show session attribution for indexed file
-changes in Activity. The watcher remains the source of recorded file changes.
+On a normal `mycel` launch, the CLI registers hooks in the user settings of
+detected Claude Code, Codex, and Cursor installations as needed, then enables
+managed capture for the current repository when setup succeeds. Run
+`mycel --no-agent-hooks` to skip registration and disable managed capture for
+that repository. To remove a registered hook, delete it in the agent's
+settings. A later normal launch can enable capture again.
+
+The watcher records file changes. Hooks supply session evidence for those
+changes in Activity. See [agent setup and attribution](../../README.md#see-which-agent-made-a-change).
 
 ### Tasks
 
@@ -35,6 +42,8 @@ changes in Activity. The watcher remains the source of recorded file changes.
 - [x] Record attribution as `confirmed`, `inferred`, or `unknown` and
       display it on file changes in Activity.
 - [x] Expose attribution through history queries and signal updates over SSE.
+- [x] Set up hooks for detected agents on normal CLI launch and provide a
+      per-repository opt-out for managed capture.
 - [ ] Add agent session filters once users have sessions to review.
 - [ ] Record explicit agent session lifecycle events if session review needs
       them.
