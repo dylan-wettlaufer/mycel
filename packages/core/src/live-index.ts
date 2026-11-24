@@ -9,7 +9,7 @@ import {
 } from "@mycel/db";
 import type { ChangeSet } from "@mycel/db";
 import { diffGraph } from "./history.js";
-import type { ChangeEvent, Diagnostic } from "@mycel/shared";
+import type { ChangeEvent, Diagnostic, IndexProgress } from "@mycel/shared";
 import { parseFile } from "@mycel/parser";
 import { createSourceChangeQueue } from "./changes.js";
 import { buildProjectGraph, hashContent } from "./graph.js";
@@ -92,6 +92,12 @@ export async function watchRepository(options: WatchRepositoryOptions) {
   const startup: SourceChange[] = [];
   let queue: ReturnType<typeof createSourceChangeQueue> | undefined;
   const watcher = watchSourceFiles({
+  options.onInitialProgress?.({
+    status: "indexing",
+    indexedFiles: 0,
+    totalFiles: null,
+    message: "Discovering source files",
+  });
     root: options.project.root,
     ...(options.indexing === undefined ? {} : { indexing: options.indexing }),
     onChange: (change) => {
@@ -147,6 +153,15 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       root: project.root,
       indexing: project.indexing,
       initialReadErrors: captured.readErrors,
+    let latestIndex: IndexProgress = {
+      status: "ready",
+      indexedFiles: files.size,
+      totalFiles:
+        files.size +
+        [...failures.keys()].filter((path) => !files.has(path)).length,
+      revision: initialCommit.revision,
+      committedAt: new Date().toISOString(),
+    };
       initialHashes: new Map(
         captured.files.map((file) => [
           file.parsed.path,
@@ -156,7 +171,15 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       ...(options.debounceMs === undefined
         ? {}
         : { debounceMs: options.debounceMs }),
-      onError: options.onError,
+      onError: (error) => {
+        latestIndex = {
+          ...latestIndex,
+          status: "error",
+          message:
+            "The last update failed. Check the Mycel terminal for details.",
+        };
+        options.onError(error);
+      },
       onBatch: async (batch) => {
         const parseStartedAt = performance.now();
         const next = new Map(files);
@@ -240,6 +263,16 @@ export async function watchRepository(options: WatchRepositoryOptions) {
           revision,
           changedPaths: Object.freeze([...batch.files.keys()]),
           retainedPaths: Object.freeze(retainedPaths),
+        latestIndex = {
+          status: "ready",
+          indexedFiles: files.size,
+          totalFiles:
+            files.size +
+            [...batch.readErrors.keys()].filter((path) => !files.has(path))
+              .length,
+          revision,
+          committedAt: new Date().toISOString(),
+        };
           observedAt: batch.observedAt,
           completedAt,
           latencyMs: completedAt - batch.observedAt,
@@ -269,6 +302,7 @@ export async function watchRepository(options: WatchRepositoryOptions) {
       onEvent(listener: (event: ChangeEvent) => void) {
         listeners.add(listener);
         return () => {
+      getIndexProgress: () => latestIndex,
           listeners.delete(listener);
         };
       },

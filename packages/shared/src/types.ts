@@ -14,6 +14,8 @@ export interface IndexProgress {
   /** Null while discovery has not determined the total. */
   totalFiles: number | null;
   message?: string;
+  revision?: number;
+  committedAt?: string;
 }
 
 export type DatabaseStatus = "closed" | "ready" | "error";

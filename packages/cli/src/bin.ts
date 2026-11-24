@@ -139,3 +139,9 @@ main().catch((error: unknown) => {
   );
   process.exitCode = 1;
 });
+    onInitialProgress: ({ message, indexedFiles, totalFiles }) =>
+      console.info(
+        totalFiles === null
+          ? message
+          : `${message} (${indexedFiles}/${totalFiles})`,
+      ),

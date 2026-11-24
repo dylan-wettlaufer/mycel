@@ -6,6 +6,7 @@ import { parseFile } from "@mycel/parser";
 import type {
   GraphStats,
   IndexingSettings,
+  IndexProgress,
   Project,
   ProjectInfo,
 } from "@mycel/shared";
@@ -23,6 +24,7 @@ export interface IndexRepositoryOptions {
   project: ProjectInfo;
   database: SqliteDatabase;
   indexing?: Partial<IndexingSettings>;
+  onInitialProgress?(progress: IndexProgress): void;
 }
 
 export interface IndexResult extends GraphStats {
@@ -61,7 +63,10 @@ export async function indexRepository(
 }
 
 export async function captureRepository(
-  options: Pick<IndexRepositoryOptions, "project" | "indexing"> &
+  options: Pick<
+    IndexRepositoryOptions,
+    "project" | "indexing" | "onInitialProgress"
+  > &
     Partial<Pick<IndexRepositoryOptions, "database">>,
   parse: typeof parseFile = parseFile,
 ) {
@@ -77,7 +82,15 @@ export async function captureRepository(
   };
   const files: CapturedFile[] = [];
   const readErrors = new Map<string, string>();
-  for (const path of discovered.paths) {
+  const totalFiles = discovered.paths.length;
+  for (const [index, path] of discovered.paths.entries()) {
+    if (index % 100 === 0)
+      options.onInitialProgress?.({
+        status: "indexing",
+        indexedFiles: index,
+        totalFiles,
+        message: "Reading and parsing source",
+      });
     let source: string;
     try {
       source = await readRepositoryText(discovered.root, path);
@@ -95,6 +108,12 @@ export async function captureRepository(
     files.push({ source, parsed: parse(path, source) });
   }
   const paths = files.map((file) => file.parsed.path);
+  options.onInitialProgress?.({
+    status: "indexing",
+    indexedFiles: totalFiles,
+    totalFiles,
+    message: "Resolving and committing the initial graph",
+  });
   const resolution = await loadModuleResolver(
     discovered.root,
     paths,

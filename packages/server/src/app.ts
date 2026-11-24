@@ -13,6 +13,7 @@ import type {
   AgentHookSetup,
   AgentHookStatus,
   HealthResponse,
+  IndexProgress,
   ProjectInfo,
 } from "@mycel/shared";
 import { Hono } from "hono";
@@ -27,6 +28,7 @@ export interface AppOptions {
   project?: ProjectInfo;
   graph?: GraphQueries;
   getSourceWarnings?: () => string[];
+  getIndexProgress?: () => IndexProgress;
   history?: HistoryQueries;
   architecture?: ArchitectureQueries;
   agentHooks?: readonly AgentHookSetup[];
@@ -37,6 +39,7 @@ export function createApp({
   project,
   graph,
   getSourceWarnings,
+  getIndexProgress,
   history,
   architecture,
   agentHooks,
@@ -70,6 +73,7 @@ export function createApp({
 
   app.get("/api/health", (context) => {
     const response: HealthResponse = { status: "ok" };
+    if (getIndexProgress) response.index = getIndexProgress();
     const warnings = getSourceWarnings?.();
     if (warnings?.length) response.sourceWarnings = warnings;
     return context.json(response);

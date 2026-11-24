@@ -47,6 +47,8 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let running = Promise.resolve();
   let closed = false;
+  let retryAttempt = 0;
+  const retryDelays = [100, 500, 2000];
 
   async function process() {
     if (closed || !pending.size) return;
@@ -125,7 +127,23 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
   function flush(): Promise<void> {
     clearTimeout(timer);
     timer = undefined;
-    const next = running.then(process);
+    const next = running.then(process).finally(() => {
+      const delay = retryDelays[retryAttempt];
+      if (
+        closed ||
+        timer !== undefined ||
+        delay === undefined ||
+        (!pending.size && !readErrors.size)
+      )
+        return;
+      retryAttempt++;
+      timer = setTimeout(() => {
+        for (const path of readErrors.keys())
+          if (!pending.has(path)) pending.set(path, performance.now());
+        void flush().catch(options.onError);
+      }, delay);
+      timer.unref();
+    });
     running = next.catch(() => {});
     return next;
   }
@@ -134,6 +152,7 @@ export function createSourceChangeQueue(options: SourceChangeQueueOptions) {
     enqueue(change: SourceChange): void {
       if (closed) return;
       pending.set(change.path, pending.get(change.path) ?? change.observedAt);
+      retryAttempt = 0;
       clearTimeout(timer);
       timer = setTimeout(() => {
         void flush().catch(options.onError);

@@ -134,7 +134,10 @@ test("starts the dashboard and selected project before opening the browser", asy
     openBrowser: async (url) => {
       openedUrl = url;
       const health = await fetch(`${url}/api/health`);
-      assert.deepEqual(await health.json(), { status: "ok" });
+      const { status, index } = await health.json();
+      assert.equal(status, "ok");
+      assert.equal(index.revision, 1);
+      assert.equal(index.indexedFiles, 1);
       const response = await fetch(`${url}/api/project`);
       assert.deepEqual(await response.json(), { name: basename(root), root });
       const search = await fetch(`${url}/api/graph/search?q=sample`);
@@ -242,6 +245,8 @@ test(
         reject(new Error(`CLI exited with ${code}: ${errors}`));
       });
     });
+    assert.match(output, /Discovering source files/);
+    assert.match(output, /Reading and parsing source \(0\/1\)/);
     assert.ok(output.includes(`Repository: ${root}`));
     const project = await fetch(`${url}/api/project`);
     assert.deepEqual(await project.json(), { name: basename(root), root });

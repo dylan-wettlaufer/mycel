@@ -1,16 +1,15 @@
 import { once } from "node:events";
-import { openIndexedProject } from "@mycel/core";
-import type { ProjectInfo } from "@mycel/shared";
+import { openIndexedProject, type IndexedProjectOptions } from "@mycel/core";
 import type { AppOptions } from "./app.js";
 import { startServer } from "./server.js";
 
-export interface IndexedServerOptions extends Pick<
-  AppOptions,
-  "webDistPath" | "agentHooks"
-> {
-  project: ProjectInfo;
-  databasePath?: string;
-}
+export interface IndexedServerOptions
+  extends
+    Pick<AppOptions, "webDistPath" | "agentHooks">,
+    Pick<
+      IndexedProjectOptions,
+      "project" | "databasePath" | "onInitialProgress"
+    > {}
 
 /** Return a listening server with an initial index; close owns storage cleanup. */
 export async function startIndexedServer(
@@ -24,6 +23,7 @@ export async function startIndexedServer(
       project: options.project,
       graph: indexed.graph,
       getSourceWarnings: indexed.getSourceWarnings,
+      getIndexProgress: indexed.getIndexProgress,
       history: indexed.history,
       architecture: indexed.architecture,
       ...(options.agentHooks === undefined

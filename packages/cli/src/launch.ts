@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { defaultWebDistPath, startIndexedServer } from "@mycel/server";
 import open from "open";
+import type { IndexProgress } from "@mycel/shared";
 
 import { resolveRepository } from "./repository.js";
 import { setManagedHooks, setupAgentHooks } from "./setup-agent-hooks.js";
@@ -14,6 +15,7 @@ interface LaunchOptions {
   port?: number;
   openBrowser?: (url: string) => Promise<unknown>;
   agentHooks?: "enabled" | "disabled";
+  onInitialProgress?(progress: IndexProgress): void;
 }
 
 export async function launchDashboard({
@@ -23,6 +25,7 @@ export async function launchDashboard({
   port = 0,
   openBrowser = open,
   agentHooks,
+  onInitialProgress,
 }: LaunchOptions = {}) {
   const project = await resolveRepository(cwd);
   try {
@@ -42,6 +45,7 @@ export async function launchDashboard({
   const server = await startIndexedServer(port, {
     project,
     webDistPath,
+    ...(onInitialProgress && { onInitialProgress }),
     ...(databasePath === undefined ? {} : { databasePath }),
     ...(hookSetup === undefined ? {} : { agentHooks: hookSetup }),
   });

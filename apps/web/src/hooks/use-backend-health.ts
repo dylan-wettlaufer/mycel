@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { IndexProgress } from "@mycel/shared";
 
 import { fetchHealth } from "@/lib/api";
 import type { ConnectionStatus } from "@/lib/api";
@@ -7,6 +8,7 @@ const pollInterval = 5000;
 const requestTimeout = 3000;
 
 export function useBackendHealth() {
+  const [index, setIndex] = useState<IndexProgress>();
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
   const [connection, setConnection] = useState<ConnectionStatus>("checking");
 
@@ -24,6 +26,7 @@ export function useBackendHealth() {
         const health = await fetchHealth(controller.signal);
         if (!disposed) {
           setConnection("connected");
+          setIndex(health.index);
           setSourceWarnings(health.sourceWarnings ?? []);
         }
       } catch {
@@ -43,5 +46,5 @@ export function useBackendHealth() {
     };
   }, []);
 
-  return { connection, sourceWarnings };
+  return { connection, sourceWarnings, index };
 }
