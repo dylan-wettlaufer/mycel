@@ -20,7 +20,17 @@ export async function fetchHealth(
     throw new Error("Invalid health response");
   }
 
-  return { status: body.status };
+  const warnings = "sourceWarnings" in body ? body.sourceWarnings : undefined;
+  if (
+    warnings !== undefined &&
+    !(
+      Array.isArray(warnings) &&
+      warnings.every((value: unknown) => typeof value === "string")
+    )
+  ) {
+    throw new Error("Invalid source warnings");
+  }
+  return { status: body.status, ...(warnings && { sourceWarnings: warnings }) };
 }
 
 export async function fetchProject(signal: AbortSignal): Promise<ProjectInfo> {

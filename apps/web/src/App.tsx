@@ -54,7 +54,7 @@ export function App() {
     useState<ArchitectureChangeWindow>("branch");
   const activity = useActivity();
   const historyRevision = activity.revision + activity.attributionRevision;
-  const connection = useBackendHealth();
+  const { connection, sourceWarnings } = useBackendHealth();
   const { project, error } = useProject(connection);
   const architecture = useResource(
     (view === "Graph" && ((!nodeId && !files) || component || part)) ||
@@ -121,6 +121,19 @@ export function App() {
       connection={connection}
       liveConnection={activity.connection}
     >
+      {sourceWarnings.length > 0 && (
+        <details className="mb-2 max-h-32 shrink-0 overflow-y-auto rounded border border-warning p-2 text-sm">
+          <summary>
+            Index incomplete · {sourceWarnings.length} unreadable{" "}
+            {sourceWarnings.length === 1 ? "file" : "files"}
+          </summary>
+          <ul className="mt-2 list-inside list-disc break-words">
+            {sourceWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </details>
+      )}
       {view === "Graph" && (
         <GraphBreadcrumbs
           navigation={navigation}

@@ -21,9 +21,14 @@ async function main() {
     command === "agent-hook" &&
     isAgentProvider(provider) &&
     positionals.length === 2;
+  const isHistory =
+    command === "history" &&
+    positionals.length === 2 &&
+    (provider === "status" || provider === "clear");
   if (
     positionals.length &&
     !isAgentHook &&
+    !isHistory &&
     (!["architecture", "install-skill"].includes(command ?? "") ||
       positionals.length !== 1)
   )
@@ -36,6 +41,7 @@ async function main() {
   if (values.help) {
     console.info(`Usage: mycel [options]
        mycel architecture [--component <name-or-id>]
+       mycel history <status|clear>
        mycel install-skill
        mycel agent-hook <claude-code|codex|cursor>
 
@@ -47,6 +53,8 @@ Commands:
                  file is missing or invalid, or a pattern matches no file.
                  With --component, show the selected component's files, links,
                  and responsibility assignments.
+  history        Inspect source storage and event counts, or clear past history
+                 while retaining the current index.
   install-skill  Add the mycel-architecture agent skill to .agents/skills
                  (Codex) and .claude/skills (Claude Code) in this repository.
   agent-hook     Record coding agent hook metadata from stdin for local attribution.
@@ -79,6 +87,12 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
   if (command === "install-skill") {
     const { installSkill } = await import("./skill.js");
     await installSkill();
+    return;
+  }
+
+  if (isHistory) {
+    const { historyCommand } = await import("./history.js");
+    await historyCommand(provider);
     return;
   }
 

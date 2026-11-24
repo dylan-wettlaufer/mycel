@@ -33,8 +33,17 @@ Pass an external absolute `databasePath` to override the default location and
 `busyTimeoutMs` to override the timeout. Disk storage requires `projectRoot` so
 paths inside the repository can be rejected before directories/files are
 created. The caller supplies the actual repository root resolved by the CLI.
-Existing files and ancestors are canonicalized through symlinks. Relative paths,
-dangling symlinks, and internal destinations fail explicitly.
+Custom database paths canonicalize existing files and ancestors through
+symlinks. Relative paths, dangling symlinks, and internal destinations fail
+explicitly. Managed storage rejects symlinks in the Mycel directory, the
+`projects` directory, and the database file. SQLite sidecars must be regular,
+unshared files.
+
+On Unix, Mycel creates managed directories with mode `0700` and database
+files with mode `0600`. Opening an existing database corrects these modes,
+including existing WAL, shared-memory, and rollback journal files. Existing
+custom parent directories keep their configured permissions. On Windows,
+files inherit the access controls of their containing directory.
 
 Tests and temporary consumers can use
 `openDatabase({ databasePath: ":memory:" })` without a repository root.

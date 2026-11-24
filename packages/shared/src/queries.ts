@@ -12,6 +12,7 @@ import type { Diagnostic } from "./types.js";
 /** Options after HTTP parameter parsing; the server validates numeric bounds. */
 export interface SearchQuery {
   q: string;
+  kind?: "files" | "symbols";
   limit?: number;
 }
 

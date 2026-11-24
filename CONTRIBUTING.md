@@ -6,8 +6,10 @@ see the [README](README.md). Remaining work is tracked in the
 
 ## Setup
 
-Requires Node.js 22 or newer and pnpm 10.34.7 (pinned in `package.json`).
+Requires Node.js 22.x (22.22.2+), 24.x (24.15.0+), or 26.x and pnpm 10.34.7 (pinned in `package.json`).
 If pnpm is unavailable, run `npx pnpm@10.34.7` in place of `pnpm` below.
+The [CI matrix](.github/workflows/checks.yml) installs dependencies and runs
+the test suite on Node.js 22.22.2, 24.15.0, and 26.0.0.
 
 ```sh
 pnpm install

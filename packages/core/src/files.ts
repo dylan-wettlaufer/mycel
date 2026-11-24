@@ -1,3 +1,4 @@
+import type { Diagnostic } from "@mycel/shared";
 import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import { join } from "node:path";
@@ -25,6 +26,28 @@ export async function readRepositoryText(
   } finally {
     await handle.close();
   }
+}
+
+export function sourceReadDiagnostic(
+  path: string,
+  reason: string,
+  retained: boolean,
+): Diagnostic {
+  return {
+    path,
+    source: "parser",
+    severity: "error",
+    code: "source-read",
+    message: `${retained ? "Showing the last indexed version" : "Skipped file"}. Check read access and UTF-8 encoding. ${reason}`,
+    range: {
+      start: 0,
+      end: 0,
+      startLine: 1,
+      endLine: 1,
+      startColumn: 1,
+      endColumn: 1,
+    },
+  };
 }
 
 export function isMissing(error: unknown): boolean {

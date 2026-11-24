@@ -21,11 +21,11 @@ afterEach(() => {
 test("checks the same-origin health endpoint before showing connected", async () => {
   fetchMock.mockResolvedValue(Response.json({ status: "ok" }));
   const { result } = renderHook(() => useBackendHealth());
-  expect(result.current).toBe("checking");
+  expect(result.current.connection).toBe("checking");
 
   await act(async () => {});
 
-  expect(result.current).toBe("connected");
+  expect(result.current.connection).toBe("connected");
   expect(fetchMock).toHaveBeenCalledWith("/api/health", {
     signal: expect.any(AbortSignal),
     cache: "no-store",
@@ -39,13 +39,29 @@ test("detects backend loss and reconnects on subsequent polls", async () => {
     .mockResolvedValueOnce(Response.json({ status: "ok" }));
   const { result } = renderHook(() => useBackendHealth());
   await act(async () => {});
-  expect(result.current).toBe("connected");
+  expect(result.current.connection).toBe("connected");
 
   await act(() => vi.advanceTimersByTimeAsync(5000));
-  expect(result.current).toBe("disconnected");
+  expect(result.current.connection).toBe("disconnected");
 
   await act(() => vi.advanceTimersByTimeAsync(5000));
-  expect(result.current).toBe("connected");
+  expect(result.current.connection).toBe("connected");
+});
+
+test("reports unreadable sources and clears the warning after recovery", async () => {
+  fetchMock
+    .mockResolvedValueOnce(
+      Response.json({
+        status: "ok",
+        sourceWarnings: ["legacy.ts: Skipped file"],
+      }),
+    )
+    .mockResolvedValueOnce(Response.json({ status: "ok" }));
+  const { result } = renderHook(() => useBackendHealth());
+  await act(async () => {});
+  expect(result.current.sourceWarnings).toEqual(["legacy.ts: Skipped file"]);
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  expect(result.current.sourceWarnings).toEqual([]);
 });
 
 test.each([
@@ -58,7 +74,7 @@ test.each([
   fetchMock.mockResolvedValue(response());
   const { result } = renderHook(() => useBackendHealth());
   await act(async () => {});
-  expect(result.current).toBe("disconnected");
+  expect(result.current.connection).toBe("disconnected");
 });
 
 test("times out a stalled request and continues polling", async () => {
@@ -74,10 +90,10 @@ test("times out a stalled request and continues polling", async () => {
   const { result } = renderHook(() => useBackendHealth());
 
   await act(() => vi.advanceTimersByTimeAsync(3000));
-  expect(result.current).toBe("disconnected");
+  expect(result.current.connection).toBe("disconnected");
 
   await act(() => vi.advanceTimersByTimeAsync(5000));
-  expect(result.current).toBe("connected");
+  expect(result.current.connection).toBe("connected");
 });
 
 test("aborts pending requests and stops polling when unmounted", async () => {

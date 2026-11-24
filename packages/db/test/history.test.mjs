@@ -354,3 +354,41 @@ test("activity pages summarize actual file edits and recover older call endpoint
     ["deleted", "modified"],
   );
 });
+
+test("clearing project history retains only current source and permits subsequent edits", async (t) => {
+  const { manageProjectHistory, getDiff, getFileContent } =
+    await import("../dist/index.js");
+  const db = openDatabase({ databasePath: ":memory:" });
+  t.after(() => db.close());
+  const set = changeSet();
+  set.sources.set("other.ts", "a");
+  commitChangeSet(db, set);
+  set.sources.set("a.ts", "updated");
+  set.sources.delete("other.ts");
+  set.changes[0] = { ...set.changes[0], action: "modified", before: node };
+  commitChangeSet(db, set);
+  const foreign = changeSet();
+  foreign.graph.project = { ...project, root: "/other", id: "q" };
+  foreign.graph.nodes = [{ ...node, projectId: "q" }];
+  foreign.changes[0] = { ...foreign.changes[0], after: foreign.graph.nodes[0] };
+  commitChangeSet(db, foreign);
+  assert.deepEqual(manageProjectHistory(db, project.root, "status"), {
+    eventCount: 2,
+    uniqueSources: 2,
+    sourceBytes: 8,
+  });
+  assert.deepEqual(manageProjectHistory(db, project.root, "clear"), {
+    eventCount: 0,
+    uniqueSources: 1,
+    sourceBytes: 7,
+  });
+  assert.equal(getFileContent(db, "p", "other.ts", 1), undefined);
+  assert.equal(getFileContent(db, "p", "a.ts", 2).content, "updated");
+  assert.equal(getFileContent(db, "q", "a.ts", 1).content, "a");
+  assert.equal(manageProjectHistory(db, "/other", "status").eventCount, 1);
+  assert.equal(manageProjectHistory(db, "/missing", "clear"), undefined);
+  set.sources.set("a.ts", "edited again");
+  const [event] = commitChangeSet(db, set).events;
+  assert.equal(getDiff(db, "p", event.id).beforeContent, "updated");
+  assert.equal(getDiff(db, "p", event.id).afterContent, "edited again");
+});

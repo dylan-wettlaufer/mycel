@@ -23,15 +23,11 @@ export function Explorer({
   }, [query]);
   // Every indexed path has a source extension.
   const { data, error } = useResource(
-    `/api/graph/search?q=${encodeURIComponent(search || ".")}&limit=100`,
+    `/api/graph/search?q=${encodeURIComponent(search || ".")}&limit=100${filter === "all" ? "" : `&kind=${filter}`}`,
     isSearchResult,
     revision,
   );
-  const nodes = data?.nodes.filter(
-    (node) =>
-      filter === "all" ||
-      (filter === "files" ? node.kind === "file" : node.kind !== "file"),
-  );
+  const nodes = data?.nodes;
   return (
     <section className="space-y-4" aria-label="File and symbol explorer">
       <h2 className="text-xl font-semibold">Explorer</h2>

@@ -117,8 +117,10 @@ export function resolveDatabasePath(
   if (!isAbsolute(directory))
     throw new TypeError("Data directory must be absolute");
   const key = createHash("sha256").update(root).digest("hex");
-  return resolveExternalDatabasePath(
-    root,
-    join(directory, "projects", `${key}.sqlite`),
-  );
+  const base = canonicalDestination(dirname(directory));
+  const intended = join(base, basename(directory), "projects", `${key}.sqlite`);
+  const path = resolveExternalDatabasePath(root, intended);
+  if (path !== intended)
+    throw new Error("Managed database storage must not use symbolic links");
+  return path;
 }

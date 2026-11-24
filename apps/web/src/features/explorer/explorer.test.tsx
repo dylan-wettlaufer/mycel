@@ -26,11 +26,11 @@ afterEach(() => {
 test("search selects a symbol and filters file results", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
+    vi.fn().mockImplementation(async (url: string) =>
       Response.json({
         projectId: "p",
         revision: 1,
-        nodes: [node],
+        nodes: url.includes("kind=files") ? [] : [node],
         truncated: true,
       }),
     ),
@@ -42,13 +42,13 @@ test("search selects a symbol and filters file results", async () => {
   );
   expect(select).toHaveBeenCalledWith(node);
   fireEvent.click(screen.getByRole("button", { name: "files" }));
-  expect(screen.getByText("No matching files or symbols.")).toBeTruthy();
+  expect(await screen.findByText("No matching files or symbols.")).toBeTruthy();
   fireEvent.change(screen.getByRole("textbox"), {
     target: { value: "save & more" },
   });
   await vi.waitFor(() =>
     expect(fetch).toHaveBeenCalledWith(
-      "/api/graph/search?q=save%20%26%20more&limit=100",
+      "/api/graph/search?q=save%20%26%20more&limit=100&kind=files",
       expect.any(Object),
     ),
   );

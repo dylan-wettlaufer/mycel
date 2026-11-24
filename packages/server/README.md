@@ -22,7 +22,8 @@ The dev server indexes the Mycel checkout before listening on port 3000. The CLI
 does the same for its selected repository on an available port. Both use the
 per-repository SQLite database outside the source tree and close it on server
 shutdown. Each launch performs a full scan, then watches source files and commits
-changes to the graph and source history. Indexing failures abort startup with an error.
+changes to the graph and source history. A source read failure keeps any indexed
+copy of that file and allows other files to update.
 
 `startIndexedServer(port, { project, webDistPath?, databasePath? })` is the shared
 startup helper. It returns a listening server with graph routes ready. Use
@@ -37,11 +38,10 @@ curl 'http://127.0.0.1:<port>/api/health'
 ```
 
 Use the port printed by `mycel`, or 3000 for `pnpm dev:server`. The health
-endpoint reports process liveness only. Startup completes the initial index
-before listening, so a healthy response means the graph is ready. The
-dashboard's connection badge shows **Checking…**, then **Connected** after a
-successful response. It polls every five seconds and shows **Disconnected** on
-errors or after a three-second timeout.
+endpoint reports process liveness. An indexed server includes a
+`sourceWarnings` list when it retains or skips unreadable files. The dashboard
+shows these warnings alongside its connection badge. It polls every five seconds
+and shows **Disconnected** on errors or after a three-second timeout.
 
 When `webDistPath` is set, the same process serves the compiled dashboard.
 Navigation to client routes returns `index.html`; unknown API routes and
@@ -100,7 +100,7 @@ includes up to 20 source locations. If more exist, `siteCount` gives the total.
 | --- | --- | --- |
 | `/api/graph/repository` | None | Complete `RepositoryGraph` of files and directed imports, including isolated files |
 | `/api/graph/nodes/:id/symbols` | None | All declarations in a file, including nested methods, in source order |
-| `/api/graph/search` | Required `q`; optional `limit` (default 20, range 1–100) | `SearchResult` |
+| `/api/graph/search` | Required `q`; optional `kind` (`files` or `symbols`) and `limit` (default 20, range 1–100) | `SearchResult` |
 | `/api/graph/nodes/:id` | Optional `limit` for each relationship list (default 100, range 1–100) | `NodeDetails` |
 | `/api/graph/nodes/:id/neighborhood` | Optional `depth` (default 1, range 0–5) and `limit` (default 100, range 1–500) | `Neighborhood` |
 

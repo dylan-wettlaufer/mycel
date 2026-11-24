@@ -26,6 +26,7 @@ export interface AppOptions {
   webDistPath?: string;
   project?: ProjectInfo;
   graph?: GraphQueries;
+  getSourceWarnings?: () => string[];
   history?: HistoryQueries;
   architecture?: ArchitectureQueries;
   agentHooks?: readonly AgentHookSetup[];
@@ -35,14 +36,42 @@ export function createApp({
   webDistPath = defaultWebDistPath,
   project,
   graph,
+  getSourceWarnings,
   history,
   architecture,
   agentHooks,
 }: AppOptions = {}) {
-  const app = new Hono();
+  const app = new Hono<{
+    Bindings: { incoming?: { socket: { localPort?: number } } };
+  }>();
+
+  app.use("*", async (context, next) => {
+    const url = new URL(context.req.url);
+    const socket = context.env?.incoming?.socket;
+    const port = socket ? socket.localPort : Number(url.port || 80);
+    const suffix = port === 80 ? "" : `:${port}`;
+    const authority = context.req.header("host") ?? (socket ? "" : url.host);
+    const normalized = authority.toLowerCase();
+    const validHost = ["localhost", "127.0.0.1"].some(
+      (name) =>
+        normalized === name + suffix ||
+        (port === 80 && normalized === name + ":80"),
+    );
+    const origin = context.req.header("origin");
+    if (
+      !validHost ||
+      (origin !== undefined &&
+        origin !== `http://${normalized.replace(/:80$/, "")}`)
+    ) {
+      return context.json({ error: "Local dashboard requests only" }, 403);
+    }
+    return next();
+  });
 
   app.get("/api/health", (context) => {
     const response: HealthResponse = { status: "ok" };
+    const warnings = getSourceWarnings?.();
+    if (warnings?.length) response.sourceWarnings = warnings;
     return context.json(response);
   });
 

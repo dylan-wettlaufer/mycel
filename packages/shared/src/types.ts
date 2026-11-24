@@ -3,6 +3,7 @@ export interface HealthResponse {
   /** Absent until the engine is attached; status still describes process liveness. */
   index?: IndexProgress;
   database?: DatabaseStatus;
+  sourceWarnings?: string[];
 }
 
 export type IndexStatus = "idle" | "indexing" | "ready" | "error";

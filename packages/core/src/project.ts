@@ -24,6 +24,7 @@ export interface IndexedProject {
   history: HistoryQueries;
   architecture: ArchitectureQueries;
   readonly lastUpdate: GraphUpdateTiming | undefined;
+  getSourceWarnings(): string[];
   flush(): Promise<void>;
   close(): void;
 }
@@ -76,6 +77,7 @@ export async function openIndexedProject(
       get lastUpdate() {
         return live.lastUpdate;
       },
+      getSourceWarnings: live.getSourceWarnings,
       flush: live.flush,
       close: () => {
         shutdown.abort();

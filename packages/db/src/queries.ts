@@ -10,6 +10,7 @@ import type {
   NodeDetails,
   NodeList,
   ProjectId,
+  SearchQuery,
   SearchResult,
   SourceRange,
 } from "@mycel/shared";
@@ -76,6 +77,7 @@ export function searchSymbols(
   projectId: ProjectId,
   query: string,
   limit = 20,
+  kind?: SearchQuery["kind"],
 ): SearchResult {
   validateInteger("limit", limit, 1);
   const q = query.trim();
@@ -88,6 +90,7 @@ export function searchSymbols(
             {
               projectId: string;
               q: string;
+              kind: string | null;
               prefix: string;
               match: string;
               limit: number;
@@ -95,7 +98,9 @@ export function searchSymbols(
             NodeRow
           >(
             `SELECT ${nodeColumns} FROM nodes n
-            WHERE n.project_id = @projectId AND (
+            WHERE n.project_id = @projectId
+              AND (@kind IS NULL OR (@kind = 'files' AND n.kind = 'file')
+                OR (@kind = 'symbols' AND n.kind <> 'file')) AND (
               n.name LIKE @match ESCAPE '\\' OR
               n.qualified_name LIKE @match ESCAPE '\\' OR
               n.path LIKE @match ESCAPE '\\'
@@ -113,6 +118,7 @@ export function searchSymbols(
           .all({
             projectId,
             q,
+            kind: kind ?? null,
             prefix: `${escaped}%`,
             match: `%${escaped}%`,
             limit: probeLimit(limit),

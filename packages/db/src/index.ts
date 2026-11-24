@@ -29,7 +29,7 @@ export {
 } from "./history.js";
 export { getEventsAfter } from "./history.js";
 export { getDiff } from "./history.js";
-export { pruneHistory } from "./history.js";
+export { manageProjectHistory, pruneHistory } from "./history.js";
 export { startMonitoringSession, endMonitoringSession } from "./sessions.js";
 export { recordAgentToolEvents, getAgentHookActivity } from "./agents.js";
 

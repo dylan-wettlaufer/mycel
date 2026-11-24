@@ -6,7 +6,7 @@ import type {
 } from "@mycel/shared";
 import { existsSync } from "node:fs";
 import Database from "better-sqlite3";
-import type { SqliteDatabase } from "./database.js";
+import { secureDatabaseFiles, type SqliteDatabase } from "./database.js";
 import { resolveDatabasePath, resolveExternalDatabasePath } from "./paths.js";
 
 const matchWindowMs = 5_000;
@@ -249,6 +249,7 @@ export function recordAgentToolEvents(
       ? resolveDatabasePath(projectRoot)
       : resolveExternalDatabasePath(projectRoot, databasePath);
   if (!existsSync(path)) return;
+  secureDatabaseFiles(path, databasePath === undefined, false);
   const db = new Database(path, { fileMustExist: true, timeout: 1_000 });
   try {
     db.pragma("foreign_keys = ON");

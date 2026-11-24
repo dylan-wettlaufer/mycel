@@ -6,7 +6,8 @@ import type { ConnectionStatus } from "@/lib/api";
 const pollInterval = 5000;
 const requestTimeout = 3000;
 
-export function useBackendHealth(): ConnectionStatus {
+export function useBackendHealth() {
+  const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
   const [connection, setConnection] = useState<ConnectionStatus>("checking");
 
   useEffect(() => {
@@ -20,8 +21,11 @@ export function useBackendHealth(): ConnectionStatus {
       requestTimer = setTimeout(() => controller.abort(), requestTimeout);
 
       try {
-        await fetchHealth(controller.signal);
-        if (!disposed) setConnection("connected");
+        const health = await fetchHealth(controller.signal);
+        if (!disposed) {
+          setConnection("connected");
+          setSourceWarnings(health.sourceWarnings ?? []);
+        }
       } catch {
         if (!disposed) setConnection("disconnected");
       } finally {
@@ -39,5 +43,5 @@ export function useBackendHealth(): ConnectionStatus {
     };
   }, []);
 
-  return connection;
+  return { connection, sourceWarnings };
 }

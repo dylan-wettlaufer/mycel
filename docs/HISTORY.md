@@ -41,13 +41,28 @@ returns 503; unknown or pruned diffs return 404.
 
 ## Storage and retention
 
-History is kept indefinitely by default. Each committed revision currently
-captures all accepted source files, favoring simple reliable diffs over storage
-compression. `@mycel/db` exposes the explicit administrative operation
-`pruneHistory(database, projectId, beforeId)`: delete events strictly before an
-ID and remove snapshots no longer needed by retained events or the current
-revision. There is no automatic pruning or mutating HTTP route. Replay after a
-pruned cursor returns only retained events; it cannot restore deleted history.
+Mycel keeps history until you clear it. Each revision records which source
+content belongs to each path. Identical source text is stored once per project,
+including across renames and reversions. Upgrading an older index converts its
+existing snapshots transactionally and preserves exact revision lookups.
+The first migration may need temporary disk space while both representations exist.
+
+From anywhere in the repository, run `mycel history status` to display the
+database path, SQLite page allocation, recorded event count, and byte count for
+unique source content. Page allocation covers the database and its indexes.
+The source byte count includes the current index.
+
+Run `mycel history clear` to remove recorded events, prior source snapshots,
+agent evidence, and completed monitoring sessions for this project. Mycel keeps
+the current graph and source as a baseline for the next diff. The command
+compacts the database and truncates its write-ahead log to reclaim space. If a
+concurrent connection blocks compaction, close other Mycel sessions for the
+repository and run the command again. A running watcher can record subsequent
+edits. Reload open dashboards to discard activity already loaded in memory.
+
+For partial retention, `pruneHistory(database, projectId, beforeId)` deletes
+events before an exclusive ID. It preserves current source and both source
+sides of retained events. Cursor replay resumes with retained events.
 
 `commitChangeSet` accepts a complete graph and source capture plus changes
 computed by core. The caller is responsible for supplying matching graph facts
