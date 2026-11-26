@@ -9,7 +9,9 @@ behind it. As you or a coding agent save changes, the map updates and
 **Activity** shows what changed, which relationships were added or removed,
 and which agent made the edit.
 
-**Status:** V0, pre-release. Mycel indexes TypeScript, TSX, and Python.
+**Status:** V0 is available on npm as
+[`@dylan-wettlaufer/mycel`](https://www.npmjs.com/package/@dylan-wettlaufer/mycel).
+Mycel indexes TypeScript, TSX, and Python.
 
 - [Features](#features)
 - [Quickstart](#quickstart)
@@ -46,8 +48,6 @@ connections from module-level imports.
 - Git
 
 ### Install from npm
-
-The scoped package will be available after the first npm release.
 
 ```sh
 npm install -g @dylan-wettlaufer/mycel

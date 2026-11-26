@@ -1,8 +1,7 @@
 # Tooling, testing, and release tasks
 
 Cross-cutting work that does not belong to a single package: workspace setup,
-code quality, end-to-end testing, performance, packaging, and the first
-release.
+code quality, end-to-end testing, performance, packaging, and releases.
 
 ## Current state
 
@@ -45,23 +44,23 @@ release.
 
 - [x] Bundle the internal packages, dashboard, and agent skill into one npm
       package, with `mycel` as the executable.
-- [ ] Confirm publishing access for `@dylan-wettlaufer/mycel` or verify that
-      npm will allow the release account to claim `mycel`.
+- [x] Confirm publishing access for `@dylan-wettlaufer/mycel`.
 - [ ] Verify native dependency installs (prebuilt binaries) on each platform.
 - [x] Test a global install and `npm exec` from the packed tarball outside
       the workspace.
 
 Run `pnpm package` to build a tarball in `dist/npm/`, or `pnpm test:package`
-to build it and test both install paths. Set the release version in
+to build it and test both install paths. For future releases, set the version in
 `packages/cli/package.json` before building the release tarball. Publish the
-tested tarball with public access once the release account is confirmed.
+tested tarball with public access.
 
 ### Phase 7: documentation and release
 
 - [ ] Keep `README.md` and `docs/ARCHITECTURE.md` current as phases land.
 - [ ] Write a short demo walkthrough.
 - [x] Include the MIT `LICENSE`.
-- [ ] Publish the initial open-source release.
+- [x] Publish the initial open-source release as
+      [`@dylan-wettlaufer/mycel@0.1.0`](https://www.npmjs.com/package/@dylan-wettlaufer/mycel/v/0.1.0).
 
 ## Done when
 
