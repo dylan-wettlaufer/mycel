@@ -204,9 +204,12 @@ See [V0 acceptance criteria](../mycel_prd.md#minimum-v0-scope).
 
 `pnpm build` builds the workspace in dependency order. `pnpm typecheck` builds
 and then checks all packages. `pnpm test` runs package tests, and
-`pnpm test:workflow` runs the Chromium workflows. The CLI currently locates the
-dashboard relative to the checkout. Bundling it into the CLI package remains a
-[release task](tasks/tooling-and-release.md).
+`pnpm test:workflow` runs the Chromium workflows.
+
+`pnpm package` builds the standalone npm tarball. The installed CLI resolves
+the bundled dashboard and agent skill relative to its installation. npm installs
+SQLite and Tree-sitter as dependencies. `pnpm test:package` tests the tarball
+outside the workspace. See the [release checklist](tasks/tooling-and-release.md).
 
 ## Task lists
 
