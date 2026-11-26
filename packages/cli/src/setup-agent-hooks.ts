@@ -88,7 +88,7 @@ function isManagedCommand(
   return (
     entry.command === hookCommand(provider) ||
     executable === "mycel" ||
-    /^'(?:[^']|'"'"')+' '(?:[^']|'"'"')*\/(?:packages\/cli|@mycel\/cli|node_modules\/mycel)\/dist\/bin\.js'$/.test(
+    /^'(?:[^']|'"'"')+' '(?:[^']|'"'"')*\/(?:packages\/cli|@mycel\/cli|node_modules\/(?:@dylan-wettlaufer\/)?mycel)\/dist\/bin\.js'$/.test(
       executable,
     )
   );

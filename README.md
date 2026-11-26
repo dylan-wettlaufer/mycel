@@ -9,8 +9,7 @@ behind it. As you or a coding agent save changes, the map updates and
 **Activity** shows what changed, which relationships were added or removed,
 and which agent made the edit.
 
-**Status:** V0, pre-release. Mycel installs from source; there is no npm
-package yet. It indexes TypeScript, TSX, and Python.
+**Status:** V0, pre-release. Mycel indexes TypeScript, TSX, and Python.
 
 - [Features](#features)
 - [Quickstart](#quickstart)
@@ -44,10 +43,21 @@ connections from module-level imports.
 ### Requirements
 
 - Node.js 22.x (22.22.2+), 24.x (24.15.0+), or 26.x
-- pnpm 10.34.7 (or run `npx pnpm@10.34.7` in place of `pnpm`)
 - Git
 
+### Install from npm
+
+The scoped package will be available after the first npm release.
+
+```sh
+npm install -g @dylan-wettlaufer/mycel
+```
+
+To run Mycel without a global install, use `npx @dylan-wettlaufer/mycel`.
+
 ### Install from source
+
+Use pnpm 10.34.7 (or run `npx pnpm@10.34.7` in place of `pnpm`).
 
 ```sh
 git clone https://github.com/dylan-wettlaufer/mycel.git
@@ -185,8 +195,9 @@ The only files Mycel writes to your repository are the ones you ask for:
 
 ## Troubleshooting
 
-- **`mycel: command not found`.** Run `pnpm setup`, restart your shell, and
-  repeat the link step in [Install from source](#install-from-source).
+- **`mycel: command not found`.** For an npm install, check that the global npm
+  executables directory is on `PATH`. For a source install, run `pnpm setup`,
+  restart your shell, and repeat the link step in [Install from source](#install-from-source).
 - **The browser didn't open.** Copy the URL printed in the terminal, or start
   with `mycel --no-open`.
 - **The map is empty.** Save a TypeScript, TSX, or Python file in a path that
@@ -214,5 +225,4 @@ workspace layout. Remaining work is tracked in the
 
 ## License
 
-Mycel does not have a license yet. Choosing one is tracked in the
-[release tasks](docs/tasks/tooling-and-release.md).
+Mycel is available under the [MIT License](LICENSE).

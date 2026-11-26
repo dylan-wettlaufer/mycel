@@ -24,14 +24,17 @@
     "lint:fix": "eslint . --fix --max-warnings 0",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,yaml,yml,css,html}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,yaml,yml,css,html}\"",
+    "package": "pnpm --filter @mycel/cli... --filter @mycel/web... build && node scripts/package-cli.mjs && npm pack ./dist/npm/package --pack-destination ./dist/npm",
     "start": "node packages/cli/dist/bin.js",
     "test": "pnpm -r --workspace-concurrency=1 --if-present test",
+    "test:package": "pnpm package && node --test scripts/test-package.mjs",
     "typecheck": "pnpm run build && pnpm -r typecheck",
     "test:workflow": "pnpm build && node scripts/test-architecture-map.mjs && node scripts/test-dashboard.mjs && node scripts/test-relationship-review.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "^1.65.1",
+    "esbuild": "0.28.2",
     "eslint": "10.15.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "7.1.1",
