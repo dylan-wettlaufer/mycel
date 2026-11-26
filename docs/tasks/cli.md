@@ -48,10 +48,9 @@ See [architecture](../ARCHITECTURE.md#runtime-flow).
 - [ ] Detect a stale or already-running Mycel instance for the same repository
       and either reuse its URL or explain how to stop it.
 - [ ] Handle uncaught errors and unhandled rejections with a clean shutdown.
-- [ ] Stop relying on the relative path into `apps/web/dist`. Copy the built
-      dashboard into the CLI package (for example `dist/web`) during build so
-      the published package is self-contained.
-- [ ] Test `npm install -g` from a packed tarball outside the monorepo.
+- [x] Copy the built dashboard into `dist/web` in the standalone CLI package
+      and serve it relative to the installed module.
+- [x] Test `npm install -g` from a packed tarball outside the monorepo.
 
 ## Tests
 

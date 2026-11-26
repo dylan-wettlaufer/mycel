@@ -1,5 +1,6 @@
 import { access } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { defaultWebDistPath, startIndexedServer } from "@mycel/server";
 import open from "open";
@@ -11,6 +12,13 @@ import {
   setManagedHooks,
   setupAgentHooks,
 } from "./setup-agent-hooks.js";
+
+declare const __MYCEL_STANDALONE__: boolean;
+const standalone =
+  typeof __MYCEL_STANDALONE__ !== "undefined" && __MYCEL_STANDALONE__;
+const dashboardPath = standalone
+  ? fileURLToPath(new URL("./web/", import.meta.url))
+  : defaultWebDistPath;
 
 interface LaunchOptions {
   cwd?: string;
@@ -24,7 +32,7 @@ interface LaunchOptions {
 
 export async function launchDashboard({
   cwd = process.cwd(),
-  webDistPath = defaultWebDistPath,
+  webDistPath = dashboardPath,
   databasePath,
   port = 0,
   openBrowser = open,
@@ -36,7 +44,9 @@ export async function launchDashboard({
     await access(join(webDistPath, "index.html"));
   } catch (error) {
     throw new Error(
-      "Dashboard build not found. Run pnpm build in the Mycel workspace first.",
+      standalone
+        ? "Dashboard build not found. Reinstall the Mycel npm package."
+        : "Dashboard build not found. Run pnpm build in the Mycel workspace first.",
       { cause: error },
     );
   }

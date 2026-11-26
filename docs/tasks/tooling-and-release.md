@@ -43,19 +43,24 @@ release.
 
 ### Phase 7: packaging
 
-- [ ] Bundle the built dashboard into the CLI package so it runs outside the
-      monorepo.
-- [ ] Decide whether to publish one package (`mycel`) with internal packages
-      bundled in, or several scoped packages.
+- [x] Bundle the internal packages, dashboard, and agent skill into one npm
+      package, with `mycel` as the executable.
+- [ ] Confirm publishing access for `@dylan-wettlaufer/mycel` or verify that
+      npm will allow the release account to claim `mycel`.
 - [ ] Verify native dependency installs (prebuilt binaries) on each platform.
-- [ ] Test `npm install -g` and `npx` from a packed tarball in a clean
-      environment.
+- [x] Test a global install and `npm exec` from the packed tarball outside
+      the workspace.
+
+Run `pnpm package` to build a tarball in `dist/npm/`, or `pnpm test:package`
+to build it and test both install paths. Set the release version in
+`packages/cli/package.json` before building the release tarball. Publish the
+tested tarball with public access once the release account is confirmed.
 
 ### Phase 7: documentation and release
 
 - [ ] Keep `README.md` and `docs/ARCHITECTURE.md` current as phases land.
 - [ ] Write a short demo walkthrough.
-- [ ] Choose a license and add `LICENSE`.
+- [x] Include the MIT `LICENSE`.
 - [ ] Publish the initial open-source release.
 
 ## Done when

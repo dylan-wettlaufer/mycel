@@ -158,10 +158,6 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
     ...(values["no-open"] ? { openBrowser: async () => {} } : {}),
   });
 
-  console.info(
-    `Mycel · ${project.name}\nRepository: ${project.root}\nDashboard: ${url}\nPress Ctrl+C to stop.`,
-  );
-
   server.on("error", (error) => {
     console.error(`Mycel server failed: ${error.message}`);
     process.exitCode = 1;
@@ -175,6 +171,10 @@ Outside Git, the current folder is used. Press Ctrl+C to stop.`);
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
+
+  console.info(
+    `Mycel · ${project.name}\nRepository: ${project.root}\nDashboard: ${url}\nPress Ctrl+C to stop.`,
+  );
 }
 
 main().catch((error: unknown) => {

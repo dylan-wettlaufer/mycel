@@ -21,31 +21,49 @@ async function fixture(t, onBatch, debounceMs = 30) {
     onError: (e) => errors.push(e),
   });
   t.after(() => queue.close());
-  const enqueue = (path = "main.ts") =>
-    queue.enqueue({ kind: "change", path, observedAt: performance.now() });
+  const enqueue = (path = "main.ts") => {
+    const observedAt = performance.now();
+    queue.enqueue({ kind: "change", path, observedAt });
+    return observedAt;
+  };
   return { root, queue, errors, enqueue };
 }
 
 test("debounces bursts and skips identical content, including revert saves", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const debounceMs = 30;
   const batches = [];
-  const { root, queue, enqueue, errors } = await fixture(t, async (b) => {
-    batches.push(b);
-  });
+  const committed = Promise.withResolvers();
+  const { root, queue, enqueue, errors } = await fixture(
+    t,
+    async (batch) => {
+      batches.push(batch);
+      committed.resolve();
+    },
+    debounceMs,
+  );
   enqueue();
   await queue.flush();
   assert.equal(batches.length, 0);
-  for (const source of ["one", "two", "final"]) {
-    await writeFile(join(root, "main.ts"), source);
+  const path = join(root, "main.ts");
+  await writeFile(path, "one");
+  const observedAt = enqueue();
+  for (const source of ["two", "final"]) {
+    t.mock.timers.tick(debounceMs - 1);
+    await writeFile(path, source);
     enqueue();
   }
-  await setTimeout(120);
+  t.mock.timers.tick(debounceMs - 1);
+  assert.equal(batches.length, 0);
+  t.mock.timers.tick(1);
+  await committed.promise;
   await queue.flush();
   assert.equal(batches.length, 1);
   assert.deepEqual([...batches[0].files], [["main.ts", "final"]]);
-  assert.ok(batches[0].observedAt <= performance.now() - 30);
-  await writeFile(join(root, "main.ts"), "temporary");
+  assert.equal(batches[0].observedAt, observedAt);
+  await writeFile(path, "temporary");
   enqueue();
-  await writeFile(join(root, "main.ts"), "final");
+  await writeFile(path, "final");
   enqueue();
   await queue.flush();
   assert.equal(batches.length, 1);
